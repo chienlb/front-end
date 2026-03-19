@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { competitionService } from "@/services/competition.service"; // Import interface
+import { userService } from "@/services/user.service";
+import { ranksService } from "@/services/ranks.service";
 
 import {
   Trophy,
@@ -32,6 +34,7 @@ interface Competition {
   reward: string;
   myRank?: number;
   myScore?: number;
+  isCompleted?: boolean;
   imageBg: string;
 }
 
@@ -61,19 +64,60 @@ export default function StudentCompetitionsPage() {
       try {
         setLoading(true);
         const response: any = await competitionService.getAllCompetitions();
+        const profileRes: any = await userService.getProfile().catch(() => null);
+        const profileId: string | null =
+          (profileRes?._id ?? profileRes?.data?._id ?? profileRes?.id) ?? null;
 
-        console.log("DỮ LIỆU CUỘC THI:", response);
+        let ranksRes: any = null;
+        if (typeof profileId === "string" && profileId) {
+          ranksRes = await ranksService
+            .getRanksByUser(profileId)
+            .catch(() => null);
+        }
 
-        // `api` interceptor returns `response.data` directly.
-        // Supported shapes:
-        // - Array<Competition>
-        // - { data: Array<Competition>, ...pagination }
-        // - { items: Array<Competition>, ... }
+        // Normalize competitions list
         const rawList =
           (Array.isArray(response) ? response : null) ??
           (Array.isArray(response?.data) ? response.data : null) ??
           (Array.isArray(response?.items) ? response.items : null) ??
           [];
+
+        // If profileId is missing, no need to mark completed
+        const rawRanks: any[] = Array.isArray(ranksRes) ? ranksRes : [];
+
+        const ranksByCompetitionId: Record<
+          string,
+          { rank?: number; score?: number }
+        > = {};
+        for (const r of rawRanks) {
+          const competitionId =
+            typeof r?.idCompetition === "string"
+              ? r.idCompetition
+              : typeof r?.competitionId === "string"
+                ? r.competitionId
+                : typeof r?.id === "string"
+                  ? r.id
+                  : null;
+
+          if (!competitionId) continue;
+
+          ranksByCompetitionId[competitionId] = {
+            rank:
+              typeof r?.rank === "number"
+                ? r.rank
+                : typeof r?.position === "number"
+                  ? r.position
+                  : undefined,
+            score:
+              typeof r?.score === "number"
+                ? r.score
+                : typeof r?.points === "number"
+                  ? r.points
+                  : undefined,
+          };
+        }
+
+        console.log("DỮ LIỆU CUỘC THI:", response);
 
         const now = Date.now();
         const normalized = rawList.map((c: any) => {
@@ -90,6 +134,9 @@ export default function StudentCompetitionsPage() {
             else status = "UPCOMING";
           }
 
+          const compId = String(c?._id ?? c?.id ?? "");
+          const my = ranksByCompetitionId[compId];
+
           return {
             ...c,
             _id: c?._id ?? c?.id,
@@ -102,6 +149,10 @@ export default function StudentCompetitionsPage() {
             reward: c?.reward ?? c?.prize ?? c?.gift ?? "---",
             totalParticipants:
               c?.totalParticipants ?? c?.participants ?? c?.participantCount ?? 0,
+            myRank: my?.rank,
+            myScore: my?.score,
+            isCompleted:
+              typeof my?.score === "number" || typeof my?.rank === "number",
           };
         });
 
@@ -130,6 +181,10 @@ export default function StudentCompetitionsPage() {
 
   const goToLeaderboard = (compId: string) => {
     router.push(`/competitions/${compId}/leaderboard`);
+  };
+
+  const goToMyRanks = () => {
+    router.push(`/competitions/my-ranks`);
   };
 
   return (
@@ -220,6 +275,16 @@ export default function StudentCompetitionsPage() {
           >
             <Clock size={18} />
             Lịch sử tham gia
+          </button>
+        </div>
+
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={goToMyRanks}
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#ECE7F6] bg-white px-5 py-3 text-sm font-black text-[#5b21b6] shadow-primary-card hover:bg-white transition"
+          >
+            <Trophy size={16} />
+            Xem thứ hạng của tôi
           </button>
         </div>
 
@@ -321,7 +386,14 @@ export default function StudentCompetitionsPage() {
 
                   {/* Footer Action */}
                   <div className="mt-auto">
-                    {comp.status === "HAPPENING" ? (
+                    {comp.isCompleted ? (
+                      <button
+                        disabled
+                        className="w-full py-3.5 bg-slate-100 text-slate-400 rounded-2xl font-bold transition flex items-center justify-center gap-2 cursor-not-allowed opacity-80"
+                      >
+                        <Lock size={18} /> Đã thi xong
+                      </button>
+                    ) : comp.status === "HAPPENING" ? (
                       <button
                         onClick={() => goToPlay(comp._id)}
                         className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2 group-hover:scale-[1.02] active:scale-95"

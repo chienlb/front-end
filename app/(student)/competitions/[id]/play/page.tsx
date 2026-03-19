@@ -13,6 +13,8 @@ import {
   Menu,
 } from "lucide-react";
 import { competitionService } from "@/services/competition.service";
+import { userService } from "@/services/user.service";
+import { ranksService } from "@/services/ranks.service";
 
 export default function ExamPage({ params }: { params: Promise<{ id: string }> }) {
 
@@ -28,7 +30,13 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
   const [loading, setLoading] = useState(true);
-  const [userResult, setUserResult] = useState<{ score: number; correctCount: number } | null>(null);
+  const [userResult, setUserResult] = useState<{
+    score: number;
+    correctCount?: number | null;
+  } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [rankChecking, setRankChecking] = useState(true);
 
   useEffect(() => {
     const fetchExam = async () => {
@@ -57,16 +65,63 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     fetchExam();
   }, [competitionId]);
 
+  // Nếu user đã có rank trong kỳ thi => khóa thi lại.
+  useEffect(() => {
+    let alive = true;
+
+    const checkAlreadySubmitted = async () => {
+      try {
+        setRankChecking(true);
+
+        const profileRes: any = await userService.getProfile();
+        const userId =
+          profileRes?._id ?? profileRes?.data?._id ?? profileRes?.id ?? null;
+        if (!userId) return;
+
+        const rankRes: any = await ranksService.getUserRankInCompetition(
+          String(competitionId),
+          String(userId),
+        );
+
+        if (!alive) return;
+
+        const score =
+          typeof rankRes?.score === "number"
+            ? rankRes.score
+            : typeof rankRes?.points === "number"
+              ? rankRes.points
+              : 0;
+
+        setUserResult({ score, correctCount: null });
+        setIsSubmitted(true);
+      } catch (e: any) {
+        const status = e?.response?.status ?? e?.status;
+        if (status !== 404) {
+          console.error("Lỗi kiểm tra rank:", e);
+        }
+      } finally {
+        if (!alive) return;
+        setRankChecking(false);
+      }
+    };
+
+    checkAlreadySubmitted();
+
+    return () => {
+      alive = false;
+    };
+  }, [competitionId]);
+
 
   useEffect(() => {
-    if (!loading && timeLeft > 0 && !isSubmitted) {
+    if (!loading && !rankChecking && timeLeft > 0 && !isSubmitted && !submitting) {
       const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
       return () => clearInterval(timer);
     }
-    else if (!loading && timeLeft === 0 && !isSubmitted) {
-      handleAutoSubmit();
+    else if (!loading && !rankChecking && timeLeft === 0 && !isSubmitted && !submitting) {
+      void handleAutoSubmit();
     }
-  }, [timeLeft, isSubmitted, loading]);
+  }, [timeLeft, isSubmitted, loading, submitting, rankChecking]);
 
   const formatTime = (s: number) => {
     const min = Math.floor(s / 60);
@@ -86,7 +141,12 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const processSubmit = () => {
+  const processSubmit = async () => {
+    if (submitting || isSubmitted) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
     let score = 0;
     let correctCount = 0;
 
@@ -97,20 +157,32 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       }
     });
 
+    // Luôn hiển thị kết quả ngay để UX mượt
     setUserResult({ score, correctCount });
-    setIsSubmitted(true);
 
+    try {
+      await competitionService.submitCompetition({
+        competitionId,
+        score,
+      });
+    } catch (e: any) {
+      console.error("Lỗi submit competition:", e);
+      setSubmitError(e?.response?.data?.message ?? "Nộp bài nhưng không cập nhật được xếp hạng.");
+    } finally {
+      setIsSubmitted(true);
+      setSubmitting(false);
+    }
   };
 
   const handleUserSubmit = () => {
     if (confirm("Bạn chắc chắn muốn nộp bài sớm?")) {
-      processSubmit();
+      void processSubmit();
     }
   };
 
-  const handleAutoSubmit = () => {
+  const handleAutoSubmit = async () => {
     alert("Hết giờ làm bài! Hệ thống sẽ tự động nộp bài.");
-    processSubmit();
+    await processSubmit();
   };
 
   const totalScore = questions.reduce((acc, cur) => acc + (cur.score || 0), 0);
@@ -134,7 +206,9 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <p className="text-xs font-bold text-slate-500 uppercase mb-1">Số câu đúng</p>
               <p className="text-3xl font-black text-slate-800">
-                {userResult.correctCount}/{questions.length}
+                {typeof userResult.correctCount === "number"
+                  ? `${userResult.correctCount}/${questions.length}`
+                  : "—"}
               </p>
             </div>
           </div>
@@ -145,12 +219,18 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
           >
             Quay lại trang chủ
           </button>
+
+          {submitError && (
+            <p className="mt-4 text-sm font-semibold text-rose-600">
+              {submitError}
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
-  if (loading) {
+  if (loading || rankChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="text-center">

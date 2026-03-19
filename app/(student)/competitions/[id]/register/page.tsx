@@ -50,10 +50,15 @@ export default function CompetitionRegisterPage({
 
   const handleRegister = async () => {
     setRegistering(true);
-    // Giả lập gọi API đăng ký
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setRegistering(false);
-    setIsRegistered(true);
+    try {
+      await competitionService.joinCompetition(competitionId);
+      setIsRegistered(true);
+    } catch (err) {
+      console.error("Lỗi đăng ký cuộc thi:", err);
+      alert("Đăng ký thất bại. Vui lòng thử lại sau nhé.");
+    } finally {
+      setRegistering(false);
+    }
   };
 
   return (
@@ -164,7 +169,7 @@ export default function CompetitionRegisterPage({
                   </button>
                 ) : (
                   <button
-                    onClick={() => router.push(`/competitions/${comp._id}/play`)}
+                    onClick={() => router.push(`/competitions/${competitionId}/play`)}
                     className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 animate-pulse"
                   >
                     <Zap size={20} fill="currentColor" /> Vào phòng thi

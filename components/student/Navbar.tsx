@@ -166,6 +166,12 @@ export default function Navbar() {
           desc: "Trò chuyện bạn bè",
         },
         {
+          name: "Nhóm của tôi",
+          path: "/my-groups",
+          icon: Users,
+          desc: "Tìm kiếm và nhắn tin theo nhóm",
+        },
+        {
           name: "Cộng đồng",
           path: "/community",
           icon: MessageCircle,
