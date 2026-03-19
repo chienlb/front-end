@@ -24,11 +24,11 @@ const GRADE_TABS = [
   { key: "advanced", label: "Nâng cao" },
 ];
 const CARD_THEMES = [
-  { bg: "#FFF0F0", color: "#FF6B6B", shadow: "shadow-red-200" },
-  { bg: "#E0F9F6", color: "#4ECDC4", shadow: "shadow-teal-200" },
-  { bg: "#FFFBE6", color: "#F6E05E", shadow: "shadow-yellow-200" },
-  { bg: "#F3E8FF", color: "#9F7AEA", shadow: "shadow-purple-200" },
-  { bg: "#E8F4FD", color: "#3B82F6", shadow: "shadow-blue-200" },
+  { bg: "#FCEFF4", color: "#C86B90", shadow: "shadow-rose-100" },
+  { bg: "#EEF8F5", color: "#5C9F92", shadow: "shadow-teal-100" },
+  { bg: "#FFF7E9", color: "#C79048", shadow: "shadow-amber-100" },
+  { bg: "#F4F1FF", color: "#7B6ED6", shadow: "shadow-violet-100" },
+  { bg: "#EDF5FF", color: "#5E8FC0", shadow: "shadow-sky-100" },
 ];
 
 function getGradeLabel(grade: string) {
@@ -165,9 +165,7 @@ function LiteraturesPageContent() {
   // --- 3. LOADING STATE ---
   if (loading)
     return (
-      <div className="relative flex h-screen flex-col items-center justify-center">
-        <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url(/images/cartoon-children-playing-together-outdoors.jpg)" }} />
-        <div className="fixed inset-0 z-0 bg-[linear-gradient(180deg,rgba(255,248,251,0.78),rgba(240,249,255,0.72),rgba(255,251,235,0.76))]" aria-hidden />
+      <div className="relative flex h-screen flex-col items-center justify-center bg-white">
         <div className="relative z-10 flex flex-col items-center gap-3">
           <div className="w-12 h-12 rounded-full border-4 border-[#e9e5ff] border-t-[#7c3aed] animate-spin" />
           <p className="text-[#5b4b8a] font-semibold text-sm">Đang tải thư viện...</p>
@@ -176,11 +174,11 @@ function LiteraturesPageContent() {
     );
 
   return (
-    <div className="min-h-screen relative font-sans text-slate-800 pb-24 overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-hidden bg-white pb-24 font-sans text-slate-800">
       <style jsx global>{`
         .literature-sidebar-scroll {
           scrollbar-width: thin;
-          scrollbar-color: #f472b6 rgba(255, 255, 255, 0.5);
+          scrollbar-color: #8b80d8 rgba(255, 255, 255, 0.55);
         }
 
         .literature-sidebar-scroll::-webkit-scrollbar {
@@ -193,27 +191,18 @@ function LiteraturesPageContent() {
         }
 
         .literature-sidebar-scroll::-webkit-scrollbar-thumb {
-          background: linear-gradient(180deg, #f472b6 0%, #60a5fa 100%);
+          background: #8b80d8;
           border-radius: 0;
           border: 2px solid rgba(255, 255, 255, 0.7);
         }
 
         .literature-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(180deg, #ec4899 0%, #3b82f6 100%);
+          background: #786cc6;
         }
       `}</style>
 
       {/* --- BACKGROUND LAYER --- */}
-      <div
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url(/images/cartoon-children-playing-together-outdoors.jpg)" }}
-      />
-      <div className="fixed inset-0 z-0 bg-[linear-gradient(180deg,rgba(255,248,251,0.72),rgba(240,249,255,0.74)_45%,rgba(255,251,235,0.78)_100%)]" aria-hidden />
-      <div className="fixed inset-0 z-0 bg-[radial-gradient(rgba(196,181,253,0.2)_1px,transparent_1px)] [background-size:24px_24px] opacity-25" aria-hidden />
-      <div className="fixed left-[-50px] top-16 z-0 h-40 w-40 rounded-full bg-[#FBCFE8]/35 blur-3xl" />
-      <div className="fixed right-[-20px] top-36 z-0 h-44 w-44 rounded-full bg-[#BFDBFE]/35 blur-3xl" />
-      <div className="fixed left-[8%] top-[18%] z-0 text-5xl opacity-60">☁️</div>
-      <div className="fixed right-[10%] top-[20%] z-0 text-4xl opacity-55">🌈</div>
+      <div className="fixed inset-0 z-0 bg-white" aria-hidden />
 
       {/* --- MAIN CONTENT --- */}
       <div className="relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-6">
@@ -224,10 +213,10 @@ function LiteraturesPageContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, type: "spring" }}
         >
-          <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[2.25rem] border-4 border-white bg-[linear-gradient(135deg,#FFF4F8_0%,#EEF7FF_52%,#FFF7E8_100%)] p-6 shadow-[0_24px_60px_rgba(148,163,184,0.16)] md:p-8 lg:p-10">
+          <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[2.25rem] border border-[#ECE7F6] bg-[#F8F3FF] p-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] md:p-8 lg:p-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl text-left">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-200 bg-white/80 px-4 py-1.5 text-sm font-black text-fuchsia-600 shadow-sm">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-200 bg-white/80 px-4 py-1.5 text-sm font-black text-fuchsia-600 shadow-[0_4px_0_rgba(200,107,144,0.12),0_10px_24px_rgba(200,107,144,0.10)]">
                   <Sparkles size={16} /> Góc thơ văn thiếu nhi
                 </div>
                 <h1 className="text-4xl font-black tracking-tight text-slate-800 md:text-5xl">
@@ -238,20 +227,20 @@ function LiteraturesPageContent() {
                   dung ngôn ngữ thật vui dành cho học sinh nhỏ.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/85 px-3 py-1.5 text-sm font-black text-pink-600 shadow-sm">
+                  <span className="rounded-full bg-[#FAF3F7] px-3 py-1.5 text-sm font-black text-[#C86B90] shadow-[0_4px_0_rgba(200,107,144,0.10),0_8px_18px_rgba(200,107,144,0.08)]">
                     Đọc vui
                   </span>
-                  <span className="rounded-full bg-white/85 px-3 py-1.5 text-sm font-black text-sky-600 shadow-sm">
+                  <span className="rounded-full bg-[#F1F6FC] px-3 py-1.5 text-sm font-black text-[#5E8FC0] shadow-[0_4px_0_rgba(94,143,192,0.10),0_8px_18px_rgba(94,143,192,0.08)]">
                     Dễ chọn
                   </span>
-                  <span className="rounded-full bg-white/85 px-3 py-1.5 text-sm font-black text-amber-600 shadow-sm">
+                  <span className="rounded-full bg-[#FFF6EA] px-3 py-1.5 text-sm font-black text-[#C79048] shadow-[0_4px_0_rgba(199,144,72,0.10),0_8px_18px_rgba(199,144,72,0.08)]">
                     Nhiều thể loại
                   </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 lg:min-w-[360px]">
-                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/70">
+                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-[0_6px_0_rgba(200,107,144,0.10),0_14px_30px_rgba(148,163,184,0.08)] ring-1 ring-white/70">
                   <div className="text-[11px] font-black uppercase tracking-[0.22em] text-fuchsia-500">
                     Hiển thị
                   </div>
@@ -259,7 +248,7 @@ function LiteraturesPageContent() {
                     {displayedLiteratures.length}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/70">
+                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-[0_6px_0_rgba(94,143,192,0.10),0_14px_30px_rgba(148,163,184,0.08)] ring-1 ring-white/70">
                   <div className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-500">
                     Tổng bài
                   </div>
@@ -267,7 +256,7 @@ function LiteraturesPageContent() {
                     {totalDisplay}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/70">
+                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-[0_6px_0_rgba(199,144,72,0.10),0_14px_30px_rgba(148,163,184,0.08)] ring-1 ring-white/70">
                   <div className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-500">
                     Trang
                   </div>
@@ -275,7 +264,7 @@ function LiteraturesPageContent() {
                     {currentPage}/{totalPagesDisplay}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/70">
+                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-[0_6px_0_rgba(123,110,214,0.10),0_14px_30px_rgba(148,163,184,0.08)] ring-1 ring-white/70">
                   <div className="text-[11px] font-black uppercase tracking-[0.22em] text-violet-500">
                     Đang chọn
                   </div>
@@ -295,8 +284,8 @@ function LiteraturesPageContent() {
             transition={{ delay: 0.08, duration: 0.35 }}
             className="self-start"
           >
-            <div className="literature-sidebar-scroll overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_18px_50px_rgba(148,163,184,0.12)] backdrop-blur xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
-              <div className="border-b border-slate-100 bg-[linear-gradient(135deg,#FFF5FA_0%,#F4F9FF_55%,#FFF8EA_100%)] p-5">
+            <div className="literature-sidebar-scroll overflow-hidden rounded-[2rem] border border-[#ECE7F6] bg-white shadow-[0_8px_0_rgba(123,110,214,0.08),0_22px_56px_rgba(148,163,184,0.14)] xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
+              <div className="border-b border-slate-100 bg-[#FAF8FF] p-5">
                 <div className="text-xs font-black uppercase tracking-[0.28em] text-fuchsia-600">
                   Bộ lọc văn thơ
                 </div>
@@ -317,7 +306,7 @@ function LiteraturesPageContent() {
                         onClick={() => updateQuery({ type: tab.key, page: 1 })}
                         className={`flex w-full items-center justify-between rounded-[1.2rem] px-4 py-3 text-left text-sm font-black transition ${
                           activeTab === tab.key
-                            ? "bg-[linear-gradient(135deg,#F472B6_0%,#60A5FA_100%)] text-white shadow-[0_10px_24px_rgba(244,114,182,0.22)]"
+                            ? "bg-[#7B6ED6] text-white shadow-[0_4px_0_rgba(91,80,176,0.18),0_10px_24px_rgba(123,110,214,0.18)]"
                             : "bg-slate-50 text-slate-700 hover:bg-slate-100"
                         }`}
                       >
@@ -339,7 +328,7 @@ function LiteraturesPageContent() {
                         onClick={() => updateQuery({ grade: grade.key, page: 1 })}
                         className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
                           gradeFilter === grade.key
-                            ? "bg-[#FFF0F7] text-[#DB2777] ring-2 ring-[#F9A8D4]"
+                            ? "bg-[#F4F1FF] text-[#7B6ED6] ring-2 ring-[#D8D1F8]"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
@@ -350,7 +339,7 @@ function LiteraturesPageContent() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[1.3rem] bg-[#FFF6FB] px-4 py-4 text-center">
+                  <div className="rounded-[1.3rem] bg-[#FAF3F7] px-4 py-4 text-center">
                     <div className="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-500">
                       Đang xem
                     </div>
@@ -358,7 +347,7 @@ function LiteraturesPageContent() {
                       {displayedLiteratures.length}
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] bg-[#EEF7FF] px-4 py-4 text-center">
+                  <div className="rounded-[1.3rem] bg-[#F1F6FC] px-4 py-4 text-center">
                     <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-500">
                       Tổng bài
                     </div>
@@ -386,7 +375,7 @@ function LiteraturesPageContent() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-[2rem] border-[3px] border-white bg-white/92 shadow-[0_14px_38px_rgba(148,163,184,0.14)]">
+            <div className="overflow-hidden rounded-[2rem] border border-[#ECE7F6] bg-white shadow-[0_8px_0_rgba(123,110,214,0.08),0_22px_56px_rgba(148,163,184,0.14)]">
               <AnimatePresence mode="popLayout">
                 {displayedLiteratures.map((literature, index) => (
                   <motion.div
@@ -438,11 +427,11 @@ function LiteraturesPageContent() {
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
                           {getTypeLabel(literature.type, literature.hasAudio)}
                         </span>
-                        <span className="rounded-full bg-[#FCE7F3] px-3 py-1 text-[11px] font-black text-[#DB2777]">
+                        <span className="rounded-full bg-[#F8EEF4] px-3 py-1 text-[11px] font-black text-[#C86B90]">
                           {getGradeLabel(literature.grade)}
                         </span>
                       </div>
-                      <h3 className="line-clamp-2 text-xl font-black leading-tight text-slate-900 transition-colors group-hover:text-blue-600">
+                      <h3 className="line-clamp-2 text-xl font-black leading-tight text-slate-900 transition-colors group-hover:text-[#7B6ED6]">
                         {literature.title}
                       </h3>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
@@ -474,7 +463,7 @@ function LiteraturesPageContent() {
                     <div className="md:justify-self-end">
                       <Link
                         href={`/literatures/${literature.id}/`}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#F472B6_0%,#60A5FA_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_4px_0_rgba(0,0,0,0.1)] transition-all duration-150 hover:brightness-105 active:translate-y-[4px] active:shadow-none"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#7B6ED6] px-5 py-3 text-sm font-black text-white shadow-[0_4px_0_rgba(91,80,176,0.22),0_12px_28px_rgba(123,110,214,0.16)] transition-all duration-150 hover:bg-[#6E62C9] active:translate-y-[4px] active:shadow-none"
                       >
                         {literature.hasAudio ? "Nghe & đọc" : "Bắt đầu đọc"}
                         <ArrowRight size={18} strokeWidth={3} />

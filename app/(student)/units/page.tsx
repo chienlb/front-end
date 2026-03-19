@@ -8,10 +8,10 @@ import { unitService } from "@/services/units.service";
 import { BookOpen, Users, ArrowRight, Star, Sparkles } from "lucide-react";
 
 const CARD_THEMES = [
-  { bg: "#FFEFF5", color: "#F472B6", shadow: "shadow-pink-200" },
-  { bg: "#EAF8FF", color: "#38BDF8", shadow: "shadow-sky-200" },
-  { bg: "#FFF7E8", color: "#F59E0B", shadow: "shadow-amber-200" },
-  { bg: "#F2EEFF", color: "#8B5CF6", shadow: "shadow-violet-200" },
+  { bg: "#FCEFF4", color: "#C86B90", shadow: "shadow-rose-100" },
+  { bg: "#EEF5FF", color: "#5E8FC0", shadow: "shadow-sky-100" },
+  { bg: "#FFF6E9", color: "#C79048", shadow: "shadow-amber-100" },
+  { bg: "#F4F1FF", color: "#7B6ED6", shadow: "shadow-violet-100" },
 ];
 
 type UnitTheme = (typeof CARD_THEMES)[number];
@@ -128,7 +128,7 @@ export default function UnitsPage() {
   // --- 3. LOADING STATE ---
   if (loading)
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-[linear-gradient(180deg,#FDF7FF_0%,#F0F9FF_50%,#FFFDEA_100%)]">
+      <div className="flex h-screen flex-col items-center justify-center bg-white">
         <div className="mb-4 h-16 w-16 animate-spin rounded-full border-b-4 border-t-4 border-blue-500"></div>
         <p className="animate-pulse text-xl font-bold text-blue-500">
           Đang tải thư viện...
@@ -137,25 +137,9 @@ export default function UnitsPage() {
     );
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden pb-24 font-sans text-slate-800">
+    <div className="relative min-h-screen overflow-x-hidden bg-white pb-24 font-sans text-slate-800">
       {/* --- BACKGROUND LAYER --- */}
-      <div className="fixed inset-0 z-0">
-        <Image
-          src="/images/bg-course.png"
-          alt="Background"
-          fill
-          style={{ objectFit: "cover" }}
-          priority
-          className="opacity-100 saturate-[1.08] contrast-[1.04]"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,247,251,0.68),rgba(241,248,255,0.72)_45%,rgba(255,250,237,0.78)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(196,181,253,0.22)_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
-        <div className="absolute left-[-40px] top-20 h-40 w-40 rounded-full bg-[#FCE7F3]/40 blur-3xl" />
-        <div className="absolute right-[-30px] top-40 h-44 w-44 rounded-full bg-[#DBEAFE]/38 blur-3xl" />
-        <div className="absolute left-[8%] top-[18%] text-5xl opacity-65">☁️</div>
-        <div className="absolute right-[9%] top-[22%] text-4xl opacity-60">⭐</div>
-        <div className="absolute left-[12%] bottom-[18%] text-4xl opacity-60">🌈</div>
-      </div>
+      <div className="fixed inset-0 z-0 bg-white" />
 
       {/* --- MAIN CONTENT --- */}
       <div className="relative z-10 mx-auto w-full max-w-[1500px] px-4 md:px-6">
@@ -166,73 +150,73 @@ export default function UnitsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, type: "spring" }}
         >
-          <div className="relative mx-auto max-w-[1320px] overflow-hidden rounded-[2.25rem] border-4 border-white bg-[linear-gradient(135deg,#FFF5FA_0%,#F4F9FF_55%,#FFF8EA_100%)] p-6 shadow-[0_24px_60px_rgba(148,163,184,0.16)] md:p-8 lg:p-10">
-            <div className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
-            <div className="pointer-events-none absolute right-8 top-6 h-28 w-28 rounded-full bg-yellow-200/30 blur-2xl" />
-            <div className="pointer-events-none absolute bottom-0 left-1/3 h-24 w-40 rounded-full bg-white/20 blur-2xl" />
+          <div className="relative mx-auto max-w-[1320px] overflow-hidden rounded-[2.25rem] border border-[#DCCFF5] bg-[#F2EAFE] p-6 shadow-[0_10px_0_rgba(123,110,214,0.22),0_32px_80px_rgba(124,111,214,0.20)] md:p-8 lg:p-10">
+            <div className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/45 blur-2xl" />
+            <div className="pointer-events-none absolute right-8 top-6 h-28 w-28 rounded-full bg-[#DDD0F8]/70 blur-2xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/3 h-24 w-40 rounded-full bg-white/35 blur-2xl" />
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="max-w-2xl text-left text-slate-900">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-pink-200 bg-white/75 px-4 py-1.5 text-sm font-black text-fuchsia-600 shadow-sm">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#E7D9F8] bg-white px-4 py-1.5 text-sm font-black text-[#7B6ED6] shadow-[0_4px_0_rgba(123,110,214,0.12),0_10px_24px_rgba(123,110,214,0.10)]">
                   <Sparkles size={16} /> Cùng bé chinh phục tri thức
                 </div>
                 <h1 className="text-4xl font-black tracking-tight text-slate-800 md:text-5xl">
                   Chương học tập
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-slate-700 md:text-base">
+                <p className="mt-3 max-w-2xl text-sm font-extrabold leading-6 text-slate-700 md:text-base">
                   Mỗi chương là một chặng đường nhỏ. Bé có thể chọn chương yêu
                   thích, học từng bài và nhận thêm thật nhiều ngôi sao.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-black text-pink-600 shadow-sm">
+                  <span className="rounded-full bg-[#FAF3F7] px-3 py-1.5 text-sm font-black text-[#C86B90] shadow-sm">
                     Dễ nhìn
                   </span>
-                  <span className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-black text-sky-600 shadow-sm">
+                  <span className="rounded-full bg-[#F1F6FC] px-3 py-1.5 text-sm font-black text-[#5E8FC0] shadow-sm">
                     Dễ bấm
                   </span>
-                  <span className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-black text-amber-600 shadow-sm">
+                  <span className="rounded-full bg-[#FFF6EA] px-3 py-1.5 text-sm font-black text-[#C79048] shadow-sm">
                     Có sao thưởng
                   </span>
                 </div>
-                <div className="mt-6 inline-flex max-w-xl items-start gap-3 rounded-[1.5rem] bg-white/75 px-4 py-4 shadow-sm ring-1 ring-white/60">
+                <div className="mt-6 inline-flex max-w-xl items-start gap-3 rounded-[1.5rem] border border-[#E7D9F8] bg-white px-4 py-4 shadow-[0_6px_0_rgba(123,110,214,0.10),0_14px_30px_rgba(123,110,214,0.08)]">
                   <div className="text-3xl">🧸</div>
                   <div className="text-sm font-bold leading-6 text-slate-700">
-                    Gợi ý nhỏ: Bé nên bắt đầu từ các chương <span className="text-pink-600">Cơ bản</span>
+                    Gợi ý nhỏ: Bé nên bắt đầu từ các chương <span className="text-[#C86B90]">Cơ bản</span>
                     trước, sau đó mở dần các chương khó hơn để học thật vui và không bị ngợp.
                   </div>
                 </div>
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-black text-slate-700 shadow-sm">
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-[0_4px_0_rgba(15,23,42,0.08),0_10px_24px_rgba(15,23,42,0.05)]">
                   <span>🎯</span>
                   Nhiệm vụ hôm nay: chọn 1 chương và bắt đầu học
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 md:min-w-[360px] lg:min-w-[420px]">
-                <div className="rounded-[1.5rem] bg-white/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/60 backdrop-blur">
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-500">
+                <div className="rounded-[1.5rem] border border-[#DCEAFB] bg-white px-4 py-4 text-center shadow-[0_6px_0_rgba(94,143,192,0.12),0_14px_30px_rgba(94,143,192,0.08)]">
+                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#5E8FC0]">
                     Số chương
                   </div>
                   <div className="mt-1 text-3xl font-black text-slate-900">
                     {units.length}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-[#FFF6FB]/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/60 backdrop-blur">
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-pink-500">
+                <div className="rounded-[1.5rem] border border-[#F3D8E4] bg-white px-4 py-4 text-center shadow-[0_6px_0_rgba(200,107,144,0.12),0_14px_30px_rgba(200,107,144,0.08)]">
+                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#C86B90]">
                     Tổng bài
                   </div>
                   <div className="mt-1 text-3xl font-black text-slate-900">
                     {totalLessons}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-[#FFFBEF]/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/60 backdrop-blur">
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-500">
+                <div className="rounded-[1.5rem] border border-[#F6E3BC] bg-white px-4 py-4 text-center shadow-[0_6px_0_rgba(199,144,72,0.12),0_14px_30px_rgba(199,144,72,0.08)]">
+                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#C79048]">
                     Đang xem
                   </div>
                   <div className="mt-1 text-3xl font-black text-slate-900">
                     {filteredUnits.length}
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] bg-[#F7F3FF]/85 px-4 py-4 text-center shadow-sm ring-1 ring-white/60 backdrop-blur">
-                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-violet-500">
+                <div className="rounded-[1.5rem] border border-[#E2D9FA] bg-white px-4 py-4 text-center shadow-[0_6px_0_rgba(123,110,214,0.12),0_14px_30px_rgba(123,110,214,0.08)]">
+                  <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#7B6ED6]">
                     Ngôi sao
                   </div>
                   <div className="mt-1 flex items-center justify-center gap-1 text-3xl font-black text-slate-900">
@@ -246,7 +230,7 @@ export default function UnitsPage() {
         </motion.div>
 
         <motion.div
-          className="mx-auto mb-8 max-w-[1320px] rounded-[2rem] border border-white/80 bg-white/70 p-4 shadow-[0_18px_50px_rgba(148,163,184,0.12)] backdrop-blur lg:p-5"
+          className="mx-auto mb-8 max-w-[1320px] rounded-[2rem] border border-[#E5E7EB] bg-white p-4 shadow-[0_8px_0_rgba(15,23,42,0.08),0_24px_60px_rgba(15,23,42,0.07)] lg:p-5"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45 }}
@@ -261,7 +245,7 @@ export default function UnitsPage() {
               </div>
             </div>
             <div className="flex flex-col gap-3 md:items-end">
-              <div className="inline-flex w-full flex-wrap items-center gap-2 rounded-[1.5rem] border border-white/80 bg-[linear-gradient(135deg,#FFF5FA_0%,#F4F9FF_55%,#FFF8EA_100%)] p-2 shadow-[0_12px_35px_rgba(148,163,184,0.12)] md:w-auto md:justify-end">
+              <div className="inline-flex w-full flex-wrap items-center gap-2 rounded-[1.5rem] border border-[#E5E7EB] bg-[#F8FAFC] p-2 shadow-[0_6px_0_rgba(15,23,42,0.07),0_12px_30px_rgba(15,23,42,0.05)] md:w-auto md:justify-end">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.2em] text-fuchsia-600 shadow-sm">
                   <Sparkles size={14} className="text-amber-400" />
                   Bộ lọc
@@ -272,8 +256,8 @@ export default function UnitsPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`rounded-full px-4 py-2.5 text-sm font-black transition ${
                       activeTab === tab.id
-                        ? "bg-[linear-gradient(135deg,#F472B6_0%,#60A5FA_100%)] text-white shadow-[0_10px_24px_rgba(244,114,182,0.28)]"
-                        : "bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:bg-slate-50"
+                        ? "bg-[#7B6ED6] text-white shadow-[0_10px_24px_rgba(123,110,214,0.22)]"
+                        : "bg-white text-slate-700 shadow-sm hover:-translate-y-0.5 hover:bg-slate-50"
                     }`}
                   >
                     {tab.label}
@@ -281,10 +265,10 @@ export default function UnitsPage() {
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                <span className="rounded-full bg-[#FCE7F3] px-4 py-2 text-sm font-black text-[#DB2777] shadow-sm">
+                <span className="rounded-full border border-[#F3D8E4] bg-[#FCF5F8] px-4 py-2 text-sm font-black text-[#C86B90] shadow-sm">
                   Đang chọn: {tabs.find((tab) => tab.id === activeTab)?.label}
                 </span>
-                <span className="rounded-full bg-[#FFF6DD] px-4 py-2 text-sm font-black text-[#B7791F] shadow-sm">
+                <span className="rounded-full border border-[#F6E3BC] bg-[#FFF8EF] px-4 py-2 text-sm font-black text-[#C79048] shadow-sm">
                   {filteredUnits.length} chương phù hợp
                 </span>
               </div>
@@ -304,24 +288,24 @@ export default function UnitsPage() {
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3 }}
                 whileHover={{ y: -8 }}
-                className="group flex h-full w-full flex-col overflow-hidden rounded-[1.8rem] border-[3px] border-white bg-white/90 shadow-[0_16px_40px_rgba(148,163,184,0.16)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_44px_rgba(148,163,184,0.18)]"
+                className="group flex h-full w-full flex-col overflow-hidden rounded-[1.8rem] border border-[#E5E7EB] bg-white shadow-[0_8px_0_rgba(15,23,42,0.08),0_24px_60px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_0_rgba(15,23,42,0.10),0_28px_68px_rgba(15,23,42,0.12)]"
               >
                 {/* A. Card Image Area */}
                 <div
                   className="relative flex h-44 items-center justify-center overflow-hidden rounded-t-[1.6rem]"
                   style={{ backgroundColor: unit.theme.bg }}
                 >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),transparent_55%)]" />
-                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-white/6" />
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-slate-900/12" />
                   <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-white/20 blur-2xl"></div>
                   <div className="absolute right-5 top-5 h-20 w-20 rounded-full bg-white/30 blur-xl"></div>
-                  <div className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700 shadow-sm">
+                  <div className="absolute left-4 top-4 rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800 shadow-[0_4px_0_rgba(15,23,42,0.08),0_8px_18px_rgba(15,23,42,0.08)]">
                     Chương {index + 1}
                   </div>
-                  <div className="absolute right-4 bottom-4 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
+                  <div className="absolute right-4 bottom-4 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-800 shadow-[0_4px_0_rgba(15,23,42,0.08),0_8px_18px_rgba(15,23,42,0.08)]">
                     {unit.lessons} bài học
                   </div>
-                  <div className="absolute right-4 top-4 rounded-full bg-[#FFF7DB] px-3 py-1 text-[11px] font-black text-[#B7791F] shadow-sm">
+                  <div className="absolute right-4 top-4 rounded-full border border-[#F6E3BC] bg-[#FFF8EF] px-3 py-1 text-[11px] font-black text-[#B7791F] shadow-[0_4px_0_rgba(199,144,72,0.10),0_8px_18px_rgba(199,144,72,0.08)]">
                     {index % 3 === 0 ? "Nổi bật" : index % 2 === 0 ? "Phổ biến" : "Mới"}
                   </div>
 
@@ -344,7 +328,7 @@ export default function UnitsPage() {
                   )}
 
                   <div className="absolute bottom-4 left-4">
-                    <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-800 shadow-[0_4px_0_rgba(15,23,42,0.08),0_8px_18px_rgba(15,23,42,0.08)]">
                       {unit.grade === "easy" && "Cơ bản"}
                       {unit.grade === "medium" && "Trung bình"}
                       {unit.grade === "hard" && "Nâng cao"}
@@ -353,19 +337,19 @@ export default function UnitsPage() {
                 </div>
 
                 {/* B. Card Body */}
-                <div className="flex flex-1 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-5">
-                  <div className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">
+                <div className="flex flex-1 flex-col bg-white p-5">
+                  <div className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-[#F8FAFC] px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700">
                     <Sparkles size={12} />
                     Học thật vui
                   </div>
-                  <h3 className="mb-2 text-[1.35rem] font-black leading-tight text-slate-800 transition-colors group-hover:text-blue-600">
+                  <h3 className="mb-2 text-[1.35rem] font-black leading-tight text-slate-800 transition-colors group-hover:text-[#7B6ED6]">
                     {unit.title}
                   </h3>
-                  <p className="mb-5 flex-1 line-clamp-3 text-sm font-medium leading-6 text-slate-500">
+                  <p className="mb-5 flex-1 line-clamp-3 text-sm font-semibold leading-6 text-slate-600">
                     {unit.description || "Cùng khám phá chương học thú vị này nhé."}
                   </p>
 
-                  <div className="mb-4 flex items-center gap-2 rounded-[1.1rem] bg-slate-50 px-3 py-3 ring-1 ring-slate-100">
+                  <div className="mb-4 flex items-center gap-2 rounded-[1.1rem] border border-[#EDE9F7] bg-[#FBFAFD] px-3 py-3 shadow-[0_5px_0_rgba(123,110,214,0.08),0_10px_24px_rgba(123,110,214,0.05)]">
                     <span className="text-2xl">{getDifficultyMeta(unit.grade).emoji}</span>
                     <div>
                       <div className="text-sm font-black text-slate-800">
@@ -411,7 +395,7 @@ export default function UnitsPage() {
                     </div>
                   </div>
 
-                  <div className="mb-5 flex items-center justify-between rounded-[1.1rem] bg-[linear-gradient(135deg,#FFF7FB_0%,#F4F9FF_100%)] px-3.5 py-3 ring-1 ring-slate-100">
+                  <div className="mb-5 flex items-center justify-between rounded-[1.1rem] border border-[#EDE9F7] bg-[#FAF8FF] px-3.5 py-3 shadow-[0_5px_0_rgba(123,110,214,0.08),0_10px_24px_rgba(123,110,214,0.05)]">
                     <div>
                       <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
                         Gợi ý
@@ -424,7 +408,7 @@ export default function UnitsPage() {
                             : "Chinh phục thử thách"}
                       </div>
                     </div>
-                    <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 shadow-sm">
+                    <div className="rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm">
                       {unit.grade === "easy"
                         ? "Phù hợp hôm nay"
                         : unit.grade === "medium"
@@ -436,7 +420,7 @@ export default function UnitsPage() {
                   {/* Action Button */}
                   <Link
                     href={`/units/${unit.id}/lessons/`}
-                    className="block w-full rounded-2xl bg-[linear-gradient(135deg,#F472B6_0%,#60A5FA_100%)] py-3 text-center text-sm font-black text-white shadow-[0_4px_0_rgba(0,0,0,0.1)] transition-all duration-150 active:translate-y-[4px] active:shadow-none group-hover:brightness-105"
+                    className="block w-full rounded-2xl bg-[#7B6ED6] py-3 text-center text-sm font-black text-white shadow-[0_4px_0_rgba(91,80,176,0.22)] transition-all duration-150 hover:bg-[#6E62C9] active:translate-y-[4px] active:shadow-none"
                   >
                     <span className="flex items-center justify-center gap-2">
                       Vào chương học <ArrowRight size={20} strokeWidth={3} />
