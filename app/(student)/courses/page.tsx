@@ -112,7 +112,7 @@ export default function CoursesPage() {
           <h1 className="text-4xl md:text-5xl font-black text-slate-800 mb-4 drop-shadow-sm tracking-tight">
             Thư Viện Khóa Học 📚
           </h1>
-          <p className="text-lg text-slate-600 bg-white/60 backdrop-blur-md inline-block px-6 py-2 rounded-2xl shadow-sm border border-white/50">
+          <p className="text-lg text-slate-600 bg-white/80 backdrop-blur-md inline-block px-6 py-2 rounded-2xl shadow-primary-card border border-white/50">
             Chọn cấp độ phù hợp để bắt đầu hành trình của bé
           </p>
         </motion.div>

@@ -217,7 +217,7 @@ export default function HomePage() {
           className="relative lg:h-[600px] w-full flex items-center justify-center lg:justify-end"
         >
           {/* Main Image Container */}
-          <div className="relative w-full max-w-lg aspect-[4/5] lg:aspect-auto lg:h-full rounded-[3rem] overflow-hidden border-8 border-white/40 shadow-2xl shadow-blue-200/50 backdrop-blur-sm transform rotate-[-2deg] hover:rotate-0 transition-all duration-700">
+          <div className="relative w-full max-w-lg aspect-[4/5] lg:aspect-auto lg:h-full rounded-[3rem] overflow-hidden border-8 border-white/40 shadow-primary-card backdrop-blur-sm transform rotate-[-2deg] hover:rotate-0 transition-all duration-700">
             {/* Ảnh học sinh */}
             <img
               src="/images/bg-student-learning.png"

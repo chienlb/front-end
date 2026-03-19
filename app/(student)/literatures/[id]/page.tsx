@@ -149,7 +149,7 @@ export default function LiteratureReadPage() {
 
   const primaryContent = enContent || vnContent;
   const contentCardClass =
-    "rounded-[2rem] border border-[#ECE7F6] bg-white shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]";
+    "rounded-[2rem] border border-[#ECE7F6] bg-white shadow-primary-card";
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#FFF8FC_0%,#F5FAFF_42%,#FFFDF4_100%)] pb-16 pt-24 font-sans">
@@ -171,7 +171,7 @@ export default function LiteratureReadPage() {
         </button>
 
         {/* Hero */}
-        <div className="mb-8 overflow-hidden rounded-[2.25rem] border-[3px] border-[#ECE7F6] bg-[linear-gradient(135deg,#FFF7FB_0%,#F3F9FF_52%,#FFF9EE_100%)] shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]">
+        <div className="mb-8 overflow-hidden rounded-[2.25rem] border-[3px] border-[#ECE7F6] bg-[linear-gradient(135deg,#FFF7FB_0%,#F3F9FF_52%,#FFF9EE_100%)] shadow-primary-card">
           <div className="grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr]">
             <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
               <div className="mb-3 inline-flex items-center gap-2 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-600">

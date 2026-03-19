@@ -132,7 +132,8 @@ export default function PronunciationPractice() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-24 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] p-10 border border-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(129,140,248,0.18),transparent_55%),radial-gradient(circle_at_bottom,_rgba(251,207,232,0.22),transparent_55%)] px-4 pt-20 pb-16">
+      <div className="max-w-2xl mx-auto bg-white/95 rounded-[2.5rem] shadow-primary-card p-8 md:p-10 border border-slate-100 backdrop-blur">
 
       <div className="mb-8">
         <label className="flex items-center gap-2 font-black text-slate-700 mb-3">
@@ -207,6 +208,7 @@ export default function PronunciationPractice() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

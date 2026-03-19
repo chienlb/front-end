@@ -206,7 +206,7 @@ export default function MissionsPage() {
           <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="inline-flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-1.5 rounded-full shadow-sm mb-4 border border-rose-100"
+            className="inline-flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-1.5 rounded-full shadow-primary-card mb-4 border border-rose-100"
           >
             <Star className="text-yellow-400 fill-yellow-400" size={16} />
             <span className="text-slate-700 text-sm font-bold">
@@ -238,7 +238,7 @@ export default function MissionsPage() {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
-            className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 shadow-2xl border-4 border-white/50 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300"
+            className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 shadow-primary-card border-4 border-white/50 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-50/50 to-orange-50/50 opacity-80"></div>
 

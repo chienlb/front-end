@@ -213,7 +213,7 @@ function LiteraturesPageContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, type: "spring" }}
         >
-          <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[2.25rem] border border-[#ECE7F6] bg-[#F8F3FF] p-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] md:p-8 lg:p-10">
+          <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[2.25rem] border border-[#ECE7F6] bg-[#F8F3FF] p-6 shadow-primary-card md:p-8 lg:p-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl text-left">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-fuchsia-200 bg-white/80 px-4 py-1.5 text-sm font-black text-fuchsia-600 shadow-[0_4px_0_rgba(200,107,144,0.12),0_10px_24px_rgba(200,107,144,0.10)]">

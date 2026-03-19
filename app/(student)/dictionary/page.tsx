@@ -361,7 +361,7 @@ export default function DictionaryPage() {
                 animate={{ opacity: 1 }}
                 className="mt-20 text-center"
               >
-                <div className="bg-white inline-flex p-6 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6">
+              <div className="bg-white inline-flex p-6 rounded-full shadow-primary-card mb-6">
                   <Languages size={48} className="text-blue-500/50" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">

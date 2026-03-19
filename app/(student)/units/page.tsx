@@ -150,7 +150,7 @@ export default function UnitsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, type: "spring" }}
         >
-          <div className="relative mx-auto max-w-[1320px] overflow-hidden rounded-[2.25rem] border border-[#DCCFF5] bg-[#F2EAFE] p-6 shadow-[0_10px_0_rgba(123,110,214,0.22),0_32px_80px_rgba(124,111,214,0.20)] md:p-8 lg:p-10">
+          <div className="relative mx-auto max-w-[1320px] overflow-hidden rounded-[2.25rem] border border-[#DCCFF5] bg-[#F2EAFE] p-6 shadow-primary-card md:p-8 lg:p-10">
             <div className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/45 blur-2xl" />
             <div className="pointer-events-none absolute right-8 top-6 h-28 w-28 rounded-full bg-[#DDD0F8]/70 blur-2xl" />
             <div className="pointer-events-none absolute bottom-0 left-1/3 h-24 w-40 rounded-full bg-white/35 blur-2xl" />
@@ -230,7 +230,7 @@ export default function UnitsPage() {
         </motion.div>
 
         <motion.div
-          className="mx-auto mb-8 max-w-[1320px] rounded-[2rem] border border-[#E5E7EB] bg-white p-4 shadow-[0_8px_0_rgba(15,23,42,0.08),0_24px_60px_rgba(15,23,42,0.07)] lg:p-5"
+          className="mx-auto mb-8 max-w-[1320px] rounded-[2rem] border border-[#E5E7EB] bg-white p-4 shadow-primary-card lg:p-5"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.45 }}

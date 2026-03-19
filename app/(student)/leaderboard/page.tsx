@@ -221,7 +221,7 @@ export default function LeaderboardPage() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl mb-12 flex items-center gap-4 shadow-lg text-white"
+            className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl mb-12 flex items-center gap-4 shadow-primary-card text-white"
           >
             <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-slate-200 shrink-0">
               <img

@@ -249,7 +249,7 @@ export default function ShopPage() {
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           {/* --- LEFT COL: PREVIEW (Sticky) --- */}
           <div className="lg:w-1/3 w-full relative">
-            <div className="sticky top-28 bg-white border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 overflow-hidden">
+          <div className="sticky top-28 bg-white border border-slate-200 rounded-3xl p-6 shadow-primary-card overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-blue-50 to-indigo-50 z-0"></div>
 
               <div className="relative z-10">

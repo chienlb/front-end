@@ -685,7 +685,7 @@ export default function LessonPage() {
   if (loading)
     return (
       <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FFF6FB_0%,#F4FAFF_45%,#FFFCEE_100%)]">
-        <div className="rounded-[2rem] bg-white/90 px-8 py-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]">
+        <div className="rounded-[2rem] bg-white/90 px-8 py-6 shadow-primary-card">
           <div className="flex items-center gap-3 text-[#53629E]">
             <Loader2 className="animate-spin" />
             <span className="text-lg font-black">Đang tải bài học...</span>
@@ -696,7 +696,7 @@ export default function LessonPage() {
   if (steps.length === 0)
     return (
       <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FFF6FB_0%,#F4FAFF_45%,#FFFCEE_100%)] p-10">
-        <div className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-white/95 p-8 text-center shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]">
+        <div className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-white/95 p-8 text-center shadow-primary-card">
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[1.5rem] bg-[#53629E] text-white">
             <XCircle />
           </div>
@@ -727,7 +727,7 @@ export default function LessonPage() {
       >
         <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
         <Confetti recycle={false} numberOfPieces={500} />
-        <div className="relative w-full max-w-2xl overflow-hidden rounded-[2.25rem] border border-white/80 bg-white/90 p-8 text-center shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]">
+        <div className="relative w-full max-w-2xl overflow-hidden rounded-[2.25rem] border border-white/80 bg-white/90 p-8 text-center shadow-primary-card">
           <div className="absolute inset-x-0 top-0 h-2 bg-[linear-gradient(90deg,#FF9BC2_0%,#6BCBFF_50%,#FFD166_100%)]" />
           <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-[linear-gradient(135deg,#FFD166_0%,#FFB84D_100%)] text-white shadow-lg">
             <Trophy size={36} />
@@ -808,7 +808,7 @@ export default function LessonPage() {
       <div className="relative flex w-full flex-1 flex-col pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
           <div className="pt-6">
-            <div className="mb-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur">
+            <div className="mb-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-primary-card backdrop-blur">
               <div className="grid gap-4 px-6 py-6 lg:grid-cols-[1.3fr_0.7fr] lg:px-8">
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-slate-700 bg-white shadow-sm">
@@ -860,7 +860,7 @@ export default function LessonPage() {
             {/* Sidebar (desktop) */}
             <aside className="hidden lg:block">
               <div className="sticky top-[96px] space-y-3">
-                <div className="rounded-[2rem] border border-white/80 bg-white/85 p-4 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur">
+                <div className="rounded-[2rem] border border-white/80 bg-white/85 p-4 shadow-primary-card backdrop-blur">
                   <div className="text-xs font-black uppercase tracking-widest text-slate-500">
                     Hành trình bài học
                   </div>
@@ -888,7 +888,7 @@ export default function LessonPage() {
                 </div>
 
                 {steps.length > 1 && (
-                  <div className="rounded-[2rem] border border-white/80 bg-white/85 p-3 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur">
+                  <div className="rounded-[2rem] border border-white/80 bg-white/85 p-3 shadow-primary-card backdrop-blur">
                     <div className="max-h-[320px] overflow-auto space-y-2 pr-1">
                       {steps.map((s: any, i: number) => {
                         const locked = i > unlockedStepIndex;
@@ -1018,7 +1018,7 @@ export default function LessonPage() {
 
               <div className="pt-5">
                 <div
-                  className={`overflow-hidden rounded-[2rem] border border-white/80 bg-gradient-to-b ${stepTheme.panel} p-4 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] ring-1 ${stepTheme.ring} md:p-6`}
+                  className={`overflow-hidden rounded-[2rem] border border-white/80 bg-gradient-to-b ${stepTheme.panel} p-4 shadow-primary-card ring-1 ${stepTheme.ring} md:p-6`}
                 >
                   <div className="mb-5 flex flex-col gap-3 rounded-[1.5rem] bg-white/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
                     <div>
