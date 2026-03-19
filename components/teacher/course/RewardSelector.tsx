@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Video,
   PlayCircle,
@@ -100,9 +100,86 @@ const MOCK_UNITS: Unit[] = [
 // ============================================================================
 export default function TabClasswork({
   units = MOCK_UNITS,
+  ...props
 }: {
   units?: Unit[];
+  isOpen?: boolean;
+  onClose?: () => void;
+  type?: "HANDBOOK" | "ITEM";
+  selectedIds?: string[];
+  onConfirm?: (ids: string[]) => void;
 }) {
+  const isSelectorMode = typeof props.isOpen === "boolean";
+  const [selectedText, setSelectedText] = useState(
+    props.selectedIds?.join(", ") || "",
+  );
+
+  useEffect(() => {
+    if (isSelectorMode) {
+      setSelectedText(props.selectedIds?.join(", ") || "");
+    }
+  }, [isSelectorMode, props.selectedIds]);
+
+  if (isSelectorMode) {
+    if (!props.isOpen) return null;
+
+    const label = props.type === "HANDBOOK" ? "Sổ tay" : "Vật phẩm";
+
+    return (
+      <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200">
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div>
+              <h3 className="text-lg font-black text-slate-800">
+                Chọn phần thưởng {label}
+              </h3>
+              <p className="text-sm text-slate-500">
+                Nhập danh sách ID, phân tách bằng dấu phẩy.
+              </p>
+            </div>
+            <button
+              onClick={props.onClose}
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            <textarea
+              value={selectedText}
+              onChange={(e) => setSelectedText(e.target.value)}
+              placeholder="vd: id_1, id_2, id_3"
+              className="w-full min-h-32 rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 p-5 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+            <button
+              onClick={props.onClose}
+              className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-200"
+            >
+              Huy
+            </button>
+            <button
+              onClick={() =>
+                props.onConfirm?.(
+                  selectedText
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+                )
+              }
+              className="px-5 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Xac nhan
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [data, setData] = useState<Unit[]>(units || MOCK_UNITS);
 
   // States cho Modal (Unit/Lesson)

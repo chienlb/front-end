@@ -21,7 +21,11 @@ const QUESTIONS = Array.from({ length: 15 }).map((_, i) => ({
   ans: "Cat",
 }));
 
-export default function ExamPage({ params }: { params: { id: string } }) {
+export default function ExamPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const router = useRouter();
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});

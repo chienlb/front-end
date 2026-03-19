@@ -6,6 +6,7 @@ import { Bot, Activity, Settings, History } from "lucide-react";
 import DashboardView from "@/components/admin/ai/DashboardView";
 import ConfigView from "@/components/admin/ai/ConfigView";
 import LogsView from "@/components/admin/ai/LogsView";
+import type { AILog } from "@/components/admin/ai/LogsView";
 import TabButton from "@/components/admin/ai/TabButton";
 
 // --- MOCK DATA ---
@@ -59,33 +60,43 @@ const AI_FEATURES = [
   },
 ];
 
-const AI_LOGS = [
+const AI_LOGS: AILog[] = [
   {
     id: "log_1",
     feature: "Chatbot",
     user: "Nguyễn Văn A",
+    model: "gpt-3.5-turbo",
     tokens: 450,
     cost: 0.0006,
     time: "10:30:21",
     status: "SUCCESS",
+    prompt: "Giải thích định luật Newton thứ 2 cho học sinh lớp 5.",
+    response: "Lực càng mạnh thì vật càng tăng tốc nhanh hơn nếu khối lượng giữ nguyên.",
   },
   {
     id: "log_2",
     feature: "Chấm điểm",
     user: "Trần Thị B",
+    model: "gpt-4-turbo",
     tokens: 2100,
     cost: 0.03,
     time: "10:28:15",
     status: "SUCCESS",
+    prompt: "Chấm điểm bài luận sau: 'In my opinion, pollution is...'",
+    response: "Điểm: 7.5/10. Bài viết rõ ý nhưng cần mở rộng vốn từ và cải thiện liên kết câu.",
   },
   {
     id: "log_3",
     feature: "Tạo bài tập",
     user: "Admin",
+    model: "gemini-pro",
     tokens: 0,
     cost: 0,
     time: "10:15:00",
     status: "ERROR",
+    prompt: "Tạo 50 câu hỏi trắc nghiệm toán...",
+    response: "",
+    errorDetails: "Rate limit exceeded (429). Please try again later.",
   },
 ];
 

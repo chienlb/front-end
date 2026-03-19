@@ -100,7 +100,7 @@ export default function DictionaryPage() {
       const aiRes: any = await api.post("/chat/talk", { message: prompt });
 
       // Xử lý dữ liệu trả về từ AI (Clean JSON string)
-      let aiData = { definitions: [] };
+      let aiData: { definitions: Definition[] } = { definitions: [] };
       try {
         // Loại bỏ các ký tự markdown thừa nếu AI lỡ thêm vào (VD: ```json ... ```)
         const cleanJson = aiRes.reply.replace(/```json|```/g, "").trim();

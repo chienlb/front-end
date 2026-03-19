@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -28,8 +28,9 @@ type CourseStatus = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED";
 export default function CourseDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const [activeTab, setActiveTab] = useState<
     "CURRICULUM" | "STUDENTS" | "SETTINGS" | "ANALYTICS"
   >("CURRICULUM");
@@ -113,7 +114,7 @@ export default function CourseDetailPage({
             <div className="flex items-center gap-2 mb-1">
               {renderStatusBadge()}
               <p className="text-xs text-slate-400 font-mono">
-                ID: {params.id}
+                ID: {id}
               </p>
             </div>
             <h1 className="text-xl font-black text-slate-800">

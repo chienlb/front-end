@@ -263,7 +263,7 @@ export default function CommonFields({ form, setForm }: SubFormProps) {
               <div className="h-48 w-full rounded-2xl overflow-hidden border-2 border-dashed border-slate-200 hover:border-blue-400 transition-colors bg-slate-50 group">
                 <MediaUploader
                   type="image"
-                  value={form.topicImage}
+                  value={form.topicImage ?? ""}
                   onChange={(url) => setForm({ ...form, topicImage: url })}
                 />
               </div>
@@ -280,7 +280,7 @@ export default function CommonFields({ form, setForm }: SubFormProps) {
                 <div className="h-48 w-full rounded-2xl overflow-hidden border-2 border-dashed border-slate-200 hover:border-blue-400 transition-colors bg-slate-50">
                   <MediaUploader
                     type={mediaType}
-                    value={form.mediaUrl}
+                    value={form.mediaUrl ?? ""}
                     onChange={(url) => setForm({ ...form, mediaUrl: url })}
                   />
                 </div>

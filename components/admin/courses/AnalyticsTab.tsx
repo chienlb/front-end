@@ -170,7 +170,7 @@ export default function AnalyticsTab() {
                   tickFormatter={(value) => `${value / 1000000}M`}
                 />
                 <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value?: number) => formatCurrency(value ?? 0)}
                   contentStyle={{
                     borderRadius: "12px",
                     border: "none",

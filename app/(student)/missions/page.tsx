@@ -17,10 +17,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import confetti from "canvas-confetti";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 // --- ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -30,7 +30,7 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 50, scale: 0.9 },
   visible: {
     opacity: 1,
@@ -40,7 +40,7 @@ const itemVariants = {
   },
 };
 
-const chestVariants = {
+const chestVariants: Variants = {
   hidden: { scale: 0 },
   visible: { scale: 1, transition: { type: "spring", bounce: 0.5 } },
   pulse: { scale: [1, 1.05, 1], transition: { repeat: Infinity, duration: 2 } },
@@ -76,7 +76,7 @@ export default function MissionsPage() {
           if (item.isClaimed) status = "claimed";
           else if (item.progress >= item.target) status = "claimable";
 
-          let icon = Target;
+          let icon: any = Target;
           let link = "/courses";
           let color: Mission["color"] = "blue";
 

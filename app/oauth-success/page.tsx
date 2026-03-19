@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function OAuthSuccess() {
+function OAuthSuccessContent() {
     const router = useRouter();
     const params = useSearchParams();
 
@@ -33,4 +33,12 @@ export default function OAuthSuccess() {
     }, [params, router]);
 
     return <div>Đang chuyển về trang chủ...</div>;
+}
+
+export default function OAuthSuccess() {
+    return (
+        <Suspense fallback={<div>Đang chuyển về trang chủ...</div>}>
+            <OAuthSuccessContent />
+        </Suspense>
+    );
 }

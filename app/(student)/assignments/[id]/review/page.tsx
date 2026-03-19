@@ -65,7 +65,7 @@ const REVIEW_DATA = {
 export default function ReviewAssignmentPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<"ALL" | "WRONG">("ALL");

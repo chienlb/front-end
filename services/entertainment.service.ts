@@ -5,7 +5,8 @@ export const entertainmentService = {
 
   // 1. Lấy danh sách chủ đề
   getCategories: async (type?: string) => {
-    return api.get("/categories", { params: { type } });
+    const res = await api.get("/categories", { params: { type } });
+    return res.data ?? res;
   },
 
   // 2. Tạo chủ đề mới
@@ -15,7 +16,8 @@ export const entertainmentService = {
 
   // 3. Lấy chi tiết chủ đề (bao gồm list videos bên trong)
   getCategoryDetail: async (id: string) => {
-    return api.get(`/categories/${id}`);
+    const res = await api.get(`/categories/${id}`);
+    return res.data ?? res;
   },
 
   // 4. Xóa chủ đề

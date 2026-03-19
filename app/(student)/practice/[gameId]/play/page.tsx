@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2,
@@ -35,7 +35,7 @@ const GAME_DEFAULT_BGS: Record<string, string> = {
     "https://img.freepik.com/free-vector/hand-drawn-school-learning-background_23-2148862953.jpg",
 };
 
-export default function GamePlayPage() {
+function GamePlayPageContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -384,5 +384,13 @@ export default function GamePlayPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function GamePlayPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <GamePlayPageContent />
+    </Suspense>
   );
 }

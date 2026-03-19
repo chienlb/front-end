@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import {
   Lock,
@@ -16,8 +16,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 
-export default function ResetPasswordPage() {
-  const router = useRouter();
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token"); // Lấy token từ URL (VD: ?token=xyz...)
 
@@ -224,5 +223,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

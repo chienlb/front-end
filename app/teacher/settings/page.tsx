@@ -40,9 +40,13 @@ export default function AdminSettingsPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  type BooleanSettingKey = {
+    [K in keyof typeof settings]: (typeof settings)[K] extends boolean ? K : never;
+  }[keyof typeof settings];
+
   // --- HANDLERS ---
-  const toggle = (key: keyof typeof settings) => {
-    setSettings((prev) => ({ ...prev, [key]: !prev[key as boolean] }));
+  const toggle = (key: BooleanSettingKey) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
     setIsDirty(true);
   };
 

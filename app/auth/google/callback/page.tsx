@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/utils/api";
 
-export default function GoogleCallback() {
+function GoogleCallbackContent() {
     const router = useRouter();
     const params = useSearchParams();
 
@@ -31,4 +31,12 @@ export default function GoogleCallback() {
     }, []);
 
     return <div>Đang đăng nhập bằng Google...</div>;
+}
+
+export default function GoogleCallback() {
+    return (
+        <Suspense fallback={<div>Đang đăng nhập bằng Google...</div>}>
+            <GoogleCallbackContent />
+        </Suspense>
+    );
 }

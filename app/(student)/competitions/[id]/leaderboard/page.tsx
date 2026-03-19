@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -119,16 +119,17 @@ const getMockData = (id: string) => {
 export default function CompetitionLeaderboardPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const router = useRouter();
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
     // Giả lập loading
-    const loadedData = getMockData(params.id);
+    const loadedData = getMockData(id);
     setData(loadedData);
-  }, [params.id]);
+  }, [id]);
 
   if (!data)
     return (

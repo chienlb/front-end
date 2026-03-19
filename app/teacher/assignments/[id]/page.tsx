@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import AssignmentEditor from "@/components/teacher/assignments/AssignmentEditor";
@@ -59,8 +59,9 @@ const getAssignmentById = async (id: string) => {
 export default function EditAssignmentPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +72,7 @@ export default function EditAssignmentPage({
       try {
         setIsLoading(true);
         // Gọi API lấy dữ liệu
-        const assignmentData = await getAssignmentById(params.id);
+        const assignmentData = await getAssignmentById(id);
 
         if (!assignmentData) {
           setError("Không tìm thấy bài tập này.");
@@ -86,7 +87,7 @@ export default function EditAssignmentPage({
     };
 
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   // --- TRƯỜNG HỢP 1: ĐANG TẢI ---
   if (isLoading) {

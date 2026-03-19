@@ -3,6 +3,22 @@
 import { useState } from "react";
 import { Plus, Trash2, Save, CheckCircle, GripVertical } from "lucide-react";
 
+interface ExamQuestion {
+  id: string;
+  text: string;
+  options: string[];
+  correctAnswer: number;
+  point: number;
+}
+
+interface ExamData {
+  title: string;
+  description: string;
+  durationMinutes: number;
+  passingScore: number;
+  questions: ExamQuestion[];
+}
+
 export default function ExamCreator({
   onSave,
   initialData,
@@ -10,7 +26,7 @@ export default function ExamCreator({
   onSave: (data: any) => void;
   initialData?: any;
 }) {
-  const [exam, setExam] = useState(
+  const [exam, setExam] = useState<ExamData>(
     initialData || {
       title: "",
       description: "",

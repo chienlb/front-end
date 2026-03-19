@@ -19,7 +19,7 @@ import {
   Globe,
   CornerDownRight,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 // --- 1. MOCK DATA & TYPES ---
 
@@ -114,12 +114,12 @@ const MOCK_POSTS: Post[] = [
 ];
 
 // --- 2. ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 60 } },
 };

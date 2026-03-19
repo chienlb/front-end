@@ -5,7 +5,8 @@ export const courseService = {
 
   // Lấy danh sách tất cả khóa học.
   getAllCourses: async () => {
-    return api.get("/courses");
+    const res = await api.get("/courses");
+    return res.data ?? res;
   },
 
   // Tạo một khóa học mới.
@@ -25,7 +26,8 @@ export const courseService = {
 
   // Lấy cấu trúc cây thư mục của khóa học: Course -> Units -> Lessons.
   getTree: async (id: string) => {
-    return api.get(`/courses/${id}/tree`);
+    const res = await api.get(`/courses/${id}/tree`);
+    return res.data ?? res;
   },
 
   // 2. QUẢN LÝ UNIT (Chương học)
@@ -75,7 +77,8 @@ export const courseService = {
 
   // Lấy chi tiết nội dung bài học.
   getLesson: async (lessonId: string) => {
-    return api.get(`/courses/lessons/${lessonId}`);
+    const res = await api.get(`/courses/lessons/${lessonId}`);
+    return res.data ?? res;
   },
 
   // Cập nhật nội dung Lesson

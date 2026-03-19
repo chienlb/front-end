@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { ReactNode } from "react";
 
 interface Props {
@@ -26,7 +26,7 @@ export default function FloatingElement({
   className,
 }: Props) {
   // Animation cấu hình
-  const variants = {
+  const variants: Variants = {
     // Bay lên xuống tại chỗ (cho vật phẩm)
     hover: {
       y: [0, -20, 0],
@@ -35,7 +35,7 @@ export default function FloatingElement({
       transition: {
         duration: duration,
         repeat: Infinity,
-        ease: "easeInOut",
+        ease: "easeInOut" as const,
         delay: delay,
       },
     },
@@ -45,7 +45,7 @@ export default function FloatingElement({
       transition: {
         duration: duration * 5, // Trôi rất chậm
         repeat: Infinity,
-        ease: "linear",
+        ease: "linear" as const,
         delay: delay,
       },
     },

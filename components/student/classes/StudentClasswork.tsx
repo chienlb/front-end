@@ -28,10 +28,10 @@ import {
 } from "lucide-react";
 import { liveClassService } from "@/services/live-class.service";
 import ExamRoom from "@/components/student/course/lesson/ExamRoom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 // --- ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -39,12 +39,12 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50 } },
 };
 
-const accordionVariants = {
+const accordionVariants: Variants = {
   collapsed: { opacity: 0, height: 0 },
   expanded: { opacity: 1, height: "auto" },
 };

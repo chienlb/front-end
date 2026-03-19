@@ -14,10 +14,10 @@ import {
 import { useEffect, useState } from "react";
 import { courseService } from "@/services/course.service";
 import CourseEditModal from "@/components/teacher/course/CourseEditModal";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 // --- ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -27,7 +27,7 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50 } },
 };

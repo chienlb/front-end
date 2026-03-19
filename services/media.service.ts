@@ -3,7 +3,8 @@ import api from "@/utils/api";
 export const mediaService = {
   // Lấy danh sách
   getAll: async (params?: { type?: string; search?: string }) => {
-    return api.get("/media", { params });
+    const res = await api.get("/media", { params });
+    return res.data ?? res;
   },
 
   // Tạo mới

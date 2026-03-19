@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import {
   ArrowRight,
   BookOpen,
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 // --- ANIMATION CONFIG ---
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
@@ -31,7 +31,7 @@ const fadeInUp = {
   },
 };
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,

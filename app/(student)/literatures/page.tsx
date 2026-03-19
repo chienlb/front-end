@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import { BookOpen, ArrowRight, Sparkles, Images, Music, ChevronLeft, ChevronRigh
 
 const PAGE_SIZE = 10;
 
-export default function LiteraturesPage() {
+function LiteraturesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -379,5 +379,13 @@ export default function LiteraturesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LiteraturesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <LiteraturesPageContent />
+    </Suspense>
   );
 }

@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Import Component Form tách riêng
 import HomeworkBuilder from "./HomeworkBuilder";
+import type { HomeworkData } from "./HomeworkBuilder";
 
 // --- MOCK DATA ---
 const MOCK_ASSIGNMENTS = [
@@ -54,7 +55,7 @@ export default function TabHomework() {
     const newItem = {
       id: Date.now(),
       title: data.title,
-      desc: data.desc,
+      desc: data.description,
       deadline: data.deadline,
       createdAt: new Date().toISOString().split("T")[0],
       submitted: 0,
@@ -215,7 +216,7 @@ export default function TabHomework() {
       <AnimatePresence>
         {showModal && (
           <HomeworkBuilder
-            onClose={() => setShowModal(false)}
+            onCancel={() => setShowModal(false)}
             onSave={handleCreateNew}
           />
         )}

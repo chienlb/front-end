@@ -10,7 +10,8 @@ export const notificationService = {
     page?: number;
     limit?: number;
   }) => {
-    return api.get("/notifications/all", { params });
+    const res = await api.get("/notifications/all", { params });
+    return res.data ?? res;
   },
 
 
@@ -36,6 +37,7 @@ export const notificationService = {
       limit?: number;
     },
   ) => {
-    return api.get(`/notifications/user/${userId}`, { params });
+    const res = await api.get(`/notifications/user/${userId}`, { params });
+    return res.data ?? res;
   },
 };

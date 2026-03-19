@@ -130,7 +130,7 @@ export default function DashboardView({ stats }: DashboardViewProps) {
                     boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
                   }}
                   itemStyle={{ color: "#1e293b", fontWeight: "bold" }}
-                  formatter={(value: number) => [`$${value}`, "Chi phí"]}
+                  formatter={(value?: number) => [`$${value ?? 0}`, "Chi phí"]}
                 />
                 <Area
                   type="monotone"

@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { userService } from "@/services/user.service";
 import { Loader2, Crown, Trophy } from "lucide-react";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 // --- ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -15,12 +15,12 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, x: -20 },
   visible: { opacity: 1, x: 0 },
 };
 
-const podiumVariants = {
+const podiumVariants: Variants = {
   hidden: { y: 100, opacity: 0 },
   visible: {
     y: 0,

@@ -1,5 +1,5 @@
 export interface QuestionFormState {
-  _id: string;
+  _id?: string;
   type: string;
   topic: string;
   topicImage?: string;

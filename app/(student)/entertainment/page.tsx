@@ -35,7 +35,7 @@ const ReactPlayer = dynamic(() => import("react-player"), {
       <Loader2 className="animate-spin text-white" size={40} />
     </div>
   ),
-});
+}) as any;
 
 // --- HELPER ---
 const getYouTubeID = (url: string) => {
@@ -471,8 +471,8 @@ function VideoPlayerView({
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onError={() => setUseFallback(true)}
-              onProgress={(s) => setPlayedSeconds(s.playedSeconds)}
-              config={{ youtube: { playerVars: { modestbranding: 1 } } }}
+              onProgress={(state: any) => setPlayedSeconds(state.playedSeconds)}
+              config={{ youtube: { playerVars: { modestbranding: 1 } } } as any}
             />
           ) : youtubeId ? (
             <iframe

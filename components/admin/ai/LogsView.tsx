@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 // --- TYPES ---
-interface AILog {
+export interface AILog {
   id: string;
   feature: string;
   user: string;

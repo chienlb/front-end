@@ -34,11 +34,13 @@ export const userService = {
   deleteUser: async (id: string) => api.delete(`/users/${id}/delete`),
 
   getProfile: async () => {
-    return api.get("/auths/profile");
+    const res = await api.get("/auths/profile");
+    return res.data ?? res;
   },
 
   getLeaderboard: async () => {
-    return api.get("/users/leaderboard");
+    const res = await api.get("/users/leaderboard");
+    return res.data ?? res;
   },
 
   equipItem: (itemId: string) => {

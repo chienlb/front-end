@@ -7,11 +7,8 @@ import {
   Views,
   ToolbarProps,
 } from "react-big-calendar";
-import format from "date-fns/format";
-import parse from "date-fns/parse";
-import startOfWeek from "date-fns/startOfWeek";
-import getDay from "date-fns/getDay";
-import vi from "date-fns/locale/vi";
+import { format, parse, startOfWeek, getDay } from "date-fns";
+import { vi } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { liveClassService } from "@/services/live-class.service";
 import {
@@ -111,7 +108,7 @@ const MOCK_EVENTS: CalendarEvent[] = [
 }));
 
 // --- 1. CUSTOM TOOLBAR COMPONENT ---
-const CustomToolbar = (toolbar: ToolbarProps) => {
+const CustomToolbar = (toolbar: ToolbarProps<CalendarEvent, object>) => {
   const goToBack = () => toolbar.onNavigate("PREV");
   const goToNext = () => toolbar.onNavigate("NEXT");
   const goToCurrent = () => toolbar.onNavigate("TODAY");

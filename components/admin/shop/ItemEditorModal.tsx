@@ -20,11 +20,23 @@ export default function ItemEditorModal({
   onSuccess,
   initialData,
 }: any) {
+  type ItemFormData = {
+    name: string;
+    description: string;
+    type: string;
+    price: number;
+    currency: string;
+    thumbnail: string;
+    lottieUrl: string;
+    config: Record<string, any>;
+    isActive: boolean;
+  };
+
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ItemFormData>({
     name: "",
     description: "",
     type: "SKIN",
