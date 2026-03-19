@@ -1,8 +1,22 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { X, Loader2, CheckCircle, XCircle, Lock } from "lucide-react";
+import {
+  X,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Lock,
+  Sparkles,
+  Star,
+  Trophy,
+  ArrowRight,
+  BookOpen,
+  Play,
+} from "lucide-react";
 import Confetti from "react-confetti";
 
 import MatchingGame from "@/components/student/games/MatchingGame";
@@ -17,6 +31,51 @@ import { lessonService } from "@/services/lessons.service";
 
 const SHARED_BG =
   "/images/3d-illustration-world-book-day-celebration/10444286.jpg";
+
+function getStepTheme(stepType: string) {
+  switch (stepType) {
+    case "video":
+      return {
+        badge: "Khám phá",
+        tint: "bg-[#E9F5FF] text-[#2D79C7]",
+        panel: "from-[#EAF7FF] via-white to-[#F5FBFF]",
+        ring: "ring-[#B9E2FF]",
+      };
+    case "vocab":
+    case "vocab-intro":
+      return {
+        badge: "Từ mới",
+        tint: "bg-[#FFF2E0] text-[#C97A15]",
+        panel: "from-[#FFF8E9] via-white to-[#FFFDF6]",
+        ring: "ring-[#FFD9A6]",
+      };
+    case "quiz":
+    case "matching":
+    case "flashcard":
+      return {
+        badge: "Trò chơi",
+        tint: "bg-[#F5ECFF] text-[#8A52D1]",
+        panel: "from-[#F9F1FF] via-white to-[#FDF8FF]",
+        ring: "ring-[#E5D2FF]",
+      };
+    case "speaking":
+    case "listening":
+    case "spelling":
+      return {
+        badge: "Luyện tập",
+        tint: "bg-[#EAFBF1] text-[#2D9B62]",
+        panel: "from-[#F1FFF7] via-white to-[#F7FFFB]",
+        ring: "ring-[#CBEFD9]",
+      };
+    default:
+      return {
+        badge: "Bài học",
+        tint: "bg-[#FFEAF3] text-[#D65086]",
+        panel: "from-[#FFF4F8] via-white to-[#FFFBFC]",
+        ring: "ring-[#FFD5E4]",
+      };
+  }
+}
 
 export default function LessonPage() {
   const router = useRouter();
@@ -33,7 +92,7 @@ export default function LessonPage() {
   // Trạng thái chung
   const [isGameDone, setIsGameDone] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [status, setStatus] = useState<"idle" | "correct" | "wrong">("idle");
+  const [, setStatus] = useState<"idle" | "correct" | "wrong">("idle");
 
   // Logic Queue quà tặng
   const [rewardQueue, setRewardQueue] = useState<{ type: string; data: any }[]>(
@@ -75,6 +134,7 @@ export default function LessonPage() {
     if (!currentData) return;
     // Các màn "xem/đọc" không cần làm bài để qua bước
     if (
+      currentData.type === "video" ||
       currentData.type === "reading" ||
       currentData.type === "vocab-intro" ||
       currentData.type === "vocab"
@@ -82,7 +142,7 @@ export default function LessonPage() {
       setIsGameDone(true);
       setStatus("correct");
     }
-  }, [currentData?.type, currentStepIndex]);
+  }, [currentData, currentStepIndex]);
 
   const ReadingCard = ({ title, subtitle, items }: any) => {
     const normalizedItems: string[] = Array.isArray(items)
@@ -100,85 +160,104 @@ export default function LessonPage() {
     );
 
     return (
-      <div className="w-full rounded-3xl border border-slate-200 bg-white/92 p-6 shadow-xl backdrop-blur animate-in zoom-in">
-        <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#53629E] text-white shadow-sm shrink-0">
-            <CheckCircle />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-xl font-black text-slate-900 leading-snug">
-              {title}
-            </h3>
-            {subtitle && (
-              <p className="mt-1 text-sm text-slate-700 leading-relaxed">
-                {subtitle}
-              </p>
-            )}
+      <div className="w-full overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-[0_24px_80px_rgba(148,163,184,0.18)] backdrop-blur animate-in zoom-in">
+        <div className="bg-[linear-gradient(90deg,#FFE7F0_0%,#E8F6FF_52%,#FFF5D9_100%)] px-6 py-5">
+          <div className="flex items-start gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#FF8DB3] text-white shadow-sm shrink-0">
+              <BookOpen />
+            </div>
+            <div className="min-w-0">
+              <div className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-[#D65086]">
+                Đọc và ghi nhớ
+              </div>
+              <h3 className="mt-3 text-2xl font-black text-slate-900 leading-snug">
+                {title}
+              </h3>
+              {subtitle && (
+                <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+                  {subtitle}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {bullets.length > 0 && (
-          <ul
-            className={`mt-5 ${
-              bullets.length >= 8 ? "columns-1 sm:columns-2" : ""
-            }`}
-          >
-            {bullets.map((text, i) => (
-              <li
-                key={i}
-                className="break-inside-avoid mb-2 flex gap-2 text-sm leading-relaxed text-slate-800"
-              >
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#53629E]" />
-                <span>{text}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="p-6">
+          {bullets.length > 0 && (
+            <ul
+              className={`${
+                bullets.length >= 8 ? "columns-1 sm:columns-2" : ""
+              }`}
+            >
+              {bullets.map((text, i) => (
+                <li
+                  key={i}
+                  className="mb-3 break-inside-avoid rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-sm"
+                >
+                  <div className="flex gap-3">
+                    <span className="mt-1.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#EEF6FF] text-xs font-black text-[#2D79C7]">
+                      {i + 1}
+                    </span>
+                    <span>{text}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {callouts.length > 0 && (
-          <div className="mt-5 space-y-2">
-            {callouts.map((text, i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
-              >
-                <span className="font-extrabold text-[#53629E]">Ghi nhớ:</span>{" "}
-                {text.replace(/^(remember:|note:|tip:)\s*/i, "")}
-              </div>
-            ))}
-          </div>
-        )}
+          {callouts.length > 0 && (
+            <div className="mt-5 space-y-3">
+              {callouts.map((text, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-[#FFE1A6] bg-[#FFF9E8] px-4 py-3 text-sm text-slate-800"
+                >
+                  <span className="font-extrabold text-[#C97A15]">Ghi nhớ:</span>{" "}
+                  {text.replace(/^(remember:|note:|tip:)\s*/i, "")}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
   const VocabView = ({ data }: any) => {
     return (
-      <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="w-full overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_24px_80px_rgba(148,163,184,0.18)]">
+        <div className="bg-[linear-gradient(135deg,#FFF1DC_0%,#FFF7EA_48%,#FFFDF7_100%)] px-6 py-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-[#C97A15]">
+            <Sparkles size={14} />
+            Từ vựng mới
+          </div>
+        </div>
+        <div className="p-6">
         {data?.image && (
           <img
             src={data.image}
             alt={data.word}
-            className="mb-5 h-44 w-full rounded-3xl object-cover"
+            className="mb-5 h-48 w-full rounded-[1.75rem] object-cover"
           />
         )}
         <div className="text-center">
           <div className="text-sm font-black uppercase tracking-widest text-slate-500">
             Vocabulary
           </div>
-          <div className="mt-2 text-3xl sm:text-4xl font-black text-[#53629E]">
+          <div className="mt-3 text-4xl sm:text-5xl font-black text-[#53629E]">
             {data?.word}
           </div>
           {data?.ipa && (
-            <div className="mt-2 text-sm font-extrabold text-slate-500">
+            <div className="mt-3 inline-flex rounded-full bg-[#EEF6FF] px-3 py-1 text-sm font-extrabold text-slate-500">
               {data.ipa}
             </div>
           )}
-          <div className="mt-3 text-lg font-extrabold text-slate-700">
+          <div className="mt-4 rounded-[1.5rem] bg-[#FFF7E8] px-4 py-4 text-lg font-extrabold text-slate-700">
             {data?.meaning ||
               data?.definition ||
               "Nhấn TIẾP TỤC để sang từ tiếp theo."}
           </div>
+        </div>
         </div>
       </div>
     );
@@ -186,9 +265,16 @@ export default function LessonPage() {
 
   const VocabIntro = ({ data }: any) => {
     return (
-      <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="w-full overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_24px_80px_rgba(148,163,184,0.18)]">
+        <div className="bg-[linear-gradient(90deg,#EAF7FF_0%,#F5ECFF_52%,#FFF7E8_100%)] px-6 py-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-[#53629E]">
+            <Star size={14} />
+            Sẵn sàng học
+          </div>
+        </div>
+        <div className="p-6">
         <div className="flex items-start gap-4">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#53629E] text-white shadow-sm shrink-0">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#53629E] text-white shadow-sm shrink-0">
             <CheckCircle />
           </div>
           <div className="min-w-0">
@@ -222,6 +308,7 @@ export default function LessonPage() {
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           Nhấn <span className="font-extrabold text-[#EB4C4C]">TIẾP TỤC</span> để
           bắt đầu học từng từ.
+        </div>
         </div>
       </div>
     );
@@ -597,18 +684,23 @@ export default function LessonPage() {
 
   if (loading)
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#53629E]" />
+      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FFF6FB_0%,#F4FAFF_45%,#FFFCEE_100%)]">
+        <div className="rounded-[2rem] bg-white/90 px-8 py-6 shadow-[0_24px_70px_rgba(148,163,184,0.18)]">
+          <div className="flex items-center gap-3 text-[#53629E]">
+            <Loader2 className="animate-spin" />
+            <span className="text-lg font-black">Đang tải bài học...</span>
+          </div>
+        </div>
       </div>
     );
   if (steps.length === 0)
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-10">
-        <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[#53629E] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FFF6FB_0%,#F4FAFF_45%,#FFFCEE_100%)] p-10">
+        <div className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-white/95 p-8 text-center shadow-[0_24px_70px_rgba(148,163,184,0.18)]">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[1.5rem] bg-[#53629E] text-white">
             <XCircle />
           </div>
-          <div className="text-lg font-extrabold text-slate-900">
+          <div className="text-2xl font-extrabold text-slate-900">
             Bài học trống
           </div>
           <div className="mt-2 text-sm text-slate-600">
@@ -628,49 +720,83 @@ export default function LessonPage() {
   if (isCompleted) {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center p-4 animate-in zoom-in"
+        className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4 animate-in zoom-in"
         style={{
           background: `url(${SHARED_BG}) center/cover no-repeat fixed`,
         }}
       >
-        <div className="absolute inset-0 bg-white/75 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
         <Confetti recycle={false} numberOfPieces={500} />
-        <h1 className="relative text-3xl font-black text-[#53629E] mb-2">
-          🎉 HOÀN THÀNH XUẤT SẮC!
-        </h1>
-        <button
-          onClick={() => router.back()}
-          className="relative bg-[#EB4C4C] text-white px-8 py-3 rounded-2xl font-extrabold shadow-lg hover:bg-[#D94444] transition"
-        >
-          Về bản đồ
-        </button>
+        <div className="relative w-full max-w-2xl overflow-hidden rounded-[2.25rem] border border-white/80 bg-white/90 p-8 text-center shadow-[0_28px_90px_rgba(148,163,184,0.22)]">
+          <div className="absolute inset-x-0 top-0 h-2 bg-[linear-gradient(90deg,#FF9BC2_0%,#6BCBFF_50%,#FFD166_100%)]" />
+          <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-[linear-gradient(135deg,#FFD166_0%,#FFB84D_100%)] text-white shadow-lg">
+            <Trophy size={36} />
+          </div>
+          <div className="text-sm font-black uppercase tracking-[0.28em] text-[#D65086]">
+            Xuất sắc
+          </div>
+          <h1 className="mt-3 text-3xl font-black text-[#53629E]">
+            Hoàn thành bài học!
+          </h1>
+          <p className="mt-3 text-base text-slate-600">
+            Bé đã đi hết hành trình của bài này. Nghỉ một chút rồi tiếp tục chinh
+            phục bài học mới nhé.
+          </p>
+          <button
+            onClick={() => router.back()}
+            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#FF8A65] px-8 py-3 font-extrabold text-white shadow-lg transition hover:bg-[#F9734E]"
+          >
+            Về bản đồ
+            <ArrowRight size={18} />
+          </button>
+        </div>
       </div>
     );
   }
 
+  const stepTheme = getStepTheme(currentData?.type ?? "reading");
+  const canContinue = isGameDone || currentData.type === "video";
+
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div
+      className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#FFF6FB_0%,#F4FAFF_42%,#FFFCEE_100%)]"
+      style={{
+        backgroundImage: bgImage
+          ? `radial-gradient(circle at top left, rgba(255,233,242,0.92), transparent 30%), radial-gradient(circle at top right, rgba(219,242,255,0.92), transparent 28%), linear-gradient(180deg, rgba(255,246,251,0.92) 0%, rgba(244,250,255,0.95) 42%, rgba(255,252,238,0.96) 100%), url(${bgImage})`
+          : undefined,
+        backgroundSize: bgImage ? "auto, auto, auto, cover" : undefined,
+        backgroundPosition: bgImage ? "top left, top right, center, center" : undefined,
+      }}
+    >
+      <div className="pointer-events-none absolute left-[-40px] top-24 h-40 w-40 rounded-full bg-white/55 blur-2xl" />
+      <div className="pointer-events-none absolute right-[-30px] top-44 h-44 w-44 rounded-full bg-[#FFE7A3]/45 blur-2xl" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_left,rgba(255,181,214,0.22),transparent_32%),radial-gradient(circle_at_top_right,rgba(125,211,252,0.24),transparent_28%)]" />
+
       {/* HEADER */}
-      <div className="w-full bg-white/85 backdrop-blur p-4 sticky top-0 z-20 border-b border-slate-200">
-        <div className="mx-auto w-full max-w-6xl px-4 md:px-8 flex items-center gap-4">
+      <div className="sticky top-0 z-30 w-full border-b border-white/70 bg-white/75 p-4 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 md:px-8">
           <button
             onClick={() => router.back()}
-            className="text-[#53629E] hover:bg-slate-100 p-2 rounded-2xl transition"
+            className="rounded-2xl bg-white p-2 text-[#53629E] shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
           >
             <X />
           </button>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-3">
-              <div className="truncate text-sm font-extrabold text-slate-900">
-                {lessonTitle || "Bài học"}
+            <div className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+              <div className="inline-flex items-center gap-2">
+                <Sparkles size={14} className="text-[#D65086]" />
+                Bài học
               </div>
-              <div className="text-xs font-semibold text-slate-500">
+              <div>
                 {Math.min(currentStepIndex + 1, steps.length)}/{steps.length || 0}
               </div>
             </div>
-            <div className="mt-2 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="mt-1 truncate text-base font-black text-slate-900">
+              {lessonTitle || "Bài học"}
+            </div>
+            <div className="mt-2 h-3 overflow-hidden rounded-full bg-white shadow-inner">
               <div
-                className="h-full bg-[#EB4C4C] transition-all duration-500 ease-out"
+                className="h-full bg-[linear-gradient(90deg,#FF97B7_0%,#62B6FF_58%,#7CCF63_100%)] transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -679,21 +805,79 @@ export default function LessonPage() {
       </div>
 
       {/* BODY */}
-      <div className="flex-1 w-full pb-28 flex flex-col">
+      <div className="relative flex w-full flex-1 flex-col pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
-          <div className="grid gap-4 lg:grid-cols-[280px_1fr] lg:gap-8">
+          <div className="pt-6">
+            <div className="mb-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_24px_80px_rgba(148,163,184,0.16)] backdrop-blur">
+              <div className="grid gap-4 px-6 py-6 lg:grid-cols-[1.3fr_0.7fr] lg:px-8">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-slate-700 bg-white shadow-sm">
+                    <span className={`rounded-full px-2.5 py-1 ${stepTheme.tint}`}>
+                      {stepTheme.badge}
+                    </span>
+                    Buoc {Math.min(currentStepIndex + 1, steps.length)}
+                  </div>
+                  <h1 className="mt-4 text-3xl font-black leading-tight text-slate-900 md:text-4xl">
+                    {currentData?.title || lessonTitle || "Bài học"}
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+                    Học từng bước nhỏ, hoàn thành từng nhiệm vụ và mở khóa phần
+                    tiếp theo. Mỗi tiến bộ đều rất đáng khen.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                  <div className="rounded-[1.5rem] bg-[#FFF2E8] px-4 py-4">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-[#C97A15]">
+                      Tiến độ
+                    </div>
+                    <div className="mt-2 text-3xl font-black text-slate-900">
+                      {Math.round(progress)}%
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-[#EEF7FF] px-4 py-4">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-[#2D79C7]">
+                      Đang học
+                    </div>
+                    <div className="mt-2 text-3xl font-black text-slate-900">
+                      {currentStepIndex + 1}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-[#FFF8DD] px-4 py-4">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-[#BE8A14]">
+                      Ngôi sao
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-2xl font-black text-slate-900">
+                      <Star size={20} className="fill-[#FFD166] text-[#FFD166]" />
+                      {currentStepIndex + (isGameDone ? 1 : 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[290px_1fr] lg:gap-8">
             {/* Sidebar (desktop) */}
             <aside className="hidden lg:block">
               <div className="sticky top-[96px] space-y-3">
-                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-[2rem] border border-white/80 bg-white/85 p-4 shadow-[0_18px_60px_rgba(148,163,184,0.16)] backdrop-blur">
                   <div className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    Nội dung bài học
+                    Hành trình bài học
                   </div>
-                  <div className="mt-2 text-base font-black text-slate-900">
+                  <div className="mt-2 text-lg font-black text-slate-900">
                     {currentData?.title}
                   </div>
                   <div className="mt-1 text-xs font-semibold text-slate-500">
                     {Math.min(currentStepIndex + 1, steps.length)}/{steps.length || 0}
+                  </div>
+                  <div className="mt-4 rounded-[1.5rem] bg-[#F8FAFC] p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+                      Mục tiêu
+                    </div>
+                    <div className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      Hoàn thành bước hiện tại để mở khóa phần tiếp theo trong bài
+                      học.
+                    </div>
                   </div>
                   <button
                     onClick={() => router.back()}
@@ -704,11 +888,12 @@ export default function LessonPage() {
                 </div>
 
                 {steps.length > 1 && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="max-h-[260px] overflow-auto space-y-2 pr-1">
+                  <div className="rounded-[2rem] border border-white/80 bg-white/85 p-3 shadow-[0_18px_60px_rgba(148,163,184,0.16)] backdrop-blur">
+                    <div className="max-h-[320px] overflow-auto space-y-2 pr-1">
                       {steps.map((s: any, i: number) => {
                         const locked = i > unlockedStepIndex;
                         const active = i === currentStepIndex;
+                        const itemTheme = getStepTheme(s.type);
                         return (
                           <button
                             key={i}
@@ -720,28 +905,33 @@ export default function LessonPage() {
                             }}
                             disabled={locked}
                             aria-disabled={locked}
-                            className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
+                            className={`w-full rounded-[1.35rem] border px-3 py-3 text-left transition ${
                               active
-                                ? "border-[#53629E] bg-[#53629E]/10"
+                                ? "border-[#53629E] bg-[#EEF3FF]"
                                 : locked
-                                  ? "border-slate-200 bg-white opacity-70 cursor-not-allowed"
+                                  ? "cursor-not-allowed border-slate-200 bg-white opacity-70"
                                   : "border-slate-200 bg-white hover:bg-slate-50"
                             }`}
-                    data-sidebar-step={i}
+                            data-sidebar-step={i}
                           >
                             <div className="flex items-center gap-2">
                               <span
-                                className={`grid h-5 w-5 place-items-center rounded-lg text-[11px] font-black ${
+                                className={`grid h-7 w-7 place-items-center rounded-xl text-[11px] font-black ${
                                   active
                                     ? "bg-[#53629E] text-white"
-                                    : "bg-slate-100 text-slate-600"
+                                    : `${itemTheme.tint}`
                                 }`}
                               >
                                 {i + 1}
                               </span>
-                              <span className="min-w-0 flex-1 truncate text-xs font-extrabold text-slate-800">
-                                {s.title || s.type}
-                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-xs font-extrabold text-slate-800">
+                                  {s.title || s.type}
+                                </div>
+                                <div className="mt-0.5 text-[11px] font-bold text-slate-500">
+                                  {itemTheme.badge}
+                                </div>
+                              </div>
                               {locked && (
                                 <Lock size={14} className="text-slate-400" />
                               )}
@@ -755,14 +945,14 @@ export default function LessonPage() {
 
                 <button
                   onClick={handleNext}
-                  disabled={!isGameDone}
-                  className={`w-full rounded-2xl px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition ${
-                    isGameDone
-                      ? "bg-[#EB4C4C] hover:bg-[#D94444]"
-                      : "bg-gray-300 cursor-not-allowed"
+                  disabled={!canContinue}
+                  className={`w-full rounded-2xl px-4 py-3 text-sm font-extrabold text-white shadow-sm transition ${
+                    canContinue
+                      ? "bg-[#FF8A65] hover:bg-[#F9734E]"
+                      : "cursor-not-allowed bg-gray-300"
                   }`}
                 >
-                  TIẾP TỤC
+                  Tiếp tục
                 </button>
               </div>
             </aside>
@@ -771,11 +961,12 @@ export default function LessonPage() {
             <main className="min-w-0">
               {/* Stepper (mobile) */}
               {steps.length > 1 && (
-                <div className="lg:hidden sticky top-[72px] md:top-[76px] z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-2 bg-white/90 backdrop-blur border-b border-slate-200">
+                <div className="sticky top-[72px] z-20 -mx-4 border-b border-white/70 bg-white/85 px-4 py-3 backdrop-blur md:-mx-8 md:top-[76px] md:px-8 lg:hidden">
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {steps.map((s: any, i: number) => {
                       const locked = i > unlockedStepIndex;
                       const active = i === currentStepIndex;
+                      const itemTheme = getStepTheme(s.type);
                       return (
                         <button
                           key={i}
@@ -787,28 +978,33 @@ export default function LessonPage() {
                           }}
                           disabled={locked}
                           aria-disabled={locked}
-                          className={`shrink-0 rounded-2xl border px-3 py-2 text-left transition ${
+                          className={`shrink-0 rounded-[1.25rem] border px-3 py-2.5 text-left transition ${
                             active
-                              ? "border-[#53629E] bg-[#53629E]/10"
+                              ? "border-[#53629E] bg-[#EEF3FF]"
                               : locked
-                                ? "border-slate-200 bg-white opacity-70 cursor-not-allowed"
+                                ? "cursor-not-allowed border-slate-200 bg-white opacity-70"
                                 : "border-slate-200 bg-white hover:bg-slate-50"
                           }`}
                           data-mobile-step={i}
                         >
                           <div className="flex items-center gap-2">
                             <span
-                              className={`grid h-5 w-5 place-items-center rounded-lg text-[11px] font-black ${
+                              className={`grid h-6 w-6 place-items-center rounded-lg text-[11px] font-black ${
                                 active
                                   ? "bg-[#53629E] text-white"
-                                  : "bg-slate-100 text-slate-600"
+                                  : `${itemTheme.tint}`
                               }`}
                             >
                               {i + 1}
                             </span>
-                            <span className="max-w-[220px] truncate text-xs font-extrabold text-slate-800">
-                              {s.title || s.type}
-                            </span>
+                            <div className="max-w-[220px]">
+                              <div className="truncate text-xs font-extrabold text-slate-800">
+                                {s.title || s.type}
+                              </div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                                {itemTheme.badge}
+                              </div>
+                            </div>
                             {locked && (
                               <Lock size={14} className="text-slate-400" />
                             )}
@@ -821,73 +1017,119 @@ export default function LessonPage() {
               )}
 
               <div className="pt-5">
-                {/* Render Game Content */}
-                {currentData.type === "video" && (
-                  <div
-                    className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl"
-                    onEnded={() => setIsGameDone(true)}
-                  >
-                    <iframe
-                      src={currentData.src}
-                      className="w-full h-full"
-                      allowFullScreen
-                    ></iframe>
+                <div
+                  className={`overflow-hidden rounded-[2rem] border border-white/80 bg-gradient-to-b ${stepTheme.panel} p-4 shadow-[0_28px_90px_rgba(148,163,184,0.18)] ring-1 ${stepTheme.ring} md:p-6`}
+                >
+                  <div className="mb-5 flex flex-col gap-3 rounded-[1.5rem] bg-white/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.22em] ${stepTheme.tint}`}>
+                        {stepTheme.badge}
+                      </div>
+                      <div className="mt-3 text-2xl font-black text-slate-900">
+                        {currentData.title}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.25rem] bg-[#F8FAFC] px-4 py-3 text-sm font-semibold text-slate-600">
+                      {canContinue
+                        ? "Bạn đã sẵn sàng sang bước tiếp theo."
+                        : "Hãy hoàn thành phần này trước nhé."}
+                    </div>
                   </div>
-                )}
-                {currentData.type === "vocab-intro" && (
-                  <VocabIntro data={currentData} />
-                )}
-                {currentData.type === "vocab" && <VocabView data={currentData} />}
-                {currentData.type === "flashcard" && (
-                  <FlashcardGame
-                    data={{
-                      content: currentData.question || "Tìm cặp tương ứng",
-                      pairs: currentData.pairs || [],
-                    }}
-                    onFinish={(isCorrect) => handleStepComplete(isCorrect)}
-                  />
-                )}
-                {currentData.type === "quiz" && (
-                  <QuizGame data={currentData} onFinish={handleStepComplete} />
-                )}
-                {currentData.type === "listening" && (
-                  <ListeningGame data={currentData} onFinish={handleStepComplete} />
-                )}
-                {currentData.type === "spelling" && (
-                  <SpellingGame data={currentData} onFinish={handleStepComplete} />
-                )}
-                {currentData.type === "matching" && (
-                  <MatchingGame
-                    data={currentData.pairs}
-                    onFinish={() => handleStepComplete(true)}
-                  />
-                )}
-                {currentData.type === "speaking" && (
-                  <PronounceGame
-                    data={currentData}
-                    onSuccess={() => handleStepComplete(true)}
-                  />
-                )}
-                {currentData.type === "reading" && (
-                  <ReadingCard
-                    title={currentData.title}
-                    subtitle={currentData.subtitle}
-                    items={currentData.items}
-                  />
-                )}
+
+                  {currentData.type === "video" && (
+                    <div className="overflow-hidden rounded-[1.75rem] bg-slate-950 shadow-xl">
+                      <div className="aspect-video w-full">
+                        <iframe
+                          src={currentData.src}
+                          className="h-full w-full"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    </div>
+                  )}
+                  {currentData.type === "vocab-intro" && (
+                    <VocabIntro data={currentData} />
+                  )}
+                  {currentData.type === "vocab" && <VocabView data={currentData} />}
+                  {currentData.type === "flashcard" && (
+                    <FlashcardGame
+                      data={{
+                        content: currentData.question || "Tìm cặp tương ứng",
+                        pairs: currentData.pairs || [],
+                      }}
+                      onFinish={(isCorrect) => handleStepComplete(isCorrect)}
+                    />
+                  )}
+                  {currentData.type === "quiz" && (
+                    <QuizGame data={currentData} onFinish={handleStepComplete} />
+                  )}
+                  {currentData.type === "listening" && (
+                    <ListeningGame data={currentData} onFinish={handleStepComplete} />
+                  )}
+                  {currentData.type === "spelling" && (
+                    <SpellingGame data={currentData} onFinish={handleStepComplete} />
+                  )}
+                  {currentData.type === "matching" && (
+                    <MatchingGame
+                      data={currentData.pairs}
+                      onFinish={() => handleStepComplete(true)}
+                    />
+                  )}
+                  {currentData.type === "speaking" && (
+                    <PronounceGame
+                      data={currentData}
+                      onSuccess={() => handleStepComplete(true)}
+                    />
+                  )}
+                  {currentData.type === "reading" && (
+                    <ReadingCard
+                      title={currentData.title}
+                      subtitle={currentData.subtitle}
+                      items={currentData.items}
+                    />
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                  <div className="rounded-[1.5rem] border border-white/80 bg-white/80 px-4 py-4 text-sm text-slate-600 shadow-sm">
+                    <div className="flex items-center gap-2 font-black text-slate-800">
+                      <Play size={16} className="text-[#FF8A65]" />
+                      Hướng dẫn nhanh
+                    </div>
+                    <p className="mt-2 leading-6">
+                      Học xong bước hiện tại, nhấn <span className="font-extrabold text-[#FF8A65]">Tiếp tục</span> để đi tiếp.
+                      Nếu muốn xem lại, bé có thể bấm vào bước đã mở khóa trong danh sách.
+                    </p>
+                  </div>
+                  <div className="hidden items-center justify-end lg:flex">
+                    <button
+                      onClick={handleNext}
+                      disabled={!canContinue}
+                      className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white shadow-sm transition ${
+                        canContinue
+                          ? "bg-[#FF8A65] hover:bg-[#F9734E]"
+                          : "cursor-not-allowed bg-gray-300"
+                      }`}
+                    >
+                      Tiếp tục
+                      <ArrowRight size={18} />
+                    </button>
+                  </div>
+                </div>
 
                 {/* Continue button (mobile) */}
                 <div className="mt-4 flex justify-end lg:hidden">
                   <button
                     onClick={handleNext}
-                    disabled={!isGameDone}
-                    className={`rounded-2xl px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition ${
-                      isGameDone
-                        ? "bg-[#EB4C4C] hover:bg-[#D94444]"
-                        : "bg-gray-300 cursor-not-allowed"
+                    disabled={!canContinue}
+                    className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold text-white shadow-sm transition ${
+                      canContinue
+                        ? "bg-[#FF8A65] hover:bg-[#F9734E]"
+                        : "cursor-not-allowed bg-gray-300"
                     }`}
                   >
-                    TIẾP TỤC
+                    Tiếp tục
+                    <ArrowRight size={18} />
                   </button>
                 </div>
               </div>
