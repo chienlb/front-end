@@ -117,10 +117,19 @@ function extractLessonList(payload: Lesson[] | ApiListResponse<Lesson> | unknown
   return [];
 }
 
-function extractUnit(payload: Unit | { data?: Unit } | null) {
+function isUnit(payload: unknown): payload is Unit {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      "_id" in payload &&
+      typeof (payload as { _id?: unknown })._id === "string"
+  );
+}
+
+function extractUnit(payload: Unit | { data?: Unit } | null): Unit | null {
   if (!payload) return null;
-  if ("data" in payload && payload.data) return payload.data;
-  return payload;
+  if ("data" in payload && isUnit(payload.data)) return payload.data;
+  return isUnit(payload) ? payload : null;
 }
 
 function LoadingSkeleton() {
