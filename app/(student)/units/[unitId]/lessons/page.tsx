@@ -136,7 +136,7 @@ function LoadingSkeleton() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#FDF7FF_0%,#F3FAFF_45%,#FFFDF3_100%)]">
       <div className="container mx-auto px-4 pt-24 pb-20">
-        <div className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(148,163,184,0.16)] backdrop-blur">
+        <div className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-3">
               <div className="h-6 w-32 rounded-full bg-slate-200 animate-pulse" />
@@ -154,7 +154,7 @@ function LoadingSkeleton() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur"
+              className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur"
             >
               <div className="flex flex-col gap-4 md:flex-row md:items-center">
                 <div className="h-16 w-16 rounded-[1.5rem] bg-slate-200 animate-pulse" />
@@ -269,7 +269,7 @@ export default function LessonsByUnitPage() {
       <div className="pointer-events-none absolute right-[-30px] top-52 h-44 w-44 rounded-full bg-[#FFE7A3]/50 blur-2xl" />
 
       <div className="container relative mx-auto px-4 pt-24 pb-20">
-        <div className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_24px_80px_rgba(148,163,184,0.18)] backdrop-blur md:p-8">
+        <div className="rounded-[2rem] border border-white/80 bg-white/80 p-6 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] backdrop-blur md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -367,7 +367,7 @@ export default function LessonsByUnitPage() {
         )}
 
         {!error && lessons.length === 0 && (
-          <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_24px_70px_rgba(148,163,184,0.16)]">
+          <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)]">
             <div className="h-2 bg-[linear-gradient(90deg,#FF8DB3_0%,#62B6FF_50%,#7CCF63_100%)]" />
             <div className="p-8">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -418,7 +418,7 @@ export default function LessonsByUnitPage() {
 
               const cardContent = (
                 <div
-                  className={`group relative rounded-[2rem] border p-5 shadow-[0_20px_60px_rgba(148,163,184,0.18)] transition md:p-6 ${
+                  className={`group relative rounded-[2rem] border p-5 shadow-[0_10px_0_rgba(123,110,214,0.20),0_30px_76px_rgba(148,163,184,0.18)] transition md:p-6 ${
                     locked
                       ? "cursor-not-allowed opacity-90"
                       : "hover:-translate-y-1"
