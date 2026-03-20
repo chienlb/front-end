@@ -11,7 +11,7 @@ export const groupMessagesService = {
         params: { page, limit },
       });
     } catch {
-      return api.get(`/group-messages/${groupId}`, {
+      return api.get(`/group-messages/group/${groupId}`, {
         params: { page, limit },
       });
     }

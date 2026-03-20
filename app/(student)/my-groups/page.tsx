@@ -34,6 +34,7 @@ export default function MyGroupsPage() {
 
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const activeGroup = useMemo(
     () => myGroups.find((g) => g.id === activeGroupId) ?? null,
@@ -119,6 +120,43 @@ export default function MyGroupsPage() {
       // ignore
     }
   }, [myGroups]);
+
+  useEffect(() => {
+    // Xác định "tôi" để căn phải/trái tin nhắn.
+    try {
+      const stored = window.localStorage.getItem("currentUser");
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      const id =
+        parsed?.id ??
+        parsed?._id ??
+        parsed?.userId ??
+        parsed?.user?.userId ??
+        null;
+      if (typeof id === "string" && id.trim()) setCurrentUserId(id.trim());
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const formatTime = (value?: string) => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getInitials = (name?: string) => {
+    const n = (name ?? "").trim();
+    if (!n) return "?";
+    const parts = n.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? "";
+    const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+    return (first + last).toUpperCase();
+  };
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -430,29 +468,81 @@ export default function MyGroupsPage() {
                     <div className="text-slate-500 text-sm">Đang tải tin nhắn...</div>
                   ) : messages?.length ? (
                     messages.map((m, idx) => {
-                      const content = m.content ?? (m as any)?.message ?? (m as any)?.text ?? "";
-                      const sender = m.senderName ?? (m as any)?.sender?.name ?? (m as any)?.senderId ?? "Bạn";
-                      const isMe = (() => {
-                        // Không có thông tin user hiện tại ở đây nên mặc định "Bạn" là me.
-                        // Nếu API trả senderId thì bạn có thể so sánh để đổi màu bubble.
-                        return sender === "Bạn" || sender === "ME";
-                      })();
+                      const anyMsg = m as any;
+                      const content =
+                        m.content ?? anyMsg?.message ?? anyMsg?.text ?? "";
+
+                      const senderId: string | null =
+                        typeof anyMsg?.senderId === "string"
+                          ? anyMsg.senderId
+                          : typeof anyMsg?.sender?._id === "string"
+                            ? anyMsg.sender._id
+                            : null;
+
+                      const isMe =
+                        Boolean(
+                          currentUserId && senderId && currentUserId === senderId,
+                        );
+
+                      const senderName: string =
+                        m.senderName ??
+                        anyMsg?.sender?.name ??
+                        anyMsg?.sender?.fullName ??
+                        (isMe ? "Bạn" : "Thành viên");
+
+                      const timeLabel = formatTime(
+                        anyMsg?.createdAt ?? anyMsg?.timestamp ?? anyMsg?.time,
+                      );
 
                       return (
                         <div
                           key={m.id ?? `${activeGroupId}-${idx}`}
-                          className={`flex ${isMe ? "justify-end" : "justify-start"} `}
+                          className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                         >
+                          {!isMe && (
+                            <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-black text-xs shrink-0">
+                              {getInitials(senderName)}
+                            </div>
+                          )}
+
                           <div
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm border ${
+                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm border shadow-sm ${
                               isMe
-                                ? "bg-blue-600 text-white border-blue-700 rounded-tr-none"
+                                ? "bg-blue-600 text-white border-blue-500 rounded-tr-none"
                                 : "bg-white text-slate-800 border-slate-200 rounded-tl-none"
                             }`}
                           >
-                            <div className="font-bold text-xs opacity-80 mb-1">{isMe ? "Bạn" : sender}</div>
-                            <div className="break-words whitespace-pre-wrap">{content}</div>
+                            <div
+                              className={`flex items-center justify-between gap-3 mb-1 ${
+                                isMe ? "opacity-95" : "opacity-90"
+                              }`}
+                            >
+                              <div className="font-bold text-xs truncate">
+                                {senderName}
+                              </div>
+                              {timeLabel ? (
+                                <div
+                                  className={`text-[10px] ${
+                                    isMe ? "text-blue-100" : "text-slate-400"
+                                  }`}
+                                >
+                                  {timeLabel}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] opacity-0">.</div>
+                              )}
+                            </div>
+
+                            <div className="break-words whitespace-pre-wrap leading-relaxed">
+                              {content}
+                            </div>
                           </div>
+
+                          {isMe && (
+                            <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-black text-xs shrink-0">
+                              {getInitials(senderName)}
+                            </div>
+                          )}
                         </div>
                       );
                     })
