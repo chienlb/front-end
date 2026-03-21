@@ -14,75 +14,11 @@ import {
   MonitorPlay,
   Zap,
 } from "lucide-react";
-
-// --- TYPES ---
-type AssignmentStatus = "PENDING" | "SUBMITTED" | "LATE" | "GRADED";
-type AssignmentSource = "LIVE_CLASS" | "COURSE" | "SYSTEM";
-
-interface Assignment {
-  id: string;
-  title: string;
-  subject: string;
-  source: AssignmentSource;
-  sourceName?: string;
-  teacher?: string;
-  deadline: string;
-  status: AssignmentStatus;
-  score?: number;
-  duration?: string;
-  priority?: "HIGH" | "NORMAL";
-}
-
-// --- MOCK DATA ---
-const ASSIGNMENTS: Assignment[] = [
-  {
-    id: "A1",
-    title: "Bài tập thì hiện tại đơn",
-    subject: "Ngữ pháp",
-    source: "LIVE_CLASS",
-    sourceName: "Lớp Tiếng Anh 3A - Cô Lan",
-    teacher: "Cô Lan Anh",
-    deadline: "Hôm nay, 20:00",
-    status: "PENDING",
-    duration: "15 phút",
-    priority: "HIGH",
-  },
-  {
-    id: "A2",
-    title: "Quiz: Video Lesson 5",
-    subject: "Nghe hiểu",
-    source: "COURSE",
-    sourceName: "Khóa học: English for Kids (Level 1)",
-    teacher: "Hệ thống",
-    deadline: "Không giới hạn",
-    status: "PENDING",
-    duration: "10 phút",
-    priority: "NORMAL",
-  },
-  {
-    id: "A3",
-    title: "Thử thách từ vựng mỗi ngày",
-    subject: "Từ vựng",
-    source: "SYSTEM",
-    sourceName: "Daily Challenge",
-    deadline: "Hôm qua",
-    status: "LATE",
-    duration: "5 phút",
-    priority: "HIGH",
-  },
-  {
-    id: "A4",
-    title: "Kiểm tra giữa kỳ Unit 1-3",
-    subject: "Tổng hợp",
-    source: "LIVE_CLASS",
-    sourceName: "Lớp Gia sư 1-1",
-    teacher: "Thầy John",
-    deadline: "10/11/2023",
-    status: "GRADED",
-    score: 9.5,
-    duration: "45 phút",
-  },
-];
+import {
+  ASSIGNMENTS,
+  type Assignment,
+  type AssignmentSource,
+} from "./data";
 
 export default function AssignmentsPage() {
   const [activeTab, setActiveTab] = useState<"TODO" | "DONE">("TODO");
@@ -287,9 +223,12 @@ export default function AssignmentsPage() {
 
                 {/* Content */}
                 <div className="flex-1 mb-4">
-                  <h3 className="font-bold text-lg text-slate-800 mb-1 group-hover:text-blue-600 transition line-clamp-2">
+                  <Link
+                    href={`/assignments/${item.id}`}
+                    className="font-bold text-lg text-slate-800 mb-1 group-hover:text-blue-600 transition line-clamp-2 hover:underline underline-offset-4 block"
+                  >
                     {item.title}
-                  </h3>
+                  </Link>
                   {/* Hiển thị tên lớp/khóa học nguồn */}
                   <p className="text-xs text-slate-400 font-medium mb-3 line-clamp-1">
                     Từ:{" "}
@@ -321,12 +260,20 @@ export default function AssignmentsPage() {
                   </div>
 
                   {item.status === "PENDING" || item.status === "LATE" ? (
-                    <Link
-                      href={`/assignments/${item.id}/play`}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
-                    >
-                      Làm bài <ArrowUpRight size={14} />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/assignments/${item.id}`}
+                        className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
+                      >
+                        Xem nội dung
+                      </Link>
+                      <Link
+                        href={`/assignments/${item.id}/submit`}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
+                      >
+                        Nộp file <ArrowUpRight size={14} />
+                      </Link>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-3">
                       {item.score && (

@@ -195,6 +195,12 @@ export default function Navbar() {
           icon: Search,
           desc: "Tra cứu nhanh",
         },
+        {
+          name: "Feedback",
+          path: "/feedback",
+          icon: MessageSquare,
+          desc: "Góp ý cho hệ thống",
+        },
       ],
     },
     {
