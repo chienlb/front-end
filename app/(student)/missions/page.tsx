@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { showAlert } from "@/utils/dialog";
 
 // --- ANIMATION VARIANTS ---
 const containerVariants: Variants = {
@@ -151,7 +152,7 @@ export default function MissionsPage() {
       await gamificationService.claimReward(id);
     } catch (error: any) {
       setMissions(previousMissions);
-      alert("Ui da, có lỗi rồi! Bé thử lại sau nhé.");
+      await showAlert("Ui da, có lỗi rồi! Bé thử lại sau nhé.");
     }
   };
 

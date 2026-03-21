@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Medal,
   Zap,
-  Filter,
   MonitorPlay,
   Video,
 } from "lucide-react";
@@ -53,40 +52,54 @@ interface Badge {
   isLocked: boolean;
 }
 
+interface RoadmapStep {
+  id: string;
+  title: string;
+  goal: string;
+  lessons: number;
+  completedLessons: number;
+  status: "COMPLETED" | "IN_PROGRESS" | "LOCKED";
+}
+
 // --- MOCK DATA ---
 const COURSES: CourseProgress[] = [
   {
     id: "C1",
-    name: "Tiếng Anh Lớp 3 - Tập 1",
+    name: "Tiếng Anh Lớp 1 - Căn bản",
     type: "PAID_LIVE",
-    totalLessons: 20,
-    completedLessons: 18,
-    averageScore: 9.2,
-    lastAccess: "Hôm qua",
+    totalLessons: 24,
+    completedLessons: 9,
+    averageScore: 8.8,
+    lastAccess: "Hôm nay",
     image:
       "https://img.freepik.com/free-vector/english-book-illustration_1284-39828.jpg",
   },
+];
+
+const ROADMAP_STEPS: RoadmapStep[] = [
   {
-    id: "C2",
-    name: "Luyện phát âm cơ bản (IPA)",
-    type: "FREE_PRACTICE",
-    totalLessons: 15,
-    completedLessons: 5,
-    averageScore: 8.5,
-    lastAccess: "2 giờ trước",
-    image:
-      "https://img.freepik.com/free-vector/kids-learning-english-illustration_1284-39833.jpg",
+    id: "R1",
+    title: "Chặng 1: Làm quen chữ cái",
+    goal: "Nhận biết 26 chữ cái và phát âm cơ bản.",
+    lessons: 8,
+    completedLessons: 8,
+    status: "COMPLETED",
   },
   {
-    id: "C3",
-    name: "Video: Thế giới động vật",
-    type: "PAID_VIDEO",
-    totalLessons: 5,
+    id: "R2",
+    title: "Chặng 2: Từ vựng chủ đề gia đình",
+    goal: "Nắm từ vựng Family, Colors, Numbers.",
+    lessons: 8,
     completedLessons: 1,
-    averageScore: 10,
-    lastAccess: "5 ngày trước",
-    image:
-      "https://img.freepik.com/free-vector/animals-wild-nature-background_1308-46637.jpg",
+    status: "IN_PROGRESS",
+  },
+  {
+    id: "R3",
+    title: "Chặng 3: Mẫu câu đơn giản",
+    goal: "Sử dụng được mẫu câu giới thiệu bản thân.",
+    lessons: 8,
+    completedLessons: 0,
+    status: "LOCKED",
   },
 ];
 
@@ -191,12 +204,9 @@ const getTypeBadge = (type: CourseType) => {
 
 export default function ProgressPage() {
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "GRADES">("OVERVIEW");
-  const [filterType, setFilterType] = useState<"ALL" | CourseType>("ALL");
 
   // Filter Logic
-  const filteredCourses = COURSES.filter(
-    (c) => filterType === "ALL" || c.type === filterType,
-  );
+  const filteredCourses = COURSES;
 
   // Helper: Calculate % completion
   const getProgress = (done: number, total: number) =>
@@ -266,21 +276,9 @@ export default function ProgressPage() {
             </button>
           </div>
 
-          {/* Filter Dropdown (Only show in Overview tab) */}
           {activeTab === "OVERVIEW" && (
-            <div className="flex items-center gap-2 bg-white p-1.5 px-3 rounded-xl shadow-sm border border-slate-100 text-sm font-bold text-slate-600">
-              <Filter size={16} className="text-slate-400" />
-              <span className="hidden md:inline">Lọc nguồn:</span>
-              <select
-                className="bg-transparent outline-none text-indigo-600 cursor-pointer font-bold"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as any)}
-              >
-                <option value="ALL">Tất cả</option>
-                <option value="PAID_LIVE">Lớp học Live</option>
-                <option value="PAID_VIDEO">Khóa Video</option>
-                <option value="FREE_PRACTICE">Tự luyện tập</option>
-              </select>
+            <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl border border-indigo-100 text-sm font-bold">
+              Lộ trình đang áp dụng: Lớp 1
             </div>
           )}
         </div>
@@ -362,6 +360,75 @@ export default function ProgressPage() {
                   </p>
                 </div>
               )}
+
+              {/* Roadmap detail for Grade 1 */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 className="font-black text-lg text-slate-800 mb-4">
+                  Lộ trình chi tiết - Lớp 1
+                </h3>
+                <div className="space-y-3">
+                  {ROADMAP_STEPS.map((step) => {
+                    const percent = getProgress(
+                      step.completedLessons,
+                      step.lessons,
+                    );
+                    const tone =
+                      step.status === "COMPLETED"
+                        ? "border-green-200 bg-green-50"
+                        : step.status === "IN_PROGRESS"
+                          ? "border-blue-200 bg-blue-50"
+                          : "border-slate-200 bg-slate-50";
+                    const label =
+                      step.status === "COMPLETED"
+                        ? "Hoàn thành"
+                        : step.status === "IN_PROGRESS"
+                          ? "Đang học"
+                          : "Chưa mở";
+
+                    return (
+                      <div
+                        key={step.id}
+                        className={`rounded-2xl border p-4 ${tone}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-black text-slate-800">
+                              {step.title}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {step.goal}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-bold px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 whitespace-nowrap">
+                            {label}
+                          </span>
+                        </div>
+
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                            <span>
+                              {step.completedLessons}/{step.lessons} bài
+                            </span>
+                            <span>{percent}%</span>
+                          </div>
+                          <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-slate-200">
+                            <div
+                              className={`h-full ${
+                                step.status === "COMPLETED"
+                                  ? "bg-green-500"
+                                  : step.status === "IN_PROGRESS"
+                                    ? "bg-blue-500"
+                                    : "bg-slate-300"
+                              }`}
+                              style={{ width: `${percent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Right Col: Badges */}

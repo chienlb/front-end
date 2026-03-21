@@ -29,6 +29,7 @@ import {
 import { liveClassService } from "@/services/live-class.service";
 import ExamRoom from "@/components/student/course/lesson/ExamRoom";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 // --- ANIMATION VARIANTS ---
 const containerVariants: Variants = {
@@ -116,18 +117,18 @@ export default function ClassDetailPage() {
   // --- HANDLERS ---
   const handleSyncContent = async () => {
     if (
-      !confirm(
+      !(await showConfirm(
         "Hành động này sẽ tải các Lesson mới nhất. Dữ liệu cũ vẫn giữ nguyên. Tiếp tục?",
-      )
+      ))
     )
       return;
     setIsSyncing(true);
     try {
       await liveClassService.syncContent(classId);
-      alert("Đã cập nhật nội dung thành công!");
+      await showAlert("Đã cập nhật nội dung thành công!");
       fetchData();
     } catch (error) {
-      alert("Lỗi khi cập nhật nội dung.");
+      await showAlert("Lỗi khi cập nhật nội dung.");
     } finally {
       setIsSyncing(false);
     }
@@ -189,11 +190,11 @@ export default function ClassDetailPage() {
             ...fullLesson.examConfig,
           });
         } else {
-          alert("Bài kiểm tra này chưa có câu hỏi nào.");
+          await showAlert("Bài kiểm tra này chưa có câu hỏi nào.");
         }
       } catch (error) {
         console.error(error);
-        alert("Không thể tải đề thi.");
+        await showAlert("Không thể tải đề thi.");
       } finally {
         setLoadingExam(false);
       }
@@ -248,8 +249,10 @@ export default function ClassDetailPage() {
       >
         <div className="absolute top-4 right-4 z-50">
           <button
-            onClick={() => {
-              if (confirm("Bạn muốn thoát bài thi?")) setActiveExam(null);
+            onClick={async () => {
+              if (await showConfirm("Bạn muốn thoát bài thi?")) {
+                setActiveExam(null);
+              }
             }}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 font-bold transition"
           >
@@ -260,7 +263,7 @@ export default function ClassDetailPage() {
           <ExamRoom
             examData={activeExam}
             onComplete={async (score) => {
-              alert(`Bạn đã hoàn thành bài thi với số điểm: ${score}`);
+              await showAlert(`Bạn đã hoàn thành bài thi với số điểm: ${score}`);
               setActiveExam(null);
             }}
           />

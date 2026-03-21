@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MapPin, Phone, Mail, Send, MessageSquare } from "lucide-react";
+import { showAlert } from "@/utils/dialog";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -11,10 +12,10 @@ export default function ContactPage() {
     message: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Xử lý logic gửi mail
-    alert("Cảm ơn ba mẹ đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất.");
+    await showAlert("Cảm ơn ba mẹ đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất.");
     setFormData({ name: "", email: "", phone: "", message: "" });
   };
 

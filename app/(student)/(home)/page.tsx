@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
   ArrowRight,
@@ -19,6 +20,7 @@ import {
   ArrowUpRight,
   Heart,
   MapPin,
+  X,
 } from "lucide-react";
 
 // --- ANIMATION CONFIG ---
@@ -48,6 +50,8 @@ const floatAnim = {
 };
 
 export default function HomePage() {
+  const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 overflow-x-hidden font-sans selection:bg-blue-200 selection:text-blue-900 relative">
       {/* 1. DYNAMIC BACKGROUND */}
@@ -561,10 +565,10 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-10 max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <motion.div
-              whileHover={{ y: -8 }}
-              className="group relative bg-gradient-to-br from-blue-50/80 to-white p-10 rounded-[40px] border border-blue-100 shadow-[0_10px_40px_-10px_rgba(37,99,235,0.1)] hover:shadow-[0_20px_60px_-15px_rgba(37,99,235,0.2)] transition-all cursor-pointer overflow-hidden"
+              whileHover={{ y: -6 }}
+              className="group relative bg-gradient-to-br from-blue-50/80 to-white p-10 rounded-[40px] border border-blue-100 shadow-[0_10px_40px_-10px_rgba(37,99,235,0.1)] hover:shadow-[0_20px_60px_-15px_rgba(37,99,235,0.2)] transition-all overflow-hidden"
             >
               <div className="absolute -right-20 -top-20 w-60 h-60 bg-blue-100/50 rounded-full blur-3xl group-hover:bg-blue-200/50 transition-colors"></div>
 
@@ -577,7 +581,7 @@ export default function HomePage() {
                   <h3 className="text-2xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
                     Tiếng Anh Khởi Động
                   </h3>
-                  <p className="text-slate-600 text-sm max-w-xs leading-relaxed">
+                  <p className="text-slate-600 text-sm max-w-2xl leading-relaxed">
                     Xây dựng nền tảng từ vựng và ngữ âm cơ bản. Giúp bé yêu thích tiếng
                     Anh ngay từ đầu.
                   </p>
@@ -600,7 +604,7 @@ export default function HomePage() {
                 ].map((txt, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-3 text-sm text-slate-700 font-medium bg-white/50 p-2 rounded-lg"
+                    className="flex items-center gap-3 text-sm text-slate-700 font-medium bg-white/60 p-2 rounded-lg"
                   >
                     <div className="bg-blue-100 p-1 rounded-full">
                       <CheckCircle2 size={14} className="text-blue-600" />
@@ -610,66 +614,121 @@ export default function HomePage() {
                 ))}
               </ul>
 
-              <div className="w-full bg-white border border-blue-100 h-14 rounded-2xl flex items-center justify-center text-blue-700 font-bold group-hover:bg-blue-600 group-hover:text-white group-hover:border-transparent transition-all shadow-sm">
+              <button
+                onClick={() => setShowRoadmapModal(true)}
+                className="w-full bg-white border border-blue-100 h-14 rounded-2xl flex items-center justify-center text-blue-700 font-bold hover:bg-blue-600 hover:text-white hover:border-transparent transition-all shadow-sm"
+              >
                 Xem Chi Tiết Lộ Trình
-              </div>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ y: -8 }}
-              className="group relative bg-gradient-to-br from-orange-50/80 to-white p-10 rounded-[40px] border border-orange-100 shadow-[0_10px_40px_-10px_rgba(234,88,12,0.1)] hover:shadow-[0_20px_60px_-15px_rgba(234,88,12,0.2)] transition-all cursor-pointer overflow-hidden"
-            >
-              <div className="absolute -right-20 -top-20 w-60 h-60 bg-orange-100/50 rounded-full blur-3xl group-hover:bg-orange-200/50 transition-colors"></div>
-
-              <span className="inline-block bg-orange-500 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider mb-6 shadow-md shadow-orange-200">
-                Lớp 2 (7-8 Tuổi)
-              </span>
-
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2 group-hover:text-orange-600 transition-colors">
-                    Tiếng Anh Giao Tiếp
-                  </h3>
-                  <p className="text-slate-600 text-sm max-w-xs leading-relaxed">
-                    Mở rộng mẫu câu giao tiếp, luyện phản xạ nghe nói và tự tin giới
-                    thiệu bản thân.
-                  </p>
-                </div>
-
-                <div className="w-16 h-16 flex items-center justify-center bg-white rounded-2xl shadow-md group-hover:scale-110 group-hover:rotate-6 transition-transform">
-                  <img
-                    src="https://img.icons8.com/color/96/rocket.png"
-                    alt="rocket"
-                    className="w-10 h-10"
-                  />
-                </div>
-              </div>
-
-              <ul className="space-y-3 mb-8">
-                {[
-                  "1000+ Từ vựng mở rộng",
-                  "Mẫu câu giao tiếp hàng ngày",
-                  "Luyện nghe & Phản xạ",
-                ].map((txt, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center gap-3 text-sm text-slate-700 font-medium bg-white/50 p-2 rounded-lg"
-                  >
-                    <div className="bg-orange-100 p-1 rounded-full">
-                      <CheckCircle2 size={14} className="text-orange-600" />
-                    </div>
-                    {txt}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="w-full bg-white border border-orange-100 h-14 rounded-2xl flex items-center justify-center text-orange-700 font-bold group-hover:bg-orange-500 group-hover:text-white group-hover:border-transparent transition-all shadow-sm">
-                Xem Chi Tiết Lộ Trình
-              </div>
+              </button>
             </motion.div>
           </div>
         </div>
       </section>
+
+      {showRoadmapModal && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-[2rem] border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                  Lớp 1 (6-7 tuổi)
+                </p>
+                <h3 className="text-xl font-black text-slate-900 mt-1">
+                  Lộ trình chi tiết
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowRoadmapModal(false)}
+                className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                  Mục tiêu cuối lộ trình
+                </p>
+                <p className="text-sm text-slate-700 mt-2 leading-relaxed">
+                  Bé đạt nền tảng từ vựng 700+ từ, đọc được câu ngắn theo
+                  phonics, giao tiếp mẫu câu hằng ngày và tự tin tham gia bài
+                  kiểm tra chuẩn Starters cấp độ khởi đầu.
+                </p>
+              </div>
+
+              {[
+                {
+                  title: "Chặng 1 (Tuần 1-2): Làm quen chữ cái và âm cơ bản",
+                  desc: "Nhận diện 26 chữ cái, phân biệt nguyên âm/phụ âm, luyện âm đầu đơn giản bằng trò chơi hình ảnh.",
+                  progress: "100%",
+                },
+                {
+                  title: "Chặng 2 (Tuần 3-4): Phonics nền tảng",
+                  desc: "Ghép âm CVC, đọc các từ ngắn như cat, dog, pen; luyện phản xạ nghe - chọn từ đúng.",
+                  progress: "90%",
+                },
+                {
+                  title: "Chặng 3 (Tuần 5-6): Từ vựng chủ đề gia đình",
+                  desc: "Học và dùng từ vựng Family + My Home, đặt câu giới thiệu người thân và đồ vật trong nhà.",
+                  progress: "75%",
+                },
+                {
+                  title: "Chặng 4 (Tuần 7-8): Từ vựng trường học",
+                  desc: "Chủ đề School Things + Classroom Actions, luyện mẫu câu This is..., I have..., Can I...?",
+                  progress: "65%",
+                },
+                {
+                  title: "Chặng 5 (Tuần 9-10): Màu sắc, số đếm, thời gian",
+                  desc: "Nắm số 1-100, màu sắc, ngày trong tuần; luyện hỏi đáp: What color is it? How many...?",
+                  progress: "50%",
+                },
+                {
+                  title: "Chặng 6 (Tuần 11-12): Mẫu câu giao tiếp ngắn",
+                  desc: "Giới thiệu bản thân, chào hỏi, hỏi tuổi, sở thích; luyện hội thoại 2-3 lượt với AI.",
+                  progress: "35%",
+                },
+                {
+                  title: "Chặng 7 (Tuần 13-14): Luyện nghe - phản xạ",
+                  desc: "Nghe câu ngắn, chọn tranh đúng, điền từ đơn giản, tăng tốc phản xạ qua mini game.",
+                  progress: "15%",
+                },
+                {
+                  title: "Chặng 8 (Tuần 15-16): Ôn tập và kiểm tra cuối kỳ",
+                  desc: "Tổng ôn theo chủ đề, làm đề mô phỏng, chốt kỹ năng nghe - đọc - nói mức khởi đầu.",
+                  progress: "0%",
+                },
+              ].map((step, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-800">{step.title}</p>
+                    <span className="text-xs font-bold text-blue-600">{step.progress}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    {step.desc}
+                  </p>
+                </div>
+              ))}
+
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  Đầu ra cam kết
+                </p>
+                <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+                  <li>- Đọc được từ/câu ngắn theo phonics cơ bản.</li>
+                  <li>- Giao tiếp mẫu câu quen thuộc trong đời sống hằng ngày.</li>
+                  <li>- Tự học 15-20 phút/ngày với lộ trình gamification.</li>
+                  <li>- Sẵn sàng chuyển tiếp lộ trình lớp 2.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 6.5. MEET OUR TUTORS */}
       < section className="py-24 bg-gradient-to-br from-indigo-50/50 to-white relative z-10" >

@@ -12,6 +12,7 @@ import {
   Flag,
   Menu,
 } from "lucide-react";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 // Mock Data
 const QUESTIONS = Array.from({ length: 15 }).map((_, i) => ({
@@ -68,11 +69,11 @@ export default function ExamPage({
   const currentQuestion = QUESTIONS[currentQ];
   const isLastQuestion = currentQ === QUESTIONS.length - 1;
 
-  const handleSubmit = () => {
-    if (!confirm("Bạn chắc chắn muốn nộp bài sớm?")) return;
+  const handleSubmit = async () => {
+    if (!(await showConfirm("Bạn chắc chắn muốn nộp bài sớm?"))) return;
     setIsSubmitted(true);
     setTimeout(() => {
-      alert("Nộp bài thành công!");
+      void showAlert("Nộp bài thành công!");
       router.back();
     }, 1500);
   };
@@ -325,7 +326,7 @@ export default function ExamPage({
 
               {isLastQuestion ? (
                 <button
-                  onClick={handleSubmit}
+                  onClick={() => void handleSubmit()}
                   className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
                 >
                   Nop bai <CheckCircle2 size={18} />
@@ -478,7 +479,7 @@ export default function ExamPage({
         {/* Footer Sidebar */}
         <div className="border-t border-slate-100 bg-slate-50/80 p-4">
           <button
-            onClick={handleSubmit}
+            onClick={() => void handleSubmit()}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 font-bold text-white shadow-lg shadow-slate-300 transition hover:bg-slate-800"
           >
             Nop bai thi <CheckCircle2 size={18} />

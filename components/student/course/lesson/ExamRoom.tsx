@@ -9,6 +9,7 @@ import {
   RotateCcw,
   ArrowLeft,
 } from "lucide-react";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 export default function ExamRoom({
   examData,
@@ -234,11 +235,12 @@ export default function ExamRoom({
             </div>
 
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (Object.keys(answers).length < examData.questions.length) {
-                  if (!confirm("Bạn chưa làm hết bài. Vẫn muốn nộp?")) return;
+                  if (!(await showConfirm("Bạn chưa làm hết bài. Vẫn muốn nộp?")))
+                    return;
                 } else {
-                  if (!confirm("Xác nhận nộp bài?")) return;
+                  if (!(await showConfirm("Xác nhận nộp bài?"))) return;
                 }
                 handleSubmit();
               }}
@@ -278,9 +280,9 @@ export default function ExamRoom({
 
             <div className="space-y-3">
               <button
-                onClick={() => {
+                onClick={async () => {
                   // Quay lại trang bài học
-                  alert("Đóng modal");
+                  await showAlert("Đóng modal");
                 }}
                 className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200"
               >

@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import api from "@/utils/api";
+import { showAlert } from "@/utils/dialog";
 
 // --- 1. DEFINITIONS & TYPES ---
 
@@ -131,7 +132,7 @@ export default function DictionaryPage() {
       });
     } catch (err) {
       console.error(err);
-      alert("Kết nối không ổn định. Vui lòng thử lại!");
+      await showAlert("Kết nối không ổn định. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }

@@ -14,6 +14,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { showAlert } from "@/utils/dialog";
 
 // --- MOCK DATA ---
 const REVIEW_DATA = {
@@ -99,7 +100,7 @@ export default function ReviewAssignmentPage({
           </div>
           <button
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
-            onClick={() => alert("Tính năng làm lại đang phát triển!")}
+            onClick={() => void showAlert("Tính năng làm lại đang phát triển!")}
           >
             <RotateCcw size={14} /> Làm lại
           </button>

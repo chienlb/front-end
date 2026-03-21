@@ -68,6 +68,7 @@ export default function AITutorWidget() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
@@ -177,11 +178,12 @@ export default function AITutorWidget() {
   };
 
   const clearChat = () => {
-    if (confirm("Clear chat history?")) {
-      setMessages([
-        { role: "ai", text: "History cleared. Let's start fresh!" },
-      ]);
-    }
+    setShowClearConfirm(true);
+  };
+
+  const handleConfirmClearChat = () => {
+    setMessages([{ role: "ai", text: "History cleared. Let's start fresh!" }]);
+    setShowClearConfirm(false);
   };
 
   return (
@@ -346,6 +348,35 @@ ${isExpanded
                 )}
               </div>
             </motion.div>
+
+            {showClearConfirm && (
+              <div className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100">
+                    <h3 className="text-lg font-black text-slate-900">
+                      Confirm
+                    </h3>
+                  </div>
+                  <div className="px-5 py-4 text-sm text-slate-700">
+                    Clear chat history?
+                  </div>
+                  <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmClearChat}
+                      className="px-4 py-2 rounded-xl bg-teal-500 text-white font-bold hover:bg-teal-600"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </AnimatePresence>

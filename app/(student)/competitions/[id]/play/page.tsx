@@ -15,6 +15,7 @@ import {
 import { competitionService } from "@/services/competition.service";
 import { userService } from "@/services/user.service";
 import { ranksService } from "@/services/ranks.service";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 export default function ExamPage({ params }: { params: Promise<{ id: string }> }) {
 
@@ -174,14 +175,14 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const handleUserSubmit = () => {
-    if (confirm("Bạn chắc chắn muốn nộp bài sớm?")) {
+  const handleUserSubmit = async () => {
+    if (await showConfirm("Bạn chắc chắn muốn nộp bài sớm?")) {
       void processSubmit();
     }
   };
 
   const handleAutoSubmit = async () => {
-    alert("Hết giờ làm bài! Hệ thống sẽ tự động nộp bài.");
+    await showAlert("Hết giờ làm bài! Hệ thống sẽ tự động nộp bài.");
     await processSubmit();
   };
 
@@ -353,7 +354,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
 
               {currentQ === questions.length - 1 ? (
                 <button
-                  onClick={handleUserSubmit}
+                  onClick={() => void handleUserSubmit()}
                   className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition flex items-center gap-2"
                 >
                   Nộp bài <CheckCircle2 size={18} />
@@ -469,7 +470,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         {/* Footer Sidebar */}
         <div className="p-4 border-t border-slate-100 bg-slate-50">
           <button
-            onClick={handleUserSubmit}
+            onClick={() => void handleUserSubmit()}
             className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
           >
             Nộp bài thi <CheckCircle2 size={18} />

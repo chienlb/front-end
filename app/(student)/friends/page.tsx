@@ -19,6 +19,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 // --- MOCK DATA ---
 const MOCK_FRIENDS = [
@@ -228,15 +229,15 @@ export default function FriendsPage() {
     }, 800);
   };
 
-  const handleUnfriend = (id: string) => {
-    if (confirm("Chắc chắn muốn nghỉ chơi với bạn này? 😢")) {
+  const handleUnfriend = async (id: string) => {
+    if (await showConfirm("Chắc chắn muốn nghỉ chơi với bạn này? 😢")) {
       setFriends(friends.filter((f) => f.id !== id));
     }
   };
 
-  const handleAccept = (reqId: string) => {
+  const handleAccept = async (reqId: string) => {
     setRequests(requests.filter((r) => r.id !== reqId));
-    alert("Đã thêm bạn mới! 🎉");
+    await showAlert("Đã thêm bạn mới! 🎉");
   };
 
   return (

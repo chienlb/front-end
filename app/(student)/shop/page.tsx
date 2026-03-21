@@ -17,6 +17,7 @@ import {
   Star,
   Sparkles,
 } from "lucide-react";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 // --- 1. MOCK DATA ---
 const MOCK_DATA = [
@@ -151,11 +152,11 @@ export default function ShopPage() {
   // --- HANDLERS ---
   const handleBuy = async (item: any) => {
     if (userData.gold < item.price) {
-      alert("Số dư không đủ. Hãy hoàn thành thêm bài học nhé!");
+      await showAlert("Số dư không đủ. Hãy hoàn thành thêm bài học nhé!");
       return;
     }
 
-    if (!confirm(`Xác nhận mua "${item.name}"?`)) return;
+    if (!(await showConfirm(`Xác nhận mua "${item.name}"?`))) return;
 
     const previousState = { ...userData };
     setUserData((prev: any) => ({
@@ -170,7 +171,7 @@ export default function ShopPage() {
       }
     } catch (err) {
       setUserData(previousState);
-      alert("Lỗi kết nối, vui lòng thử lại.");
+      await showAlert("Lỗi kết nối, vui lòng thử lại.");
     }
   };
 

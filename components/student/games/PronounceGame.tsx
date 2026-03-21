@@ -10,6 +10,7 @@ import {
   Activity,
   RotateCcw,
 } from "lucide-react";
+import { showAlert } from "@/utils/dialog";
 
 interface Props {
   data: {
@@ -223,7 +224,9 @@ export default function PronounceGame({ data, onSuccess }: Props) {
 
       recognition.start();
     } else {
-      alert("Trình duyệt không hỗ trợ. Vui lòng dùng Chrome trên PC/Android.");
+      void showAlert(
+        "Trình duyệt không hỗ trợ. Vui lòng dùng Chrome trên PC/Android.",
+      );
     }
   };
 

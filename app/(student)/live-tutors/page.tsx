@@ -15,6 +15,7 @@ import {
 import { liveClassService } from "@/services/live-class.service";
 import { format } from "date-fns";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 // --- ANIMATION VARIANTS ---
 const containerVariants: Variants = {
@@ -67,15 +68,16 @@ export default function LiveTutorPage() {
   const handleEnroll = async (cls: any) => {
     // TRƯỜNG HỢP 1: LỚP MIỄN PHÍ -> Đăng ký luôn
     if (!cls.price || cls.price === 0) {
-      if (!confirm(`Xác nhận đăng ký lớp miễn phí: "${cls.name}"?`)) return;
+      if (!(await showConfirm(`Xác nhận đăng ký lớp miễn phí: "${cls.name}"?`)))
+        return;
 
       setRegisteringId(cls._id);
       try {
         await liveClassService.enrollClass(cls._id);
-        alert("Đăng ký thành công! Bạn sẽ được chuyển đến lớp học.");
+        await showAlert("Đăng ký thành công! Bạn sẽ được chuyển đến lớp học.");
         router.push("/my-classes");
       } catch (error: any) {
-        alert(error.message || "Đăng ký thất bại. Lớp có thể đã đầy.");
+        await showAlert(error.message || "Đăng ký thất bại. Lớp có thể đã đầy.");
       } finally {
         setRegisteringId(null);
       }

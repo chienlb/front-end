@@ -7,6 +7,7 @@ import {
   ChevronLeft, Share2, MapPin, CheckCircle2, Gift, Zap, HelpCircle
 } from "lucide-react";
 import { competitionService } from "@/services/competition.service";
+import { showAlert } from "@/utils/dialog";
 
 export default function CompetitionRegisterPage({
   params,
@@ -55,7 +56,7 @@ export default function CompetitionRegisterPage({
       setIsRegistered(true);
     } catch (err) {
       console.error("Lỗi đăng ký cuộc thi:", err);
-      alert("Đăng ký thất bại. Vui lòng thử lại sau nhé.");
+      await showAlert("Đăng ký thất bại. Vui lòng thử lại sau nhé.");
     } finally {
       setRegistering(false);
     }

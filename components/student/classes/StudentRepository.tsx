@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   Video,
 } from "lucide-react";
+import { showAlert } from "@/utils/dialog";
 
 // Mock Data
 const FILES = [
@@ -121,7 +122,7 @@ export default function StudentRepository() {
                   title="Tải xuống"
                   onClick={(e) => {
                     e.stopPropagation();
-                    alert(`Đang tải: ${file.name}`);
+                    void showAlert(`Đang tải: ${file.name}`);
                   }}
                 >
                   <Download size={20} />

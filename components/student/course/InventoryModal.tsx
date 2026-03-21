@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Check, Loader2, PackageOpen } from "lucide-react";
 import { userService } from "@/services/user.service";
 import LottiePet from "@/components/student/ui/LottiePet";
+import { showAlert } from "@/utils/dialog";
 
 interface Props {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export default function InventoryModal({
       await userService.equipItem(item._id);
       onEquipSuccess(item);
     } catch (error) {
-      alert("Lỗi trang bị pet!");
+      await showAlert("Lỗi trang bị pet!");
     } finally {
       setEquippingId(null);
     }
