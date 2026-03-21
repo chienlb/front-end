@@ -1,4 +1,6 @@
 import api from "@/utils/api";
+const API_BASE_URL =
+  "https://teach-english-3786e536fe68.herokuapp.com/api/v1";
 
 export const authService = {
   register: async (data: {
@@ -37,12 +39,10 @@ export const authService = {
     return api.post("/auths/forgot-password", { email });
   },
   googleLogin: () => {
-    window.location.href =
-      `${process.env.NEXT_PUBLIC_API_URL}/auths/google/login`;
+    window.location.href = `${API_BASE_URL}/auths/google/login`;
   },
 
   facebookLogin: () => {
-    window.location.href =
-      `${process.env.NEXT_PUBLIC_API_URL}/auths/facebook/login`;
+    window.location.href = `${API_BASE_URL}/auths/facebook/login`;
   },
 };

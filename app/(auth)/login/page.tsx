@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
-import { Facebook } from "lucide-react";
 import { HiOutlineHand } from "react-icons/hi";
 import {
   Mail,
@@ -62,10 +61,10 @@ export default function LoginPage() {
             router.push("/admin");
             break;
           case "TEACHER":
-            router.push("/teacher/dashboard");
+            router.push("/teacher");
             break;
           case "PARENT":
-            router.push("/parent/dashboard");
+            router.push("/parent");
             break;
           case "STUDENT":
           default:
@@ -251,7 +250,11 @@ export default function LoginPage() {
                 onClick={() => authService.facebookLogin()}
                 className="flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-semibold transition"
               >
-                <Facebook size={18} className="text-blue-600" />
+                <img
+                  src="/icons8-facebook-96.svg"
+                  alt="Facebook"
+                  className="w-6 h-6"
+                />
                 Facebook
               </button>
             </div>

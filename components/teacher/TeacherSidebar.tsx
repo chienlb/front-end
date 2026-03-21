@@ -41,7 +41,7 @@ export default function TeacherSidebar({
       items: [
         {
           name: "Tổng quan",
-          href: "/teacher/dashboard",
+          href: "/teacher",
           icon: LayoutDashboard,
         },
         { name: "Lịch dạy", href: "/teacher/schedule", icon: CalendarDays },

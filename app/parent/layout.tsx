@@ -75,7 +75,7 @@ function ParentSidebar({ isCollapsed }: { isCollapsed: boolean }) {
       {/* LOGO AREA */}
       <div className="h-16 flex items-center justify-center border-b border-slate-100 shrink-0 relative overflow-hidden bg-white/50 backdrop-blur-sm">
         <Link
-          href="/parent/dashboard"
+          href="/parent"
           className="flex items-center gap-2 group"
         >
           <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200 shrink-0">

@@ -122,8 +122,8 @@ export default function Navbar() {
       ],
     },
     {
-      label: "Vui chơi",
-      icon: Gamepad2,
+      label: "Cuộc thi",
+      icon: Trophy,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
       items: [
@@ -133,20 +133,16 @@ export default function Navbar() {
           icon: Trophy,
           desc: "Đấu trường trí tuệ",
         },
+      ],
+    },
+    {
+      label: "Xếp hạng",
+      icon: ShieldCheck,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50",
+      items: [
         {
-          name: "Giải trí",
-          path: "/entertainment",
-          icon: Gamepad2,
-          desc: "Mini-games vui nhộn",
-        },
-        {
-          name: "Nhiệm vụ",
-          path: "/missions",
-          icon: Sparkles,
-          desc: "Săn thưởng mỗi ngày",
-        },
-        {
-          name: "Xếp hạng",
+          name: "Bảng xếp hạng",
           path: "/leaderboard",
           icon: ShieldCheck,
           desc: "Đua top vinh quang",
@@ -160,12 +156,6 @@ export default function Navbar() {
       bgColor: "bg-emerald-50",
       items: [
         {
-          name: "Tin nhắn",
-          path: "/messages",
-          icon: MessageSquare,
-          desc: "Trò chuyện bạn bè",
-        },
-        {
           name: "Nhóm của tôi",
           path: "/my-groups",
           icon: Users,
@@ -176,18 +166,6 @@ export default function Navbar() {
           path: "/community",
           icon: MessageCircle,
           desc: "Diễn đàn trao đổi",
-        },
-        {
-          name: "Bạn bè",
-          path: "/friends",
-          icon: Users,
-          desc: "Kết bạn bốn phương",
-        },
-        {
-          name: "Đăng ký 1:1",
-          path: "/live-tutors",
-          icon: Lightbulb,
-          desc: "Hỏi đáp với gia sư",
         },
         {
           name: "Từ điển",
@@ -230,7 +208,10 @@ export default function Navbar() {
           userService
             .getProfile()
             .then((res) => {
-              if (res && res.data) setUser({ ...parsed, ...res.data });
+              const profile = res?.data ?? res;
+              if (profile && typeof profile === "object") {
+                setUser({ ...parsed, ...profile });
+              }
             })
             .catch(() => { });
         }
@@ -367,18 +348,6 @@ export default function Navbar() {
 
           {/* 3. RIGHT ACTIONS */}
           <div className="flex items-center gap-3 ml-auto">
-            {/* Header Chat Icon (Desktop Only) */}
-            {user && (
-              <Link
-                href="/messages"
-                className="hidden md:flex relative w-10 h-10 items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
-                title="Tin nhắn"
-              >
-                <MessageSquare size={20} />
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-500 border-2 border-white rounded-full"></span>
-              </Link>
-            )}
-
             {/* Notification Bell */}
             {user && (
               <div className="relative" ref={notiRef}>

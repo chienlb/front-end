@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-function GoogleCallbackContent() {
+function FacebookCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -32,7 +32,6 @@ function GoogleCallbackContent() {
       return;
     }
 
-    // Trường hợp backend redirect callback nhưng chưa đính token -> đẩy qua oauth-success nếu có query.
     const query = params.toString();
     if (query) {
       router.replace(`/oauth-success?${query}`);
@@ -41,13 +40,14 @@ function GoogleCallbackContent() {
     }
   }, [params, router]);
 
-  return <div>Đang đăng nhập bằng Google...</div>;
+  return <div>Đang đăng nhập bằng Facebook...</div>;
 }
 
-export default function GoogleCallback() {
+export default function FacebookCallback() {
   return (
-    <Suspense fallback={<div>Đang đăng nhập bằng Google...</div>}>
-      <GoogleCallbackContent />
+    <Suspense fallback={<div>Đang đăng nhập bằng Facebook...</div>}>
+      <FacebookCallbackContent />
     </Suspense>
   );
 }
+
