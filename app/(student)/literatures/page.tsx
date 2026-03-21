@@ -57,6 +57,7 @@ function LiteraturesPageContent() {
   const [gradeFilter, setGradeFilter] = useState(gradeFromQuery);
   const [literatures, setLiteratures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [useClientPagination, setUseClientPagination] = useState(false);
@@ -133,6 +134,7 @@ function LiteraturesPageContent() {
         console.error("Lỗi tải literatures:", err);
       } finally {
         setLoading(false);
+        setHasLoadedOnce(true);
       }
     };
     fetchLiteratures();
@@ -162,8 +164,17 @@ function LiteraturesPageContent() {
     ? filteredLiteratures.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
     : filteredLiteratures;
 
+  useEffect(() => {
+    // Nếu page trên URL vượt quá tổng trang sau khi lọc, kéo về trang hợp lệ.
+    // Tránh trạng thái "rỗng giả" do còn giữ page cũ.
+    if (loading) return;
+    if (pageFromQuery !== currentPage) {
+      updateQuery({ page: currentPage });
+    }
+  }, [loading, pageFromQuery, currentPage, updateQuery]);
+
   // --- 3. LOADING STATE ---
-  if (loading)
+  if (loading && !hasLoadedOnce)
     return (
       <div className="relative flex h-screen flex-col items-center justify-center bg-white">
         <div className="relative z-10 flex flex-col items-center gap-3">
@@ -202,7 +213,7 @@ function LiteraturesPageContent() {
       `}</style>
 
       {/* --- BACKGROUND LAYER --- */}
-      <div className="fixed inset-0 z-0 bg-white" aria-hidden />
+      <div className="absolute inset-0 z-0 bg-white pointer-events-none" aria-hidden />
 
       {/* --- MAIN CONTENT --- */}
       <div className="relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-6">
@@ -360,7 +371,7 @@ function LiteraturesPageContent() {
             </div>
           </motion.aside>
 
-          <div>
+          <div className={`${loading ? "opacity-70 transition-opacity" : ""}`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.24em] text-fuchsia-600">
