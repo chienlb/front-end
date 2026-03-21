@@ -4,10 +4,8 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  // Cho phép gửi/nhận cookie từ Backend
+  // Không set Content-Type mặc định: axios tự gắn application/json khi body là object;
+  // FormData cần để trống để có boundary (multipart) — xem interceptor bên dưới.
   withCredentials: true,
 });
 
@@ -30,6 +28,23 @@ const clearSessionAndRedirectLogin = () => {
 // Tự động gắn Token vào mọi request
 api.interceptors.request.use(
   (config) => {
+    /**
+     * Mặc định instance dùng Content-Type: application/json.
+     * Với FormData phải BỎ header này để browser/axios gắn
+     * multipart/form-data; boundary=... — nếu không Nest/multer không đọc
+     * được field `content`/`file` (Postman vẫn chạy vì tự set đúng).
+     */
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      const h = config.headers;
+      if (h && typeof (h as any).delete === "function") {
+        (h as any).delete("Content-Type");
+        (h as any).delete("content-type");
+      } else if (h) {
+        delete (h as Record<string, unknown>)["Content-Type"];
+        delete (h as Record<string, unknown>)["content-type"];
+      }
+    }
+
     // Lấy token từ LocalStorage (nơi bạn lưu khi login thành công)
     const token =
       typeof window !== "undefined"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Loader2,
   Heart,
@@ -17,17 +17,27 @@ import {
   Rocket,
   Zap,
   Globe,
-  CornerDownRight,
 } from "lucide-react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
+import { userService } from "@/services/user.service";
+import {
+  communitesService,
+  communiteImageUrl,
+  unwrapCommuniteDoc,
+} from "@/services/communites.service";
+import { showAlert } from "@/utils/dialog";
 
-// --- 1. MOCK DATA & TYPES ---
+// --- TYPES ---
 
 interface Comment {
   id: string;
   user: string;
   avatar: string;
   content: string;
+  /** Ảnh đính kèm comment (URL đầy đủ) */
+  imageUrl?: string;
   time: string;
   isLiked: boolean;
 }
@@ -51,69 +61,194 @@ interface Post {
   isFeatured: boolean;
 }
 
-const MOCK_COMMENTS: Comment[] = [
-  {
-    id: "c1",
-    user: "Bảo An",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=BaoAn",
-    content: "Chúc mừng bạn nhé! Giỏi quá đi 🤩",
-    time: "5 phút trước",
-    isLiked: true,
-  },
-  {
-    id: "c2",
-    user: "Minh Khôi",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=MinhKhoi",
-    content: "Bạn học bài này trong bao lâu thế? Chỉ mình bí quyết với!",
-    time: "10 phút trước",
-    isLiked: false,
-  },
-];
+const FALLBACK_AVATAR =
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Student";
 
-const MOCK_POSTS: Post[] = [
-  {
-    id: "mock_1",
-    userId: "user_1",
-    user: {
-      name: "Bé Gia Hân",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GiaHan",
-      level: 12,
-    },
-    content:
-      "Yeahh! Cuối cùng tớ cũng hoàn thành khóa 'Tiếng Anh Khởi Động' rồi nè các bạn ơi! 🥳 Cảm ơn cô giáo đã giúp đỡ em rất nhiều ạ.",
-    images: [
-      "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=800&q=80",
-    ],
-    likes: 45,
-    isLiked: true,
-    commentsCount: 2,
-    comments: MOCK_COMMENTS,
-    createdAt: new Date().toISOString(),
-    time: "2 giờ trước",
-    isFeatured: true,
-  },
-  {
-    id: "mock_2",
-    userId: "user_2",
-    user: {
-      name: "Tuấn Tú",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=TuanTu",
-      level: 5,
-    },
-    content:
-      "Hôm nay mình học được từ mới là 'Astronaut' - Phi hành gia. Có bạn nào muốn làm phi hành gia giống tớ không? 🚀✨",
-    images: [],
-    likes: 8,
-    isLiked: false,
-    commentsCount: 0,
-    comments: [],
-    createdAt: new Date().toISOString(),
-    time: "4 giờ trước",
-    isFeatured: false,
-  },
-];
+function timeAgo(iso?: string | null): string {
+  if (!iso) return "Vừa xong";
+  try {
+    return formatDistanceToNow(new Date(iso), {
+      addSuffix: true,
+      locale: vi,
+    });
+  } catch {
+    return "—";
+  }
+}
 
-// --- 2. ANIMATION VARIANTS ---
+/** Lấy username từ object user (populate) hoặc null */
+function pickUsername(u: any): string | null {
+  if (!u || typeof u !== "object") return null;
+  const candidates = [
+    u.username,
+    u.userName,
+    u.user_name,
+    u.login,
+  ];
+  for (const v of candidates) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/**
+ * Tên hiển thị người đăng / bình luận (user đã populate hoặc object phẳng).
+ * Ưu tiên họ tên, có thể ghép @username.
+ */
+function formatPersonName(u: any, fallback = "Thành viên"): string {
+  if (!u || typeof u !== "object") return fallback;
+
+  const full =
+    (typeof u.fullName === "string" && u.fullName.trim()) ||
+    (typeof u.name === "string" && u.name.trim()) ||
+    (typeof u.displayName === "string" && u.displayName.trim()) ||
+    (typeof u.authorName === "string" && u.authorName.trim()) ||
+    "";
+
+  const un = pickUsername(u);
+
+  if (full && un && full.toLowerCase() !== un.toLowerCase()) {
+    return `${full.trim()} (@${un})`;
+  }
+  if (full) return full.trim();
+  if (un) return un;
+  return fallback;
+}
+
+/** Tên từ document phẳng (API có thể lưu sẵn authorName / username) */
+function nameFromFlatDoc(d: any): string | null {
+  if (!d || typeof d !== "object") return null;
+  const a =
+    typeof d.authorName === "string" && d.authorName.trim()
+      ? d.authorName.trim()
+      : typeof d.fullName === "string" && d.fullName.trim()
+        ? d.fullName.trim()
+        : typeof d.username === "string" && d.username.trim()
+          ? d.username.trim()
+          : typeof d.userName === "string" && d.userName.trim()
+            ? d.userName.trim()
+            : null;
+  return a || null;
+}
+
+/** Chuẩn hoá 1 document Communite từ API (linh hoạt field) */
+function normalizeCommunite(raw: any, currentUserId?: string | null): Post {
+  const id = String(raw?._id ?? raw?.id ?? "");
+  const author = raw?.userId;
+  let name = "Thành viên";
+  let avatar = FALLBACK_AVATAR;
+  let level = 1;
+
+  const fromFlat = nameFromFlatDoc(raw);
+
+  if (author && typeof author === "object") {
+    name = formatPersonName(author, fromFlat ?? "Thành viên");
+    avatar = author.avatar || avatar;
+    level =
+      author.stats?.level ??
+      author.level ??
+      (typeof author.xp === "number" ? Math.floor(author.xp / 100) + 1 : level);
+  } else if (typeof author === "string" && author.length > 0) {
+    name = fromFlat ?? `Thành viên · ${author.slice(-6)}`;
+  }
+
+  if (name === "Thành viên" && fromFlat) name = fromFlat;
+
+  const content =
+    raw?.content ??
+    raw?.title ??
+    raw?.text ??
+    raw?.body ??
+    raw?.description ??
+    "";
+
+  const img = raw?.image ?? raw?.images?.[0];
+  const images: string[] = [];
+  if (img) {
+    const url = communiteImageUrl(typeof img === "string" ? img : img?.path);
+    if (url) images.push(url);
+  }
+  if (Array.isArray(raw?.images)) {
+    raw.images.forEach((x: any) => {
+      const u = communiteImageUrl(typeof x === "string" ? x : x?.url ?? x?.path);
+      if (u && !images.includes(u)) images.push(u);
+    });
+  }
+
+  let likes = 0;
+  if (typeof raw?.totalLikes === "number") likes = raw.totalLikes;
+  else if (typeof raw?.likesCount === "number") likes = raw.likesCount;
+  else if (typeof raw?.likeCount === "number") likes = raw.likeCount;
+  else if (Array.isArray(raw?.likes)) likes = raw.likes.length;
+  else if (typeof raw?.likes === "number") likes = raw.likes;
+
+  let isLiked = Boolean(raw?.isLiked);
+  if (currentUserId) {
+    if (Array.isArray(raw?.likedBy) && raw.likedBy.some((x: any) => String(x) === String(currentUserId)))
+      isLiked = true;
+    if (Array.isArray(raw?.likes) && raw.likes.every((x: any) => typeof x === "string"))
+      isLiked = raw.likes.includes(String(currentUserId));
+  }
+
+  const rawComments = raw?.comments ?? raw?.commentList ?? [];
+  const comments: Comment[] = (Array.isArray(rawComments) ? rawComments : []).map(
+    (c: any, idx: number) => {
+      const cu = c?.userId;
+      let cname = "Thành viên";
+      let cavatar = FALLBACK_AVATAR;
+      const cFlat = nameFromFlatDoc(c);
+
+      if (cu && typeof cu === "object") {
+        cname = formatPersonName(cu, cFlat ?? "Thành viên");
+        cavatar = cu.avatar || cavatar;
+      } else if (typeof cu === "string" && cu.length > 0) {
+        cname = cFlat ?? `Thành viên · ${cu.slice(-6)}`;
+      } else if (cFlat) {
+        cname = cFlat;
+      }
+      const cImg = c?.image ? communiteImageUrl(c.image) : "";
+      const text =
+        c?.content ?? c?.message ?? c?.text ?? "";
+      return {
+        id: String(c?._id ?? c?.id ?? `c_${idx}`),
+        user: cname,
+        avatar: cavatar,
+        content: text.trim(),
+        imageUrl: cImg || undefined,
+        time: timeAgo(c?.createdAt ?? c?.created_at),
+        isLiked: false,
+      };
+    },
+  );
+
+  const commentsCount =
+    typeof raw?.totalComments === "number"
+      ? raw.totalComments
+      : typeof raw?.commentsCount === "number"
+        ? raw.commentsCount
+        : comments.length;
+
+  return {
+    id,
+    userId: String(
+      typeof author === "object" && author?._id
+        ? author._id
+        : author ?? raw?.userId ?? "",
+    ),
+    user: { name, avatar, level },
+    content,
+    images,
+    likes,
+    isLiked,
+    commentsCount,
+    comments,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
+    time: timeAgo(raw?.createdAt ?? raw?.created_at),
+    isFeatured: Boolean(raw?.isFeatured ?? raw?.featured),
+  };
+}
+
+// --- ANIMATION ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
@@ -124,130 +259,232 @@ const itemVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 60 } },
 };
 
-// --- 3. MAIN COMPONENT ---
 export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Create Post States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
+  const [newPostFile, setNewPostFile] = useState<File | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const createFileRef = useRef<HTMLInputElement>(null);
 
-  // Comment States
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState("");
+  const [commentFile, setCommentFile] = useState<File | null>(null);
+  const commentFileRef = useRef<HTMLInputElement>(null);
 
-  // INIT DATA
+  const [newPostPreviewUrl, setNewPostPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const [commentPreviewUrl, setCommentPreviewUrl] = useState<string | null>(
+    null,
+  );
+
+  const loadPosts = useCallback(async () => {
+    try {
+      const list = await communitesService.list({ page: 1, limit: 30 });
+      setPosts(
+        list.map((item) => normalizeCommunite(item, currentUserId)),
+      );
+    } catch (e: any) {
+      console.error(e);
+      await showAlert(
+        e?.response?.data?.message?.[0] ??
+          e?.message ??
+          "Không tải được bảng tin cộng đồng.",
+      );
+      setPosts([]);
+    }
+  }, [currentUserId]);
+
+  /** Preview ảnh đính kèm khi tạo bài */
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Mock fetch user profile
-        const userRes = {
-          fullName: "Bạn",
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-          stats: { level: 8 },
-        };
-        setCurrentUser(userRes);
+    if (!newPostFile) {
+      setNewPostPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(newPostFile);
+    setNewPostPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [newPostFile]);
 
-        // Mock fetch posts
-        setTimeout(() => {
-          setPosts(MOCK_POSTS);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error(error);
-        setLoading(false);
+  /** Preview ảnh bình luận */
+  useEffect(() => {
+    if (!commentFile) {
+      setCommentPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(commentFile);
+    setCommentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [commentFile]);
+
+  /** Đổi bài đang mở comment — reset ô nhập + file */
+  useEffect(() => {
+    setCommentInput("");
+    setCommentFile(null);
+    if (commentFileRef.current) commentFileRef.current.value = "";
+  }, [expandedPostId]);
+
+  /** Tải profile + bảng tin trong một luồng (tránh race: feed gọi trước khi state ổn định) */
+  useEffect(() => {
+    let cancelled = false;
+    const boot = async () => {
+      setLoading(true);
+      try {
+        const [profileOutcome, listOutcome] = await Promise.allSettled([
+          userService.getProfile(),
+          communitesService.list({ page: 1, limit: 30 }),
+        ]);
+        if (cancelled) return;
+
+        let uidStr: string | null = null;
+        if (profileOutcome.status === "fulfilled") {
+          const profileRes = profileOutcome.value as any;
+          const profile = profileRes?.data ?? profileRes;
+          const uid = profile?._id ?? profile?.id ?? null;
+          uidStr = uid ? String(uid) : null;
+          setCurrentUserId(uidStr);
+          const displayName = formatPersonName(profile, "Bạn");
+          setCurrentUser({
+            fullName: profile?.fullName ?? "Bạn",
+            displayName,
+            avatar: profile?.avatar ?? FALLBACK_AVATAR,
+            stats: { level: profile?.stats?.level ?? profile?.level ?? 1 },
+          });
+        } else {
+          setCurrentUser({
+            fullName: "Bạn",
+            displayName: "Bạn",
+            avatar: FALLBACK_AVATAR,
+            stats: { level: 1 },
+          });
+        }
+
+        if (listOutcome.status === "fulfilled") {
+          const list = listOutcome.value;
+          setPosts(
+            list.map((item) => normalizeCommunite(item, uidStr)),
+          );
+        } else {
+          console.error(listOutcome.reason);
+          setPosts([]);
+          await showAlert(
+            listOutcome.reason?.response?.data?.message?.[0] ??
+              listOutcome.reason?.message ??
+              "Không tải được bảng tin cộng đồng.",
+          );
+        }
+      } catch (e: any) {
+        console.error(e);
+        if (!cancelled) {
+          await showAlert(
+            e?.response?.data?.message?.[0] ??
+              e?.message ??
+              "Không tải được bảng tin cộng đồng.",
+          );
+          setPosts([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
-    fetchData();
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // --- HANDLERS ---
-
-  const handleLike = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            likes: p.isLiked ? p.likes - 1 : p.likes + 1,
-            isLiked: !p.isLiked,
-          };
-        }
-        return p;
-      }),
+  const handleLike = async (postId: string) => {
+    const prev = posts;
+    setPosts((p) =>
+      p.map((x) =>
+        x.id === postId
+          ? {
+              ...x,
+              likes: x.isLiked ? Math.max(0, x.likes - 1) : x.likes + 1,
+              isLiked: !x.isLiked,
+            }
+          : x,
+      ),
     );
+    try {
+      const updated: any = await communitesService.like(postId);
+      const doc = unwrapCommuniteDoc(updated);
+      setPosts((p) =>
+        p.map((x) =>
+          x.id === postId ? normalizeCommunite(doc, currentUserId) : x,
+        ),
+      );
+    } catch (e: any) {
+      setPosts(prev);
+      await showAlert(
+        e?.response?.data?.message?.[0] ??
+          e?.message ??
+          "Không thể thích bài viết.",
+      );
+    }
   };
 
   const handleToggleComments = (postId: string) => {
     setExpandedPostId((prev) => (prev === postId ? null : postId));
-    setCommentInput(""); // Reset input khi chuyển bài
   };
 
-  const handleSendComment = (postId: string) => {
-    if (!commentInput.trim()) return;
-
-    const newComment: Comment = {
-      id: `c_${Date.now()}`,
-      user: currentUser?.fullName || "Bạn",
-      avatar: currentUser?.avatar,
-      content: commentInput,
-      time: "Vừa xong",
-      isLiked: false,
-    };
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            comments: [newComment, ...p.comments],
-            commentsCount: p.commentsCount + 1,
-          };
-        }
-        return p;
-      }),
-    );
-
-    setCommentInput("");
+  const handleSendComment = async (postId: string) => {
+    if (!commentInput.trim() && !commentFile) return;
+    try {
+      const updated: any = await communitesService.comment(postId, {
+        content: commentInput.trim() || " ",
+        file: commentFile ?? undefined,
+      });
+      const doc = unwrapCommuniteDoc(updated);
+      setCommentInput("");
+      setCommentFile(null);
+      if (commentFileRef.current) commentFileRef.current.value = "";
+      setPosts((p) =>
+        p.map((x) =>
+          x.id === postId ? normalizeCommunite(doc, currentUserId) : x,
+        ),
+      );
+    } catch (e: any) {
+      await showAlert(
+        e?.response?.data?.message?.[0] ??
+          e?.message ??
+          "Không gửi được bình luận.",
+      );
+    }
   };
 
   const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() && !newPostFile) return;
     setIsPosting(true);
-
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const newPost: Post = {
-      id: `new_${Date.now()}`,
-      userId: "me",
-      user: {
-        name: currentUser?.fullName || "Bạn",
-        avatar: currentUser?.avatar,
-        level: currentUser?.stats?.level || 1,
-      },
-      content: newPostContent,
-      images: [],
-      likes: 0,
-      isLiked: false,
-      commentsCount: 0,
-      comments: [],
-      createdAt: new Date().toISOString(),
-      time: "Vừa xong",
-      isFeatured: false,
-    };
-
-    setPosts([newPost, ...posts]);
-    setNewPostContent("");
-    setShowCreateModal(false);
-    setIsPosting(false);
+    try {
+      const created: any = await communitesService.create({
+        content: newPostContent.trim() || " ",
+        file: newPostFile,
+      });
+      const post = normalizeCommunite(
+        unwrapCommuniteDoc(created),
+        currentUserId,
+      );
+      setPosts((p) => [post, ...p]);
+      setNewPostContent("");
+      setNewPostFile(null);
+      if (createFileRef.current) createFileRef.current.value = "";
+      setShowCreateModal(false);
+    } catch (e: any) {
+      await showAlert(
+        e?.response?.data?.message?.[0] ??
+          e?.message ??
+          "Đăng bài thất bại.",
+      );
+    } finally {
+      setIsPosting(false);
+    }
   };
-
-  // --- RENDER ---
 
   if (loading)
     return (
@@ -261,7 +498,6 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F9FF] pb-32 font-sans text-slate-900 selection:bg-indigo-100 relative overflow-hidden">
-      {/* BACKGROUND DECORATIONS */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-gradient-to-br from-blue-100/40 to-purple-100/40 rounded-full blur-3xl"></div>
         <div className="absolute bottom-20 left-10 text-6xl opacity-10 rotate-12 text-indigo-300">
@@ -272,7 +508,6 @@ export default function CommunityPage() {
         </div>
       </div>
 
-      {/* HEADER HERO */}
       <div className="relative z-10 pt-24 pb-16 text-center px-4">
         <motion.h1
           initial={{ y: -20, opacity: 0 }}
@@ -295,7 +530,6 @@ export default function CommunityPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 space-y-8 relative z-20 -mt-6">
-        {/* === CREATE POST BAR === */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -307,11 +541,15 @@ export default function CommunityPage() {
             <div className="w-12 h-12 rounded-full border-2 border-indigo-50 p-0.5 bg-white shrink-0 overflow-hidden">
               <img
                 src={currentUser?.avatar}
+                alt=""
                 className="w-full h-full rounded-full object-cover"
               />
             </div>
             <div className="flex-1 bg-slate-50 hover:bg-slate-100 transition rounded-full px-5 py-3 text-slate-400 text-sm font-medium border border-transparent group-hover:border-indigo-100 truncate">
-              {currentUser?.fullName ? `Hi ${currentUser.fullName}, ` : ""}bạn
+              {currentUser?.displayName
+                ? `Hi ${currentUser.displayName}, `
+                : ""}
+              bạn
               đang nghĩ gì thế?
             </div>
           </div>
@@ -324,13 +562,15 @@ export default function CommunityPage() {
                 <Smile size={16} /> Cảm xúc
               </span>
             </div>
-            <button className="bg-indigo-600 text-white px-5 py-1.5 rounded-full text-xs font-bold shadow-md">
+            <button
+              type="button"
+              className="bg-indigo-600 text-white px-5 py-1.5 rounded-full text-xs font-bold shadow-md"
+            >
               Đăng bài
             </button>
           </div>
         </motion.div>
 
-        {/* === FEED POSTS === */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -338,208 +578,277 @@ export default function CommunityPage() {
           className="space-y-6"
         >
           <AnimatePresence mode="popLayout">
-            {posts.map((post) => (
-              <motion.div
-                key={post.id}
-                layout
-                variants={itemVariants}
-                className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-900/5 transition-all duration-300"
-              >
-                {/* 1. Header Post */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 border-2 border-white shadow-sm overflow-hidden p-0.5">
-                        <img
-                          src={post.user.avatar}
-                          className="w-full h-full rounded-xl object-cover"
-                        />
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded-md border-2 border-white shadow-sm flex items-center gap-0.5">
-                        <Zap size={8} fill="currentColor" /> {post.user.level}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                        {post.user.name}
-                        {post.user.level >= 10 && (
-                          <Crown
-                            size={14}
-                            className="text-yellow-500 fill-yellow-500 animate-pulse"
+            {posts.length === 0 ? (
+              <div className="text-center py-16 bg-white/80 rounded-[2rem] border border-dashed border-indigo-100">
+                <p className="text-slate-500 font-medium">
+                  Chưa có bài viết nào. Hãy là người đầu tiên đăng bài nhé!
+                </p>
+              </div>
+            ) : (
+              posts.map((post) => (
+                <motion.div
+                  key={post.id}
+                  layout
+                  initial={false}
+                  variants={itemVariants}
+                  className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-900/5 transition-all duration-300"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border-2 border-white shadow-sm overflow-hidden p-0.5">
+                          <img
+                            src={post.user.avatar}
+                            alt=""
+                            className="w-full h-full rounded-xl object-cover"
                           />
-                        )}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Clock size={10} /> {post.time}
-                        </span>
-                        <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                        <span className="flex items-center gap-1">
-                          <Globe size={10} /> Công khai
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <button className="text-slate-300 hover:text-indigo-500 p-2 rounded-xl hover:bg-indigo-50 transition">
-                    <MoreHorizontal size={20} />
-                  </button>
-                </div>
-
-                {/* 2. Content */}
-                <div className="text-slate-700 mb-4 leading-relaxed whitespace-pre-wrap text-[15px] pl-1">
-                  {post.content}
-                </div>
-
-                {post.isFeatured && (
-                  <div className="mb-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-orange-200">
-                    <Sparkles size={14} fill="currentColor" /> BÀI VIẾT NỔI BẬT
-                  </div>
-                )}
-
-                {post.images && post.images.length > 0 && (
-                  <div className="w-full relative rounded-2xl overflow-hidden mb-5 border-2 border-white shadow-sm">
-                    <img
-                      src={post.images[0]}
-                      className="w-full h-auto max-h-[500px] object-cover hover:scale-105 transition duration-700"
-                    />
-                  </div>
-                )}
-
-                {/* 3. Actions Bar */}
-                <div className="flex items-center gap-2 pt-2 pb-2 border-b border-slate-50">
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => handleLike(post.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      post.isLiked
-                        ? "text-pink-500 bg-pink-50 border border-pink-100"
-                        : "text-slate-500 bg-slate-50 hover:bg-slate-100 border border-transparent"
-                    }`}
-                  >
-                    <Heart
-                      size={18}
-                      fill={post.isLiked ? "currentColor" : "none"}
-                      className={post.isLiked ? "animate-bounce" : ""}
-                    />
-                    {post.likes > 0 ? post.likes : "Thích"}
-                  </motion.button>
-
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleToggleComments(post.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border border-transparent
-                      ${expandedPostId === post.id ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "text-slate-500 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600"}`}
-                  >
-                    <MessageCircle size={18} />
-                    {post.commentsCount > 0 ? post.commentsCount : "Bình luận"}
-                  </motion.button>
-
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    className="w-12 flex items-center justify-center py-2.5 rounded-xl text-slate-400 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-all"
-                  >
-                    <Share2 size={18} />
-                  </motion.button>
-                </div>
-
-                {/* 4. Comments Section (Collapsible) */}
-                <AnimatePresence>
-                  {expandedPostId === post.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden pt-4"
-                    >
-                      {/* Input */}
-                      <div className="flex gap-3 mb-5">
-                        <img
-                          src={currentUser?.avatar}
-                          className="w-9 h-9 rounded-full border border-slate-200 bg-white"
-                        />
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            placeholder="Viết bình luận..."
-                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-300 focus:bg-white transition pr-10"
-                            value={commentInput}
-                            onChange={(e) => setCommentInput(e.target.value)}
-                            onKeyDown={(e) =>
-                              e.key === "Enter" && handleSendComment(post.id)
-                            }
-                          />
-                          <button
-                            onClick={() => handleSendComment(post.id)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 hover:text-indigo-700 p-1"
-                          >
-                            <Send size={16} />
-                          </button>
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded-md border-2 border-white shadow-sm flex items-center gap-0.5">
+                          <Zap size={8} fill="currentColor" /> {post.user.level}
                         </div>
                       </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                          {post.user.name}
+                          {post.user.level >= 10 && (
+                            <Crown
+                              size={14}
+                              className="text-yellow-500 fill-yellow-500 animate-pulse"
+                            />
+                          )}
+                        </h3>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <Clock size={10} /> {post.time}
+                          </span>
+                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                          <span className="flex items-center gap-1">
+                            <Globe size={10} /> Công khai
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-slate-300 hover:text-indigo-500 p-2 rounded-xl hover:bg-indigo-50 transition"
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                  </div>
 
-                      {/* List */}
-                      <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                        {post.comments && post.comments.length > 0 ? (
-                          post.comments.map((comment, idx) => (
-                            <div
-                              key={comment.id || idx}
-                              className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
-                            >
-                              <img
-                                src={comment.avatar}
-                                className="w-8 h-8 rounded-full border border-slate-100 mt-1"
+                  <div className="text-slate-700 mb-4 leading-relaxed whitespace-pre-wrap text-[15px] pl-1">
+                    {post.content}
+                  </div>
+
+                  {post.isFeatured && (
+                    <div className="mb-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-orange-200">
+                      <Sparkles size={14} fill="currentColor" /> BÀI VIẾT NỔI
+                      BẬT
+                    </div>
+                  )}
+
+                  {post.images && post.images.length > 0 && (
+                    <div className="w-full relative rounded-2xl overflow-hidden mb-5 border-2 border-white shadow-sm">
+                      <img
+                        src={post.images[0]}
+                        alt=""
+                        className="w-full h-auto max-h-[500px] object-cover hover:scale-105 transition duration-700"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-2 pb-2 border-b border-slate-50">
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => void handleLike(post.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                        post.isLiked
+                          ? "text-pink-500 bg-pink-50 border border-pink-100"
+                          : "text-slate-500 bg-slate-50 hover:bg-slate-100 border border-transparent"
+                      }`}
+                    >
+                      <Heart
+                        size={18}
+                        fill={post.isLiked ? "currentColor" : "none"}
+                        className={post.isLiked ? "animate-bounce" : ""}
+                      />
+                      {post.likes > 0 ? post.likes : "Thích"}
+                    </motion.button>
+
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleToggleComments(post.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border border-transparent
+                      ${expandedPostId === post.id ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "text-slate-500 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600"}`}
+                    >
+                      <MessageCircle size={18} />
+                      {post.commentsCount > 0
+                        ? post.commentsCount
+                        : "Bình luận"}
+                    </motion.button>
+
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      className="w-12 flex items-center justify-center py-2.5 rounded-xl text-slate-400 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                    >
+                      <Share2 size={18} />
+                    </motion.button>
+                  </div>
+
+                  <AnimatePresence>
+                    {expandedPostId === post.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden pt-4"
+                      >
+                        <div className="flex gap-3 mb-5">
+                          <img
+                            src={currentUser?.avatar}
+                            alt=""
+                            className="w-9 h-9 rounded-full border border-slate-200 bg-white shrink-0"
+                          />
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="relative flex gap-2 items-center">
+                              <input
+                                ref={commentFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) =>
+                                  setCommentFile(e.target.files?.[0] ?? null)
+                                }
                               />
-                              <div className="flex-1">
-                                <div className="bg-slate-50 px-4 py-2.5 rounded-2xl rounded-tl-none border border-slate-100 inline-block min-w-[150px]">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="font-bold text-sm text-slate-800">
-                                      {comment.user}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">
-                                      {comment.time}
-                                    </span>
+                              <input
+                                type="text"
+                                placeholder="Viết bình luận hoặc gửi ảnh..."
+                                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 pr-[4.75rem] text-sm focus:outline-none focus:border-indigo-300 focus:bg-white transition"
+                                value={commentInput}
+                                onChange={(e) =>
+                                  setCommentInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    void handleSendComment(post.id);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  commentFileRef.current?.click()
+                                }
+                                className="absolute right-11 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50"
+                                title="Đính ảnh"
+                              >
+                                <ImageIcon size={18} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleSendComment(post.id)
+                                }
+                                disabled={
+                                  !commentInput.trim() && !commentFile
+                                }
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 hover:text-indigo-700 p-1 disabled:opacity-30"
+                              >
+                                <Send size={16} />
+                              </button>
+                            </div>
+                            {commentPreviewUrl && (
+                              <div className="relative inline-block max-w-[200px]">
+                                <img
+                                  src={commentPreviewUrl}
+                                  alt=""
+                                  className="rounded-xl border border-slate-200 max-h-28 w-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCommentFile(null);
+                                    if (commentFileRef.current)
+                                      commentFileRef.current.value = "";
+                                  }}
+                                  className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-slate-700 text-white text-[10px]"
+                                  aria-label="Gỡ ảnh"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                          {post.comments && post.comments.length > 0 ? (
+                            post.comments.map((comment, idx) => (
+                              <div
+                                key={comment.id || idx}
+                                className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+                              >
+                                <img
+                                  src={comment.avatar}
+                                  alt=""
+                                  className="w-8 h-8 rounded-full border border-slate-100 mt-1"
+                                />
+                                <div className="flex-1">
+                                  <div className="bg-slate-50 px-4 py-2.5 rounded-2xl rounded-tl-none border border-slate-100 inline-block min-w-[150px]">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="font-bold text-sm text-slate-800">
+                                        {comment.user}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {comment.time}
+                                      </span>
+                                    </div>
+                                    {comment.content ? (
+                                      <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                        {comment.content}
+                                      </p>
+                                    ) : null}
+                                    {comment.imageUrl ? (
+                                      <img
+                                        src={comment.imageUrl}
+                                        alt=""
+                                        className="mt-2 rounded-xl max-h-48 w-full object-cover border border-slate-100"
+                                      />
+                                    ) : null}
                                   </div>
-                                  <p className="text-sm text-slate-600 leading-relaxed">
-                                    {comment.content}
-                                  </p>
-                                </div>
-                                <div className="flex gap-3 mt-1 ml-2">
-                                  <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-500 transition">
-                                    Thích
-                                  </button>
-                                  <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-500 transition">
-                                    Phản hồi
-                                  </button>
                                 </div>
                               </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-6 text-slate-400 text-sm italic flex flex-col items-center">
+                              <MessageCircle
+                                size={24}
+                                className="mb-2 opacity-20"
+                              />
+                              Chưa có bình luận nào. Hãy là người đầu tiên!
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-6 text-slate-400 text-sm italic flex flex-col items-center">
-                            <MessageCircle
-                              size={24}
-                              className="mb-2 opacity-20"
-                            />
-                            Chưa có bình luận nào. Hãy là người đầu tiên!
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              ))
+            )}
           </AnimatePresence>
         </motion.div>
 
         <div className="text-center pt-8 pb-4">
           <p className="text-slate-400 text-sm font-medium bg-white/50 inline-block px-4 py-2 rounded-full">
-            Đã hiển thị hết tin mới 😴
+            Đã hiển thị tin mới nhất
           </p>
         </div>
       </div>
 
-      {/* === CREATE POST MODAL === */}
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -554,7 +863,12 @@ export default function CommunityPage() {
                   Tạo bài viết
                 </h3>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setNewPostFile(null);
+                    if (createFileRef.current) createFileRef.current.value = "";
+                  }}
                   className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition"
                 >
                   <X size={24} />
@@ -566,12 +880,13 @@ export default function CommunityPage() {
                   <div className="w-12 h-12 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
                     <img
                       src={currentUser?.avatar}
+                      alt=""
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div>
                     <p className="font-bold text-slate-800 text-base">
-                      {currentUser?.fullName || "Bạn"}
+                      {currentUser?.displayName || currentUser?.fullName || "Bạn"}
                     </p>
                     <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold mt-1 inline-block">
                       🌏 Công khai
@@ -584,27 +899,68 @@ export default function CommunityPage() {
                   value={newPostContent}
                   onChange={(e) => setNewPostContent(e.target.value)}
                   autoFocus
-                ></textarea>
+                />
+
+                <input
+                  ref={createFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) =>
+                    setNewPostFile(e.target.files?.[0] ?? null)
+                  }
+                />
 
                 <div className="border border-slate-200 rounded-2xl p-2 flex items-center justify-between mt-4 bg-slate-50">
                   <span className="text-xs font-bold text-slate-400 pl-3 uppercase tracking-wider">
                     Đính kèm
                   </span>
                   <div className="flex gap-1">
-                    <button className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-green-500 transition">
+                    <button
+                      type="button"
+                      onClick={() => createFileRef.current?.click()}
+                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-green-500 transition"
+                    >
                       <ImageIcon size={22} />
                     </button>
-                    <button className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-yellow-500 transition">
+                    <button
+                      type="button"
+                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-yellow-500 transition"
+                    >
                       <Smile size={22} />
                     </button>
                   </div>
                 </div>
+                {newPostPreviewUrl && (
+                  <div className="relative mt-3 inline-block max-w-full">
+                    <img
+                      src={newPostPreviewUrl}
+                      alt=""
+                      className="max-h-56 rounded-2xl border border-slate-200 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewPostFile(null);
+                        if (createFileRef.current)
+                          createFileRef.current.value = "";
+                      }}
+                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700"
+                      aria-label="Gỡ ảnh"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="p-5 border-t border-slate-100">
                 <button
-                  onClick={handleCreatePost}
-                  disabled={!newPostContent.trim() || isPosting}
+                  type="button"
+                  onClick={() => void handleCreatePost()}
+                  disabled={
+                    (!newPostContent.trim() && !newPostFile) || isPosting
+                  }
                   className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 text-lg"
                 >
                   {isPosting ? (
