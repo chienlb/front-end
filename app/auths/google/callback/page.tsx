@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function GoogleLegacyCallbackAliasPage() {
+function GoogleLegacyCallbackAliasContent() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -13,5 +13,13 @@ export default function GoogleLegacyCallbackAliasPage() {
   }, [params, router]);
 
   return <div>Đang chuyển hướng đăng nhập Google...</div>;
+}
+
+export default function GoogleLegacyCallbackAliasPage() {
+  return (
+    <Suspense fallback={<div>Đang chuyển hướng đăng nhập Google...</div>}>
+      <GoogleLegacyCallbackAliasContent />
+    </Suspense>
+  );
 }
 

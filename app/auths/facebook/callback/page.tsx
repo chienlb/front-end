@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function FacebookLegacyCallbackAliasPage() {
+function FacebookLegacyCallbackAliasContent() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -13,5 +13,13 @@ export default function FacebookLegacyCallbackAliasPage() {
   }, [params, router]);
 
   return <div>Đang chuyển hướng đăng nhập Facebook...</div>;
+}
+
+export default function FacebookLegacyCallbackAliasPage() {
+  return (
+    <Suspense fallback={<div>Đang chuyển hướng đăng nhập Facebook...</div>}>
+      <FacebookLegacyCallbackAliasContent />
+    </Suspense>
+  );
 }
 
