@@ -5,7 +5,6 @@ import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   Loader2,
-  Calendar,
   Award,
   Zap,
   Coins,
@@ -72,19 +71,38 @@ function normalizeProfile(raw: any) {
       : FALLBACK_AVATAR;
   const level =
     u?.stats?.level ?? u?.level ?? 1;
-  const xp = Number(u?.stats?.xp ?? u?.xp ?? 0);
+  /** Kinh nghiệm — API có thể dùng `exp` hoặc `xp` / `stats.xp` */
+  const xp = Number(
+    u?.exp ??
+      u?.stats?.exp ??
+      u?.stats?.xp ??
+      u?.xp ??
+      0,
+  );
   const nextLevelXp = Math.max(
     1,
-    Number(u?.stats?.nextLevelXp ?? u?.nextLevelXp ?? level * 1000),
+    Number(
+      u?.stats?.nextLevelXp ??
+        u?.nextLevelXp ??
+        u?.nextExp ??
+        u?.stats?.nextExp ??
+        level * 1000,
+    ),
   );
   const gold = Number(u?.gold ?? u?.stats?.gold ?? 0);
   const diamond = Number(u?.diamond ?? u?.stats?.diamond ?? 0);
-  const streak = Number(u?.streak ?? u?.stats?.streak ?? 0);
+  /** Chuỗi ngày học liên tục — API: `streakDays` (fallback `streak` / `stats.streak`) */
+  const streakDays = Number(
+    u?.streakDays ??
+      u?.stats?.streakDays ??
+      u?.streak ??
+      u?.stats?.streak ??
+      0,
+  );
   const title =
     typeof u?.title === "string" && u.title.trim()
       ? u.title
       : "Học viên";
-  const attendance = Array.isArray(u?.attendance) ? u.attendance : [];
   const badges = Array.isArray(u?.badges) ? u.badges : [];
 
   return {
@@ -97,12 +115,13 @@ function normalizeProfile(raw: any) {
     avatar,
     level,
     xp,
+    exp: xp,
     nextLevelXp,
     gold,
     diamond,
-    streak,
+    streak: streakDays,
+    streakDays,
     title,
-    attendance,
     badges,
   };
 }
@@ -356,7 +375,7 @@ export default function ProfilePage() {
   }, []);
 
   const xpPercent = profile
-    ? Math.min(100, Math.round((profile.xp / profile.nextLevelXp) * 100))
+    ? Math.min(100, Math.round((profile.exp / profile.nextLevelXp) * 100))
     : 0;
 
   const siteOrigin =
@@ -481,7 +500,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5">
                   <span>Level {profile.level}</span>
                   <span>
-                    {Math.floor(profile.xp)} / {profile.nextLevelXp} XP
+                    {Math.floor(profile.exp)} / {profile.nextLevelXp} EXP
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
@@ -504,7 +523,7 @@ export default function ProfilePage() {
                     />
                   </div>
                   <span className="font-black text-lg text-slate-700">
-                    {profile.streak}
+                    {profile.streakDays}
                   </span>
                   <span className="text-[10px] uppercase font-bold text-slate-400">
                     Chuỗi ngày
@@ -600,20 +619,20 @@ export default function ProfilePage() {
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-600">
-                  <Calendar size={24} />
+                <div className="bg-orange-100 p-2.5 rounded-xl text-orange-600">
+                  <Zap size={24} className="fill-orange-500/20" />
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-slate-800">
-                    Lịch học tập
+                    Chuỗi học (Streak)
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Tháng {currentMonth + 1}, {currentYear}
+                    Tháng {currentMonth + 1}, {currentYear} — các ngày trong chuỗi hiện tại
                   </p>
                 </div>
               </div>
-              <div className="bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full text-sm font-bold">
-                🔥 Đã điểm danh: {profile.attendance.length} ngày
+              <div className="bg-orange-50 text-orange-800 px-4 py-1.5 rounded-full text-sm font-bold border border-orange-200/80">
+                🔥 Streak: {profile.streakDays} ngày liên tục
               </div>
             </div>
 
@@ -632,11 +651,24 @@ export default function ProfilePage() {
               {calendarDays.map((day, idx) => {
                 if (!day) return <div key={idx} />;
 
-                const isAttended =
-                  profile.attendance.includes(day) ||
-                  profile.attendance.includes(String(day));
+                const cellDate = new Date(currentYear, currentMonth, day);
+                cellDate.setHours(0, 0, 0, 0);
+                const todayStart = new Date(
+                  today.getFullYear(),
+                  today.getMonth(),
+                  today.getDate(),
+                );
+                const diffDays = Math.round(
+                  (todayStart.getTime() - cellDate.getTime()) / 86400000,
+                );
+                const streakLen = profile.streakDays;
+                const isInStreak =
+                  streakLen > 0 &&
+                  diffDays >= 0 &&
+                  diffDays < streakLen;
                 const isToday = day === currentDay;
                 const isPast = day < currentDay;
+                const isFuture = day > currentDay;
 
                 return (
                   <div
@@ -644,18 +676,24 @@ export default function ProfilePage() {
                     className={`
                       aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all relative
                       ${
-                        isAttended
-                          ? "bg-emerald-500 text-white shadow-md shadow-emerald-200"
+                        isInStreak
+                          ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white shadow-md shadow-orange-200/80"
                           : isToday
                             ? "bg-sky-100 text-sky-800 border-2 border-sky-300"
                             : isPast
                               ? "bg-slate-50 text-slate-300"
-                              : "bg-white text-slate-600 border border-slate-100"
+                              : isFuture
+                                ? "bg-white text-slate-600 border border-slate-100"
+                                : "bg-white text-slate-600 border border-slate-100"
                       }
                     `}
                   >
-                    {isAttended ? <Zap size={16} fill="currentColor" /> : day}
-                    {isToday && !isAttended && (
+                    {isInStreak ? (
+                      <Zap size={16} fill="currentColor" className="text-white" />
+                    ) : (
+                      day
+                    )}
+                    {isToday && !isInStreak && (
                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
                     )}
                   </div>
@@ -663,8 +701,9 @@ export default function ProfilePage() {
               })}
             </div>
             <p className="text-xs text-slate-400 mt-4 text-center">
-              Lịch điểm danh minh họa khi API trả mảng <code>attendance</code>{" "}
-              (số ngày trong tháng).
+              Ô cam: các ngày thuộc <strong>chuỗi streak</strong> hiện tại (
+              <code className="text-slate-600">streakDays</code> từ API), tính
+              ngược từ hôm nay.
             </p>
           </div>
 

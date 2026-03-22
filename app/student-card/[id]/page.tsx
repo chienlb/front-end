@@ -20,6 +20,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import html2canvas from "html2canvas";
 import { userService } from "@/services/user.service";
 import { communitesService } from "@/services/communites.service";
 
@@ -37,10 +38,13 @@ export type StudentCardData = {
   avatar: string;
   level: number;
   xp: number;
+  /** Cùng giá trị với xp — khớp tên trường API `exp` */
+  exp: number;
   nextLevelXp: number;
   gold: number;
   diamond: number;
-  streak: number;
+  /** Chuỗi ngày học liên tục (nguồn API: streakDays) */
+  streakDays: number;
   title: string;
   id: string;
   badges: { icon?: string; name?: string; unlocked?: boolean }[];
@@ -111,14 +115,24 @@ function normalizeCardUser(
         : "";
 
   const level = Number(stats.level ?? u.level ?? 1);
-  const xp = Number(stats.xp ?? u.xp ?? 0);
+  const xp = Number(
+    u.exp ?? stats.exp ?? stats.xp ?? u.xp ?? 0,
+  );
   const nextLevelXp = Math.max(
     1,
-    Number(stats.nextLevelXp ?? u.nextLevelXp ?? level * 1000),
+    Number(
+      stats.nextLevelXp ??
+        u.nextLevelXp ??
+        u.nextExp ??
+        stats.nextExp ??
+        level * 1000,
+    ),
   );
   const gold = Number(u.gold ?? stats.gold ?? 0);
   const diamond = Number(u.diamond ?? stats.diamond ?? 0);
-  const streak = Number(u.streak ?? stats.streak ?? 0);
+  const streakDays = Number(
+    u.streakDays ?? stats.streakDays ?? u.streak ?? stats.streak ?? 0,
+  );
 
   const title =
     typeof u.title === "string" && u.title.trim() ? u.title : "Học viên";
@@ -141,10 +155,11 @@ function normalizeCardUser(
     avatar: resolveAvatar(u),
     level: Number.isFinite(level) ? level : 1,
     xp: Number.isFinite(xp) ? xp : 0,
+    exp: Number.isFinite(xp) ? xp : 0,
     nextLevelXp: Number.isFinite(nextLevelXp) ? nextLevelXp : 1000,
     gold: Number.isFinite(gold) ? gold : 0,
     diamond: Number.isFinite(diamond) ? diamond : 0,
-    streak: Number.isFinite(streak) ? streak : 0,
+    streakDays: Number.isFinite(streakDays) ? streakDays : 0,
     title,
     id,
     badges,
@@ -204,7 +219,7 @@ export default function StudentCardPage() {
 
   const xpPercent = useMemo(() => {
     if (!card) return 0;
-    return Math.min(100, Math.round((card.xp / card.nextLevelXp) * 100));
+    return Math.min(100, Math.round((card.exp / card.nextLevelXp) * 100));
   }, [card]);
 
   const handleCopyLink = async () => {
@@ -246,7 +261,6 @@ export default function StudentCardPage() {
     setDownloading(true);
     setActionMsg(null);
     try {
-      const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
@@ -255,7 +269,11 @@ export default function StudentCardPage() {
         backgroundColor: "#0c1222",
       });
       const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/png", 0.95),
+        canvas.toBlob(
+          (b: Blob | null) => resolve(b),
+          "image/png",
+          0.95,
+        ),
       );
       if (!blob) throw new Error("toBlob");
       const url = URL.createObjectURL(blob);
@@ -268,7 +286,6 @@ export default function StudentCardPage() {
       URL.revokeObjectURL(url);
     } catch {
       try {
-        const html2canvas = (await import("html2canvas")).default;
         const el2 = cardCaptureRef.current;
         if (!el2) return;
         const canvas = await html2canvas(el2, {
@@ -279,7 +296,11 @@ export default function StudentCardPage() {
           backgroundColor: "#0c1222",
         });
         const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob((b) => resolve(b), "image/png", 0.92),
+          canvas.toBlob(
+            (b: Blob | null) => resolve(b),
+            "image/png",
+            0.92,
+          ),
         );
         if (blob) {
           const url = URL.createObjectURL(blob);
@@ -467,7 +488,7 @@ export default function StudentCardPage() {
                   </div>
                 </div>
 
-                {/* Ảnh + XP */}
+                {/* Ảnh + EXP */}
                 <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-stretch">
                   <div className="mx-auto shrink-0 sm:mx-0">
                     <div className="relative">
@@ -492,9 +513,9 @@ export default function StudentCardPage() {
                   <div className="min-w-0 flex-1 space-y-4">
                     <div>
                       <div className="mb-1.5 flex justify-between text-[11px] font-bold text-slate-500">
-                        <span>Kinh nghiệm (XP)</span>
+                        <span>Kinh nghiệm (EXP)</span>
                         <span className="font-mono text-cyan-200/90">
-                          {Math.floor(card.xp)} / {card.nextLevelXp}
+                          {Math.floor(card.exp)} / {card.nextLevelXp}
                         </span>
                       </div>
                       <div className="h-2.5 overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-white/5">
@@ -542,7 +563,7 @@ export default function StudentCardPage() {
                       <Zap className="h-4 w-4 text-orange-400" />
                     </div>
                     <p className="text-lg font-black text-white tabular-nums sm:text-xl">
-                      {card.streak}
+                      {card.streakDays}
                     </p>
                     <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500 sm:text-[10px]">
                       Chuỗi ngày
