@@ -10,29 +10,10 @@ import {
   FolderUp,
   Headphones,
 } from "lucide-react";
-import { pronunciationService } from "@/services/pronunciation.service";
-
-type PronunciationResult = {
-  attemptId?: string;
-  status?: string;
-  recognizedText?: string;
-  scores?: {
-    pronScore?: number;
-    accuracy?: number;
-    fluency?: number;
-    prosody?: number;
-    completeness?: number;
-    confidence?: number;
-    overallScore?: number;
-  };
-  words?: Array<{
-    Word?: string;
-    AccuracyScore?: number;
-    ErrorType?: string;
-    Confidence?: number;
-  }>;
-  aiAnalysis?: string;
-};
+import {
+  pronunciationService,
+  type PronunciationAssessResponse,
+} from "@/services/pronunciation.service";
 
 export default function PronunciationPractice() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -49,7 +30,7 @@ export default function PronunciationPractice() {
     null,
   );
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PronunciationResult | null>(null);
+  const [result, setResult] = useState<PronunciationAssessResponse | null>(null);
 
   useEffect(() => {
     return () => {
@@ -220,12 +201,12 @@ export default function PronunciationPractice() {
     setLoading(true);
 
     try {
-      const res = (await pronunciationService.assessFromParams({
+      const res = await pronunciationService.assessFromParams({
         audio: audioBlob,
         referenceText: text.trim(),
         language: "en-US",
         audioFileName,
-      })) as PronunciationResult;
+      });
       setResult(res);
     } catch (e) {
       console.error(e);

@@ -29,6 +29,31 @@ export function buildPronunciationAssessFormData(params: {
   return formData;
 }
 
+/** Payload JSON từ POST /pronunciation/assess (sau interceptor axios = body). */
+export type PronunciationAssessResponse = {
+  attemptId?: string;
+  /** Trạng thái nghiệp vụ, ví dụ "Success" — khác status HTTP */
+  status?: string;
+  recognizedText?: string;
+  scores?: {
+    pronScore?: number;
+    accuracy?: number;
+    fluency?: number;
+    prosody?: number;
+    completeness?: number;
+    confidence?: number;
+    overallScore?: number;
+  };
+  words?: Array<{
+    Word?: string;
+    AccuracyScore?: number;
+    ErrorType?: string;
+    Confidence?: number;
+  }>;
+  aiAnalysis?: string;
+  raw?: unknown;
+};
+
 export const pronunciationService = {
   getAll: async (params?: { lessonId?: string; unitId?: string }) => {
     return api.get("/pronunciation/get-all", { params });
@@ -58,8 +83,12 @@ export const pronunciationService = {
    * Chấm điểm phát âm — body phải là FormData (multipart).
    * Hoặc dùng `assessFromParams` bên dưới.
    */
-  assess: async (formData: FormData) => {
-    return api.post("/pronunciation/assess", formData);
+  assess: async (
+    formData: FormData,
+  ): Promise<PronunciationAssessResponse> => {
+    /** Interceptor trả về `response.data`, nhưng kiểu Axios vẫn là AxiosResponse — ép qua unknown. */
+    const data = await api.post("/pronunciation/assess", formData);
+    return data as unknown as PronunciationAssessResponse;
   },
 
   assessFromParams: async (params: {
@@ -67,7 +96,7 @@ export const pronunciationService = {
     referenceText: string;
     language?: string;
     audioFileName?: string;
-  }) => {
+  }): Promise<PronunciationAssessResponse> => {
     return pronunciationService.assess(
       buildPronunciationAssessFormData(params),
     );
