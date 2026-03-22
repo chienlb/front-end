@@ -1,5 +1,34 @@
 import api from "@/utils/api";
 
+/** Mặc định giống Postman: en-US */
+export const DEFAULT_PRONUNCIATION_LANGUAGE = "en-US";
+
+/**
+ * POST /pronunciation/assess — multipart/form-data:
+ * - `audio`: file .wav
+ * - `referenceText`: text
+ * - `language`: text (vd: en-US)
+ */
+export function buildPronunciationAssessFormData(params: {
+  /** File ghi âm — nên là WAV (MIME audio/wav) */
+  audio: Blob | File;
+  referenceText: string;
+  language?: string;
+  /** Tên file gửi lên server (mặc định .wav) */
+  audioFileName?: string;
+}): FormData {
+  const formData = new FormData();
+  const name =
+    params.audioFileName ??
+    (params.audio instanceof File && params.audio.name
+      ? params.audio.name
+      : "recording.wav");
+  formData.append("audio", params.audio, name);
+  formData.append("referenceText", params.referenceText.trim());
+  formData.append("language", params.language ?? DEFAULT_PRONUNCIATION_LANGUAGE);
+  return formData;
+}
+
 export const pronunciationService = {
   getAll: async (params?: { lessonId?: string; unitId?: string }) => {
     return api.get("/pronunciation/get-all", { params });
@@ -25,11 +54,22 @@ export const pronunciationService = {
     });
   },
 
+  /**
+   * Chấm điểm phát âm — body phải là FormData (multipart).
+   * Hoặc dùng `assessFromParams` bên dưới.
+   */
   assess: async (formData: FormData) => {
-    return api.post("/pronunciation/assess", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return api.post("/pronunciation/assess", formData);
+  },
+
+  assessFromParams: async (params: {
+    audio: Blob | File;
+    referenceText: string;
+    language?: string;
+    audioFileName?: string;
+  }) => {
+    return pronunciationService.assess(
+      buildPronunciationAssessFormData(params),
+    );
   },
 };

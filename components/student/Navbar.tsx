@@ -60,6 +60,22 @@ const MOCK_NOTIFICATIONS = [
   },
 ];
 
+/** Tránh crash khi localStorage `currentUser` rỗng / không phải JSON hợp lệ (JSON.parse → Unexpected end of JSON input). */
+function parseStoredUser(raw: string | null): Record<string, unknown> | null {
+  if (raw == null) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  try {
+    const v = JSON.parse(t) as unknown;
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+      return v as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -202,8 +218,8 @@ export default function Navbar() {
     const fetchUser = async () => {
       if (typeof window !== "undefined") {
         const storedUser = localStorage.getItem("currentUser");
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
+        const parsed = parseStoredUser(storedUser);
+        if (parsed) {
           setUser(parsed);
           userService
             .getProfile()
@@ -222,7 +238,7 @@ export default function Navbar() {
     const onProfileUpdated = () => {
       if (typeof window === "undefined") return;
       const storedUser = localStorage.getItem("currentUser");
-      const parsed = storedUser ? JSON.parse(storedUser) : {};
+      const parsed = parseStoredUser(storedUser) ?? {};
       userService
         .getProfile()
         .then((res) => {
