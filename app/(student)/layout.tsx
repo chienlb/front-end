@@ -13,7 +13,8 @@ export default function CustomerLayout({
       className="customer-wrapper relative font-sans"
       style={{ minHeight: "100vh", backgroundColor: "#f0f8ff" }}
     >
-      <div className="fixed top-0 left-0 w-full h-48 z-[9999] pointer-events-none overflow-hidden">
+      {/* z-[110]: trên Navbar (100), dưới modal hồ sơ (250); pointer-events-none để không chặn click trang */}
+      <div className="fixed top-0 left-0 w-full h-48 z-[110] pointer-events-none overflow-hidden">
         <NavbarPet />
       </div>
 

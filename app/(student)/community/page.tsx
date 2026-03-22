@@ -335,7 +335,7 @@ function normalizeCommunite(
         content: text.trim(),
         imageUrl: cImg || undefined,
         time: timeAgo(c?.createdAt ?? c?.created_at),
-        isLiked: false,
+    isLiked: false,
       };
     },
   );
@@ -453,7 +453,7 @@ export default function CommunityPage() {
   useEffect(() => {
     let cancelled = false;
     const boot = async () => {
-      setLoading(true);
+        setLoading(true);
       try {
         const [profileOutcome, listOutcome] = await Promise.allSettled([
           userService.getProfile(),
@@ -486,7 +486,7 @@ export default function CommunityPage() {
           });
         } else {
           setCurrentUser({
-            fullName: "Bạn",
+          fullName: "Bạn",
             displayName: "Bạn",
             avatar: FALLBACK_AVATAR,
             stats: { level: 1 },
@@ -583,7 +583,7 @@ export default function CommunityPage() {
         file: commentFile ?? undefined,
       });
       const doc = unwrapCommuniteDoc(updated);
-      setCommentInput("");
+    setCommentInput("");
       setCommentFile(null);
       if (commentFileRef.current) commentFileRef.current.value = "";
       setPosts((p) =>
@@ -631,10 +631,10 @@ export default function CommunityPage() {
         },
       );
       setPosts((p) => [post, ...p]);
-      setNewPostContent("");
+    setNewPostContent("");
       setNewPostFile(null);
       if (createFileRef.current) createFileRef.current.value = "";
-      setShowCreateModal(false);
+    setShowCreateModal(false);
     } catch (e: any) {
       await showAlert(
         e?.response?.data?.message?.[0] ??
@@ -642,7 +642,7 @@ export default function CommunityPage() {
           "Đăng bài thất bại.",
       );
     } finally {
-      setIsPosting(false);
+    setIsPosting(false);
     }
   };
 
@@ -746,129 +746,129 @@ export default function CommunityPage() {
               </div>
             ) : (
               posts.map((post) => (
-                <motion.div
-                  key={post.id}
-                  layout
+              <motion.div
+                key={post.id}
+                layout
                   initial={false}
-                  variants={itemVariants}
-                  className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-900/5 transition-all duration-300"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border-2 border-white shadow-sm overflow-hidden p-0.5">
-                          <img
-                            src={post.user.avatar}
+                variants={itemVariants}
+                className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-900/5 transition-all duration-300"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 border-2 border-white shadow-sm overflow-hidden p-0.5">
+                        <img
+                          src={post.user.avatar}
                             alt=""
-                            className="w-full h-full rounded-xl object-cover"
-                          />
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded-md border-2 border-white shadow-sm flex items-center gap-0.5">
-                          <Zap size={8} fill="currentColor" /> {post.user.level}
-                        </div>
+                          className="w-full h-full rounded-xl object-cover"
+                        />
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                          {post.user.name}
-                          {post.user.level >= 10 && (
-                            <Crown
-                              size={14}
-                              className="text-yellow-500 fill-yellow-500 animate-pulse"
-                            />
-                          )}
-                        </h3>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mt-0.5">
-                          <span className="flex items-center gap-1">
-                            <Clock size={10} /> {post.time}
-                          </span>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                          <span className="flex items-center gap-1">
-                            <Globe size={10} /> Công khai
-                          </span>
-                        </div>
+                      <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded-md border-2 border-white shadow-sm flex items-center gap-0.5">
+                        <Zap size={8} fill="currentColor" /> {post.user.level}
                       </div>
                     </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                        {post.user.name}
+                        {post.user.level >= 10 && (
+                          <Crown
+                            size={14}
+                            className="text-yellow-500 fill-yellow-500 animate-pulse"
+                          />
+                        )}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Clock size={10} /> {post.time}
+                        </span>
+                        <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                        <span className="flex items-center gap-1">
+                          <Globe size={10} /> Công khai
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                     <button
                       type="button"
                       className="text-slate-300 hover:text-indigo-500 p-2 rounded-xl hover:bg-indigo-50 transition"
                     >
-                      <MoreHorizontal size={20} />
-                    </button>
-                  </div>
+                    <MoreHorizontal size={20} />
+                  </button>
+                </div>
 
-                  <div className="text-slate-700 mb-4 leading-relaxed whitespace-pre-wrap text-[15px] pl-1">
-                    {post.content}
-                  </div>
+                <div className="text-slate-700 mb-4 leading-relaxed whitespace-pre-wrap text-[15px] pl-1">
+                  {post.content}
+                </div>
 
-                  {post.isFeatured && (
-                    <div className="mb-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-orange-200">
+                {post.isFeatured && (
+                  <div className="mb-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-orange-200">
                       <Sparkles size={14} fill="currentColor" /> BÀI VIẾT NỔI
                       BẬT
-                    </div>
-                  )}
+                  </div>
+                )}
 
-                  {post.images && post.images.length > 0 && (
-                    <div className="w-full relative rounded-2xl overflow-hidden mb-5 border-2 border-white shadow-sm">
-                      <img
-                        src={post.images[0]}
+                {post.images && post.images.length > 0 && (
+                  <div className="w-full relative rounded-2xl overflow-hidden mb-5 border-2 border-white shadow-sm">
+                    <img
+                      src={post.images[0]}
                         alt=""
-                        className="w-full h-auto max-h-[500px] object-cover hover:scale-105 transition duration-700"
-                      />
-                    </div>
-                  )}
+                      className="w-full h-auto max-h-[500px] object-cover hover:scale-105 transition duration-700"
+                    />
+                  </div>
+                )}
 
-                  <div className="flex items-center gap-2 pt-2 pb-2 border-b border-slate-50">
-                    <motion.button
+                <div className="flex items-center gap-2 pt-2 pb-2 border-b border-slate-50">
+                  <motion.button
                       type="button"
-                      whileTap={{ scale: 0.9 }}
+                    whileTap={{ scale: 0.9 }}
                       onClick={() => void handleLike(post.id)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        post.isLiked
-                          ? "text-pink-500 bg-pink-50 border border-pink-100"
-                          : "text-slate-500 bg-slate-50 hover:bg-slate-100 border border-transparent"
-                      }`}
-                    >
-                      <Heart
-                        size={18}
-                        fill={post.isLiked ? "currentColor" : "none"}
-                        className={post.isLiked ? "animate-bounce" : ""}
-                      />
-                      {post.likes > 0 ? post.likes : "Thích"}
-                    </motion.button>
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                      post.isLiked
+                        ? "text-pink-500 bg-pink-50 border border-pink-100"
+                        : "text-slate-500 bg-slate-50 hover:bg-slate-100 border border-transparent"
+                    }`}
+                  >
+                    <Heart
+                      size={18}
+                      fill={post.isLiked ? "currentColor" : "none"}
+                      className={post.isLiked ? "animate-bounce" : ""}
+                    />
+                    {post.likes > 0 ? post.likes : "Thích"}
+                  </motion.button>
 
-                    <motion.button
+                  <motion.button
                       type="button"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleToggleComments(post.id)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border border-transparent
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleToggleComments(post.id)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border border-transparent
                       ${expandedPostId === post.id ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "text-slate-500 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600"}`}
-                    >
-                      <MessageCircle size={18} />
+                  >
+                    <MessageCircle size={18} />
                       {post.commentsCount > 0
                         ? post.commentsCount
                         : "Bình luận"}
-                    </motion.button>
+                  </motion.button>
 
-                    <motion.button
+                  <motion.button
                       type="button"
-                      whileTap={{ scale: 0.95 }}
-                      className="w-12 flex items-center justify-center py-2.5 rounded-xl text-slate-400 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-all"
-                    >
-                      <Share2 size={18} />
-                    </motion.button>
-                  </div>
+                    whileTap={{ scale: 0.95 }}
+                    className="w-12 flex items-center justify-center py-2.5 rounded-xl text-slate-400 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                  >
+                    <Share2 size={18} />
+                  </motion.button>
+                </div>
 
-                  <AnimatePresence>
-                    {expandedPostId === post.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden pt-4"
-                      >
-                        <div className="flex gap-3 mb-5">
-                          <img
-                            src={currentUser?.avatar}
+                <AnimatePresence>
+                  {expandedPostId === post.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden pt-4"
+                    >
+                      <div className="flex gap-3 mb-5">
+                        <img
+                          src={currentUser?.avatar}
                             alt=""
                             className="w-9 h-9 rounded-full border border-slate-200 bg-white shrink-0"
                           />
@@ -883,11 +883,11 @@ export default function CommunityPage() {
                                   setCommentFile(e.target.files?.[0] ?? null)
                                 }
                               />
-                              <input
-                                type="text"
+                          <input
+                            type="text"
                                 placeholder="Viết bình luận hoặc gửi ảnh..."
                                 className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 pr-[4.75rem] text-sm focus:outline-none focus:border-indigo-300 focus:bg-white transition"
-                                value={commentInput}
+                            value={commentInput}
                                 onChange={(e) =>
                                   setCommentInput(e.target.value)
                                 }
@@ -897,8 +897,8 @@ export default function CommunityPage() {
                                     void handleSendComment(post.id);
                                   }
                                 }}
-                              />
-                              <button
+                          />
+                          <button
                                 type="button"
                                 onClick={() =>
                                   commentFileRef.current?.click()
@@ -917,9 +917,9 @@ export default function CommunityPage() {
                                   !commentInput.trim() && !commentFile
                                 }
                                 className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 hover:text-indigo-700 p-1 disabled:opacity-30"
-                              >
-                                <Send size={16} />
-                              </button>
+                          >
+                            <Send size={16} />
+                          </button>
                             </div>
                             {commentPreviewUrl && (
                               <div className="relative inline-block max-w-[200px]">
@@ -942,35 +942,35 @@ export default function CommunityPage() {
                                 </button>
                               </div>
                             )}
-                          </div>
                         </div>
+                      </div>
 
-                        <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                          {post.comments && post.comments.length > 0 ? (
-                            post.comments.map((comment, idx) => (
-                              <div
-                                key={comment.id || idx}
-                                className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
-                              >
-                                <img
-                                  src={comment.avatar}
+                      <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                        {post.comments && post.comments.length > 0 ? (
+                          post.comments.map((comment, idx) => (
+                            <div
+                              key={comment.id || idx}
+                              className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+                            >
+                              <img
+                                src={comment.avatar}
                                   alt=""
-                                  className="w-8 h-8 rounded-full border border-slate-100 mt-1"
-                                />
-                                <div className="flex-1">
-                                  <div className="bg-slate-50 px-4 py-2.5 rounded-2xl rounded-tl-none border border-slate-100 inline-block min-w-[150px]">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                      <span className="font-bold text-sm text-slate-800">
-                                        {comment.user}
-                                      </span>
-                                      <span className="text-[10px] text-slate-400">
-                                        {comment.time}
-                                      </span>
-                                    </div>
+                                className="w-8 h-8 rounded-full border border-slate-100 mt-1"
+                              />
+                              <div className="flex-1">
+                                <div className="bg-slate-50 px-4 py-2.5 rounded-2xl rounded-tl-none border border-slate-100 inline-block min-w-[150px]">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="font-bold text-sm text-slate-800">
+                                      {comment.user}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                      {comment.time}
+                                    </span>
+                                  </div>
                                     {comment.content ? (
                                       <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                                        {comment.content}
-                                      </p>
+                                    {comment.content}
+                                  </p>
                                     ) : null}
                                     {comment.imageUrl ? (
                                       <img
@@ -979,24 +979,24 @@ export default function CommunityPage() {
                                         className="mt-2 rounded-xl max-h-48 w-full object-cover border border-slate-100"
                                       />
                                     ) : null}
-                                  </div>
                                 </div>
                               </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6 text-slate-400 text-sm italic flex flex-col items-center">
-                              <MessageCircle
-                                size={24}
-                                className="mb-2 opacity-20"
-                              />
-                              Chưa có bình luận nào. Hãy là người đầu tiên!
                             </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                          ))
+                        ) : (
+                          <div className="text-center py-6 text-slate-400 text-sm italic flex flex-col items-center">
+                            <MessageCircle
+                              size={24}
+                              className="mb-2 opacity-20"
+                            />
+                            Chưa có bình luận nào. Hãy là người đầu tiên!
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
               ))
             )}
           </AnimatePresence>

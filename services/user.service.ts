@@ -38,6 +38,30 @@ export const userService = {
     return res.data ?? res;
   },
 
+  /** GET /users/:id — dùng cho thẻ học viên / QR (có thể 401 nếu API không public). */
+  getUserById: async (id: string) => {
+    const res = await api.get(`/users/${encodeURIComponent(id)}`);
+    return res.data ?? res;
+  },
+
+  /**
+   * Cập nhật thông tin cá nhân (user đang đăng nhập).
+   * Thử PATCH /auths/profile; nếu backend không có (404/405) thì PUT /users/:id.
+   */
+  updateMyProfile: async (userId: string, data: Record<string, unknown>) => {
+    try {
+      const res = await api.patch("/auths/profile", data);
+      return res.data ?? res;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        const res = await api.put(`/users/${userId}`, data);
+        return res.data ?? res;
+      }
+      throw err;
+    }
+  },
+
   getLeaderboard: async () => {
     const res = await api.get("/users/leaderboard");
     return res.data ?? res;

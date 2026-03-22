@@ -219,6 +219,24 @@ export default function Navbar() {
     };
     fetchUser();
 
+    const onProfileUpdated = () => {
+      if (typeof window === "undefined") return;
+      const storedUser = localStorage.getItem("currentUser");
+      const parsed = storedUser ? JSON.parse(storedUser) : {};
+      userService
+        .getProfile()
+        .then((res) => {
+          const profile = res?.data ?? res;
+          if (profile && typeof profile === "object") {
+            const merged = { ...parsed, ...profile };
+            setUser(merged);
+            localStorage.setItem("currentUser", JSON.stringify(merged));
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("smartkids-profile-updated", onProfileUpdated);
+
     const handleClickOutside = (event: any) => {
       if (menuRef.current && !menuRef.current.contains(event.target))
         setShowUserMenu(false);
@@ -233,6 +251,7 @@ export default function Navbar() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("smartkids-profile-updated", onProfileUpdated);
     };
   }, []);
 
