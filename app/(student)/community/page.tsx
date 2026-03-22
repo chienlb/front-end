@@ -61,6 +61,8 @@ interface Post {
   isFeatured: boolean;
 }
 
+type UsernameMap = Record<string, string>;
+
 const FALLBACK_AVATAR =
   "https://api.dicebear.com/7.x/avataaars/svg?seed=Student";
 
@@ -91,12 +93,49 @@ function pickUsername(u: any): string | null {
   return null;
 }
 
+/** Khi không có username: hiển thị mã ngắn từ id (không dùng nhãn "Thành viên") */
+function fallbackDisplayForId(id: string | null | undefined): string {
+  if (!id || !String(id).trim()) return "Người dùng";
+  const s = String(id).trim();
+  return `user_${s.slice(-6)}`;
+}
+
+/** Chuẩn hoá id để tra map (Mongo id không phân biệt hoa thường) */
+function normalizeUserIdKey(id: string | null | undefined): string {
+  return String(id ?? "").trim().toLowerCase();
+}
+
+function lookupUsername(
+  map: UsernameMap,
+  id: string | null | undefined,
+): string | undefined {
+  const k = normalizeUserIdKey(id);
+  if (!k) return undefined;
+  return map[k];
+}
+
+/** Username / handle / tên hiển thị từ object user (API list hoặc GET /users/:id) */
+function pickDisplayHandle(u: any): string | null {
+  const un = pickUsername(u);
+  if (un) return un;
+  for (const k of ["nickName", "nickname", "slug"] as const) {
+    const v = u?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  if (typeof u?.email === "string" && u.email.includes("@")) {
+    const local = u.email.split("@")[0]?.trim();
+    if (local) return local;
+  }
+  if (typeof u?.fullName === "string" && u.fullName.trim()) return u.fullName.trim();
+  if (typeof u?.name === "string" && u.name.trim()) return u.name.trim();
+  return null;
+}
+
 /**
- * Tên hiển thị người đăng / bình luận (user đã populate hoặc object phẳng).
- * Ưu tiên họ tên, có thể ghép @username.
+ * Họ tên / tên hiển thị khi không có username (populate object).
  */
-function formatPersonName(u: any, fallback = "Thành viên"): string {
-  if (!u || typeof u !== "object") return fallback;
+function formatPersonName(u: any, idFallback: string): string {
+  if (!u || typeof u !== "object") return idFallback;
 
   const full =
     (typeof u.fullName === "string" && u.fullName.trim()) ||
@@ -105,14 +144,8 @@ function formatPersonName(u: any, fallback = "Thành viên"): string {
     (typeof u.authorName === "string" && u.authorName.trim()) ||
     "";
 
-  const un = pickUsername(u);
-
-  if (full && un && full.toLowerCase() !== un.toLowerCase()) {
-    return `${full.trim()} (@${un})`;
-  }
   if (full) return full.trim();
-  if (un) return un;
-  return fallback;
+  return idFallback;
 }
 
 /** Tên từ document phẳng (API có thể lưu sẵn authorName / username) */
@@ -131,28 +164,104 @@ function nameFromFlatDoc(d: any): string | null {
   return a || null;
 }
 
+function extractUserId(value: any): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (!value || typeof value !== "object") return null;
+  const id = value?._id ?? value?.id;
+  if (typeof id === "string" && id.trim()) return id.trim();
+  if (id && typeof id === "object" && typeof (id as any).$oid === "string") {
+    return String((id as any).$oid).trim();
+  }
+  return null;
+}
+
+function collectUserIdsFromCommunites(list: any[]): string[] {
+  const ids = new Set<string>();
+
+  for (const item of list) {
+    const authorId = extractUserId(item?.userId);
+    if (authorId) ids.add(authorId);
+
+    const comments = Array.isArray(item?.comments)
+      ? item.comments
+      : Array.isArray(item?.commentList)
+        ? item.commentList
+        : [];
+
+    for (const comment of comments) {
+      const commentUserId = extractUserId(comment?.userId);
+      if (commentUserId) ids.add(commentUserId);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+/**
+ * Map userId -> tên hiển thị qua GET /communites/:user/fullname (backend).
+ * Key map: normalizeUserIdKey(id).
+ */
+async function fetchUsernameMapForIds(ids: string[]): Promise<UsernameMap> {
+  const map: UsernameMap = {};
+  if (ids.length === 0) return map;
+
+  const unique = [
+    ...new Set(ids.map((id) => normalizeUserIdKey(id)).filter(Boolean)),
+  ];
+  const chunkSize = 10;
+
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const settled = await Promise.allSettled(
+      chunk.map(async (key) => {
+        const name = await communitesService.getFullname(key);
+        return { key, name };
+      }),
+    );
+    settled.forEach((r) => {
+      if (r.status !== "fulfilled") return;
+      const { key, name } = r.value;
+      if (name && name.trim()) map[key] = name.trim();
+    });
+  }
+
+  return map;
+}
+
 /** Chuẩn hoá 1 document Communite từ API (linh hoạt field) */
-function normalizeCommunite(raw: any, currentUserId?: string | null): Post {
+function normalizeCommunite(
+  raw: any,
+  currentUserId?: string | null,
+  usernameMap: UsernameMap = {},
+): Post {
   const id = String(raw?._id ?? raw?.id ?? "");
   const author = raw?.userId;
-  let name = "Thành viên";
+  const authorIdStr =
+    typeof author === "string" && author.length > 0
+      ? author
+      : extractUserId(author);
+
+  let name = fallbackDisplayForId(authorIdStr);
   let avatar = FALLBACK_AVATAR;
   let level = 1;
 
   const fromFlat = nameFromFlatDoc(raw);
 
   if (author && typeof author === "object") {
-    name = formatPersonName(author, fromFlat ?? "Thành viên");
+    name =
+      pickUsername(author) ??
+      lookupUsername(usernameMap, authorIdStr) ??
+      pickDisplayHandle(author) ??
+      fromFlat ??
+      formatPersonName(author, fallbackDisplayForId(authorIdStr));
     avatar = author.avatar || avatar;
     level =
       author.stats?.level ??
       author.level ??
       (typeof author.xp === "number" ? Math.floor(author.xp / 100) + 1 : level);
   } else if (typeof author === "string" && author.length > 0) {
-    name = fromFlat ?? `Thành viên · ${author.slice(-6)}`;
+    name = fromFlat ?? lookupUsername(usernameMap, author) ?? fallbackDisplayForId(author);
   }
-
-  if (name === "Thành viên" && fromFlat) name = fromFlat;
 
   const content =
     raw?.content ??
@@ -194,15 +303,25 @@ function normalizeCommunite(raw: any, currentUserId?: string | null): Post {
   const comments: Comment[] = (Array.isArray(rawComments) ? rawComments : []).map(
     (c: any, idx: number) => {
       const cu = c?.userId;
-      let cname = "Thành viên";
+      const commentUserIdStr =
+        typeof cu === "string" && cu.length > 0
+          ? cu
+          : extractUserId(cu);
+
+      let cname = fallbackDisplayForId(commentUserIdStr);
       let cavatar = FALLBACK_AVATAR;
       const cFlat = nameFromFlatDoc(c);
 
       if (cu && typeof cu === "object") {
-        cname = formatPersonName(cu, cFlat ?? "Thành viên");
+        cname =
+          pickUsername(cu) ??
+          lookupUsername(usernameMap, commentUserIdStr) ??
+          pickDisplayHandle(cu) ??
+          cFlat ??
+          formatPersonName(cu, fallbackDisplayForId(commentUserIdStr));
         cavatar = cu.avatar || cavatar;
       } else if (typeof cu === "string" && cu.length > 0) {
-        cname = cFlat ?? `Thành viên · ${cu.slice(-6)}`;
+        cname = cFlat ?? lookupUsername(usernameMap, cu) ?? fallbackDisplayForId(cu);
       } else if (cFlat) {
         cname = cFlat;
       }
@@ -261,6 +380,7 @@ const itemVariants: Variants = {
 
 export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [usernameMap, setUsernameMap] = useState<UsernameMap>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -287,7 +407,7 @@ export default function CommunityPage() {
     try {
       const list = await communitesService.list({ page: 1, limit: 30 });
       setPosts(
-        list.map((item) => normalizeCommunite(item, currentUserId)),
+        list.map((item) => normalizeCommunite(item, currentUserId, usernameMap)),
       );
     } catch (e: any) {
       console.error(e);
@@ -298,7 +418,7 @@ export default function CommunityPage() {
       );
       setPosts([]);
     }
-  }, [currentUserId]);
+  }, [currentUserId, usernameMap]);
 
   /** Preview ảnh đính kèm khi tạo bài */
   useEffect(() => {
@@ -342,13 +462,22 @@ export default function CommunityPage() {
         if (cancelled) return;
 
         let uidStr: string | null = null;
+        const baseUsernameMap: UsernameMap = {};
         if (profileOutcome.status === "fulfilled") {
           const profileRes = profileOutcome.value as any;
           const profile = profileRes?.data ?? profileRes;
           const uid = profile?._id ?? profile?.id ?? null;
           uidStr = uid ? String(uid) : null;
+          const currentUsername =
+            pickUsername(profile) ?? pickDisplayHandle(profile);
+          if (uidStr && currentUsername) {
+            baseUsernameMap[normalizeUserIdKey(uidStr)] = currentUsername;
+          }
           setCurrentUserId(uidStr);
-          const displayName = formatPersonName(profile, "Bạn");
+          const displayName =
+            pickUsername(profile) ??
+            pickDisplayHandle(profile) ??
+            formatPersonName(profile, "Bạn");
           setCurrentUser({
             fullName: profile?.fullName ?? "Bạn",
             displayName,
@@ -366,8 +495,21 @@ export default function CommunityPage() {
 
         if (listOutcome.status === "fulfilled") {
           const list = listOutcome.value;
+          let nextUsernameMap = { ...baseUsernameMap };
+
+          try {
+            const neededIds = collectUserIdsFromCommunites(list);
+            if (neededIds.length > 0) {
+              const fetchedMap = await fetchUsernameMapForIds(neededIds);
+              nextUsernameMap = { ...nextUsernameMap, ...fetchedMap };
+            }
+          } catch (err) {
+            console.error("Không tải được username người dùng:", err);
+          }
+
+          setUsernameMap(nextUsernameMap);
           setPosts(
-            list.map((item) => normalizeCommunite(item, uidStr)),
+            list.map((item) => normalizeCommunite(item, uidStr, nextUsernameMap)),
           );
         } else {
           console.error(listOutcome.reason);
@@ -416,7 +558,7 @@ export default function CommunityPage() {
       const doc = unwrapCommuniteDoc(updated);
       setPosts((p) =>
         p.map((x) =>
-          x.id === postId ? normalizeCommunite(doc, currentUserId) : x,
+          x.id === postId ? normalizeCommunite(doc, currentUserId, usernameMap) : x,
         ),
       );
     } catch (e: any) {
@@ -446,7 +588,7 @@ export default function CommunityPage() {
       if (commentFileRef.current) commentFileRef.current.value = "";
       setPosts((p) =>
         p.map((x) =>
-          x.id === postId ? normalizeCommunite(doc, currentUserId) : x,
+          x.id === postId ? normalizeCommunite(doc, currentUserId, usernameMap) : x,
         ),
       );
     } catch (e: any) {
@@ -466,9 +608,27 @@ export default function CommunityPage() {
         content: newPostContent.trim() || " ",
         file: newPostFile,
       });
+      const createdDoc = unwrapCommuniteDoc(created);
+      const meHandle =
+        pickUsername(currentUser) ??
+        pickDisplayHandle(currentUser) ??
+        (typeof currentUser?.displayName === "string"
+          ? currentUser.displayName.trim()
+          : null);
+      const meKey = currentUserId ? normalizeUserIdKey(currentUserId) : "";
+      if (meKey && meHandle) {
+        setUsernameMap((prev) => ({
+          ...prev,
+          [meKey]: meHandle,
+        }));
+      }
       const post = normalizeCommunite(
-        unwrapCommuniteDoc(created),
+        createdDoc,
         currentUserId,
+        {
+          ...usernameMap,
+          ...(meKey && meHandle ? { [meKey]: meHandle } : {}),
+        },
       );
       setPosts((p) => [post, ...p]);
       setNewPostContent("");

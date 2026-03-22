@@ -102,6 +102,22 @@ export const communitesService = {
   },
 
   /**
+   * GET /communites/:user/fullname — trả về chuỗi hiển thị (username / fullname tùy backend).
+   * Khớp @Get(':user/fullname') trên CommunitesController.
+   */
+  getFullname: async (userId: string): Promise<string> => {
+    const res: any = await api.get(
+      `/communites/${encodeURIComponent(userId)}/fullname`,
+    );
+    if (typeof res === "string") return res.trim();
+    if (res != null && typeof res === "object") {
+      const s = res.data ?? res.fullname ?? res.fullName ?? res.name;
+      if (typeof s === "string") return s.trim();
+    }
+    return String(res ?? "").trim();
+  },
+
+  /**
    * POST /communites — multipart: `content` + optional `file`.
    * Không gửi userId (server gán từ JWT).
    * Không set Content-Type thủ công — axios/browser gắn boundary cho FormData.
