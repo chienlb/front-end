@@ -15,7 +15,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
-import { lessonService } from "@/services/lessons.service";
 import { type Assignment, type AssignmentSource } from "./data";
 
 export default function AssignmentsPage() {
@@ -124,8 +123,15 @@ export default function AssignmentsPage() {
         let userId = "";
         if (rawUser) {
           try {
-            const parsed = JSON.parse(rawUser);
-            userId = parsed?._id || parsed?.id || parsed?.data?._id || "";
+            const t = rawUser.trim();
+            if (t) {
+              const parsed = JSON.parse(t);
+              userId =
+                parsed?._id ||
+                parsed?.id ||
+                parsed?.data?._id ||
+                "";
+            }
           } catch {
             userId = "";
           }
@@ -135,121 +141,21 @@ export default function AssignmentsPage() {
           return;
         }
 
-        const extractLessonIdKey = (item: any) =>
-          String(item?.lessonId?._id || item?.lessonId?.id || item?.lessonId || "");
-
-        // 1) Lấy danh sách lesson đã học từ lesson-progress (GET /lesson-progress/user/:userId)
-        const learnedLessonIdsSet = new Set<string>();
-        try {
-          const progressRes: any = await lessonService.getLessonProgressByUserId(
-            userId,
-            { page: 1, limit: 5000 },
-          );
-          const progressPayload = progressRes?.data || progressRes;
-          const progressList: any[] = Array.isArray(progressPayload)
-            ? progressPayload
-            : Array.isArray(progressPayload?.data)
-              ? progressPayload.data
-              : [];
-
-          // "đã học" = completed hoặc progress >= 100
-          for (const p of progressList) {
-            const lessonIdKey = String(
-              p?.lessonId?._id ||
-                p?.lessonId?.id ||
-                p?.lessonId ||
-                "",
-            );
-            if (!lessonIdKey) continue;
-            const statusLower = String(p?.status || "").toLowerCase();
-            const progNum = Number(p?.progress);
-            const isLearned =
-              statusLower === "completed" ||
-              statusLower === "complete" ||
-              (Number.isFinite(progNum) && progNum >= 100);
-            if (isLearned) learnedLessonIdsSet.add(lessonIdKey);
-          }
-        } catch (err) {
-          // Backend đang trả 500 ở endpoint lesson-progress/user/:userId.
-          // Fallback: cứ lấy lessonId từ assignments của user để không làm trang bị rỗng.
-          console.error("Lỗi lấy lesson-progress, fallback theo assignments:", err);
-        }
-
-        // 2) Lấy assignments theo user để có status/score đúng
-        const userRes: any = await assignmentsService.getAssignmentsByUserId(
-          userId,
-          1,
-          2000,
-          "createdAt",
-          "desc",
-        );
+        /**
+         * API mới: GET /user-assignments/:userId
+         * -> trả về list bài tập của user (đã có status/score/lesson/class tùy backend).
+         */
+        const userRes: any = await assignmentsService.getUserAssignments(userId);
         const userPayload = userRes?.data || userRes;
         const userList: any[] = Array.isArray(userPayload)
           ? userPayload
           : Array.isArray(userPayload?.assignments)
             ? userPayload.assignments
-            : [];
-
-        // fallback: nếu chưa lấy được lesson đã học (khác format status), lấy lessonId từ assignments của user
-        const fallbackLessonIdsSet = new Set<string>(
-          userList.map(extractLessonIdKey).filter(Boolean),
-        );
-        const allowedLessonIdsSet =
-          learnedLessonIdsSet.size > 0 ? learnedLessonIdsSet : fallbackLessonIdsSet;
-
-        const userById = new Map<string, any>();
-        for (const item of userList) {
-          const lessonIdKey = extractLessonIdKey(item);
-          if (lessonIdKey && !allowedLessonIdsSet.has(lessonIdKey)) continue;
-          const aid = String(item?._id || item?.id || "");
-          if (aid) userById.set(aid, item);
-        }
-
-        if (userById.size === 0) {
-          setAssignments([]);
-          return;
-        }
-
-        const lessonIds = Array.from(allowedLessonIdsSet);
-
-        // 3) Gọi assignments theo lessonId, rồi chỉ lấy các assignment mà user có
-        const settled = await Promise.allSettled(
-          lessonIds.map((lessonId) =>
-            assignmentsService.getAssignmentsByLessonId(
-              lessonId,
-              1,
-              100,
-              "createdAt",
-              "desc",
-            ),
-          ),
-        );
-
-        const lessonDetailsById = new Map<string, any>();
-        for (const st of settled) {
-          if (st.status !== "fulfilled") continue;
-          const res: any = st.value;
-          const payload = res?.data || res;
-          const list = Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload?.assignments)
-              ? payload.assignments
+            : Array.isArray(userPayload?.data)
+              ? userPayload.data
               : [];
 
-          for (const item of list) {
-            const aid = String(item?._id || item?.id || "");
-            if (!aid) continue;
-            if (!userById.has(aid)) continue;
-            if (!lessonDetailsById.has(aid)) lessonDetailsById.set(aid, item);
-          }
-        }
-
-        const mergedList = Array.from(userById.entries()).map(([aid, userItem]) => {
-          const lessonItem = lessonDetailsById.get(aid);
-          return lessonItem ? { ...lessonItem, ...userItem } : userItem;
-        });
-
-        setAssignments(mergedList.map(mapAssignment));
+        setAssignments(userList.map(mapAssignment));
       } catch (e) {
         console.error("Lỗi tải assignments:", e);
         setAssignments([]);

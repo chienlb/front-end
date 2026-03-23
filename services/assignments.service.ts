@@ -101,6 +101,15 @@ export const assignmentsService = {
     return api.get(`/assignments/user/${id}`, { params });
   },
 
+  /**
+   * API mới: Lấy danh sách bài tập theo user.
+   * Backend: GET /user-assignments/:userId
+   */
+  getUserAssignments: async (userId: string) => {
+    const id = userId.trim();
+    return api.get(`/assignments/user-assignments/${encodeURIComponent(id)}`);
+  },
+
   getAssignmentById: async (assignmentId: string) => {
     const id = assignmentId.trim();
     return api.get(`/assignments/${id}`);
