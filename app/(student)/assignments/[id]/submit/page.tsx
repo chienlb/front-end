@@ -23,31 +23,60 @@ export default function AssignmentFileSubmitPage() {
       return;
     }
 
+    // Lấy studentId từ localStorage.currentUser
+    let studentId = "";
+    try {
+      const raw = window.localStorage.getItem("currentUser");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        studentId = parsed?._id || parsed?.id || parsed?.data?._id || "";
+      }
+    } catch {
+      studentId = "";
+    }
+
+    if (!studentId) {
+      setError("Không tìm thấy studentId trong tài khoản hiện tại.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setDone(false);
       setError(null);
 
-      const uploadRes: any = await assignmentsService.uploadFile(file);
+      // Nộp bài theo SubmissionsController (POST /submissions)
+      // Backend sẽ nhận file trực tiếp qua multipart field: "files"
+      const submissionRes: any = await assignmentsService.submitWithSubmissions(
+        assignmentId,
+        studentId,
+        file,
+        note,
+      );
+
+      // Nếu backend trả lại URL cho file/attachments thì hiển thị lại.
       const fileUrl =
-        uploadRes?.data?.url ||
-        uploadRes?.data?.data?.url ||
-        uploadRes?.data?.fileUrl ||
-        uploadRes?.data?.data?.fileUrl ||
-        uploadRes?.url ||
-        uploadRes?.fileUrl;
+        submissionRes?.fileUrl ||
+        submissionRes?.url ||
+        submissionRes?.attachmentUrl ||
+        submissionRes?.file?.url ||
+        submissionRes?.attachment?.url ||
+        (Array.isArray(submissionRes?.attachments) &&
+        typeof submissionRes.attachments?.[0] === "string"
+          ? submissionRes.attachments[0]
+          : undefined) ||
+        (Array.isArray(submissionRes?.attachments) &&
+        submissionRes.attachments?.[0]?.url
+          ? submissionRes.attachments[0].url
+          : undefined) ||
+        undefined;
 
-      if (!fileUrl) {
-        throw new Error("Upload thành công nhưng không lấy được đường dẫn file.");
-      }
-
-      await assignmentsService.submitFileOnly(assignmentId, fileUrl, note);
-      setUploadedFileUrl(fileUrl);
+      setUploadedFileUrl(fileUrl ?? null);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(
           `assignment-submission-${assignmentId}`,
           JSON.stringify({
-            fileUrl,
+            fileUrl: fileUrl ?? undefined,
             fileName: file.name,
             submittedAt: new Date().toISOString(),
           }),

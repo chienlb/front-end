@@ -16,9 +16,14 @@ export const assignmentsService = {
   uploadFile: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post("/files/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    // Backend upload endpoint không phải lúc nào cũng nằm trong /api/v1
+    // (một số môi trường dùng thẳng http://localhost:4000/files/upload)
+    const res: any = await api.post(
+      "http://localhost:4000/files/upload",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return res.data ?? res;
   },
 
   submitFileOnly: async (assignmentId: string, fileUrl: string, note?: string) => {
@@ -32,6 +37,32 @@ export const assignmentsService = {
       () => api.post(`/assignments/${id}/submissions`, payload),
       () => api.post(`/homeworks/${id}/submit`, payload),
     ]);
+  },
+
+  /**
+   * Nộp bài theo SubmissionsController: POST /submissions (multipart/form-data)
+   * Field file: "files" (số lượng tối đa 10 ở backend)
+   * Body: assignmentId, studentId, status, submittedAt, feedback...
+   */
+  submitWithSubmissions: async (
+    assignmentId: string,
+    studentId: string,
+    file: File,
+    note?: string,
+  ) => {
+    const formData = new FormData();
+    formData.append("assignmentId", assignmentId.trim());
+    formData.append("studentId", studentId.trim());
+    formData.append("status", "submitted");
+    formData.append("submittedAt", new Date().toISOString());
+
+    const feedback = note?.trim();
+    if (feedback) formData.append("feedback", feedback);
+
+    // Backend: FilesInterceptor('files', 10)
+    formData.append("files", file);
+
+    return api.post("/submissions", formData);
   },
 
   getAssignmentsByClassId: async (
