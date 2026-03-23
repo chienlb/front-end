@@ -17,4 +17,10 @@ export const practiceService = {
   getStats: async () => {
     return api.get("/practice/stats");
   },
+  submitWriting: async (practiceId: string, studentWriting: string) => {
+    return api.post(`/practices/${practiceId}/submit`, { studentWriting });
+  },
+  createWritingPractice: async (studentId: string, type: string) => {
+    return api.post("/practices/", { studentId, type });
+  },
 };

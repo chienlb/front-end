@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Lightbulb, Sparkles, Wand2 } from "lucide-react";
+import { practiceService } from "@/services/practice.service";
 
 const WRITING_DETAIL_CONFIG = {
   sentence: {
@@ -60,11 +61,16 @@ type WritingType = keyof typeof WRITING_DETAIL_CONFIG;
 
 export default function WritingDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const type = params.type as string;
+  const [studentId, setStudentId] = useState<string>("");
+  const [practiceId, setPracticeId] = useState<string>("");
   const [generatedTopic, setGeneratedTopic] = useState<string>("");
   const [studentDraft, setStudentDraft] = useState<string>("");
   const [aiFeedback, setAiFeedback] = useState<string[]>([]);
   const [aiScore, setAiScore] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const content = useMemo(() => {
     if (type in WRITING_DETAIL_CONFIG) {
@@ -72,6 +78,24 @@ export default function WritingDetailPage() {
     }
     return null;
   }, [type]);
+
+  useEffect(() => {
+    const idFromQuery = searchParams.get("practiceId");
+    if (idFromQuery) setPracticeId(idFromQuery);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const rawUser = localStorage.getItem("currentUser");
+    if (!rawUser) return;
+    try {
+      const parsed = JSON.parse(rawUser);
+      const id = parsed?._id || parsed?.id || parsed?.data?._id || "";
+      if (id) setStudentId(id);
+    } catch {
+      // noop
+    }
+  }, []);
 
   const topicPool: Record<WritingType, string[]> = {
     sentence: [
@@ -91,14 +115,54 @@ export default function WritingDetailPage() {
     ],
   };
 
-  const handleGenerateTopic = () => {
+  const handleGenerateTopic = async () => {
     if (!content) return;
+    if (!studentId.trim()) {
+      setAiFeedback(["Vui lòng nhập Student ID để tạo bài viết."]);
+      setAiScore(0);
+      return;
+    }
+
     const currentType = type as WritingType;
-    const list = topicPool[currentType];
-    const picked = list[Math.floor(Math.random() * list.length)];
-    setGeneratedTopic(picked);
-    setAiFeedback([]);
-    setAiScore(null);
+    try {
+      setGenerating(true);
+      const res: any = await practiceService.createWritingPractice(
+        studentId.trim(),
+        currentType,
+      );
+      const payload = res?.data ? res.data : res;
+      const createdId = payload?._id;
+      const firstItem = payload?.exercise?.items?.[0];
+      if (createdId) setPracticeId(createdId);
+
+      if (firstItem) {
+        const lines: string[] = [];
+        if (firstItem.title) lines.push(`Tiêu đề: ${firstItem.title}`);
+        if (firstItem.situation) lines.push(`Tình huống: ${firstItem.situation}`);
+        if (firstItem.instruction) lines.push(`Yêu cầu: ${firstItem.instruction}`);
+        if (Array.isArray(firstItem.requirements) && firstItem.requirements.length > 0) {
+          lines.push(`Cần có: ${firstItem.requirements.join("; ")}`);
+        }
+        if (typeof firstItem.minimum_sentences === "number") {
+          lines.push(`Số câu tối thiểu: ${firstItem.minimum_sentences}`);
+        }
+        setGeneratedTopic(lines.join("\n"));
+      } else {
+        const list = topicPool[currentType];
+        const picked = list[Math.floor(Math.random() * list.length)];
+        setGeneratedTopic(picked);
+      }
+
+      setAiFeedback([]);
+      setAiScore(null);
+    } catch (e: any) {
+      const message =
+        e?.response?.data?.message || "Không thể tạo đề từ AI. Vui lòng thử lại.";
+      setAiScore(0);
+      setAiFeedback([String(message)]);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleGetAiFeedback = () => {
@@ -152,8 +216,55 @@ export default function WritingDetailPage() {
     setAiScore(score);
   };
 
-  const handleGradeWriting = () => {
-    handleGetAiFeedback();
+  const handleGradeWriting = async () => {
+    const text = studentDraft.trim();
+    if (!practiceId.trim()) {
+      setAiScore(0);
+      setAiFeedback(["Vui lòng nhập Practice ID trước khi chấm bài."]);
+      return;
+    }
+    if (!text) {
+      setAiScore(0);
+      setAiFeedback(["Vui lòng nhập bài viết trước khi chấm bài."]);
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res: any = await practiceService.submitWriting(practiceId.trim(), text);
+      const payload = res?.data ? res.data : res;
+      const ai = payload?.AIFeedback || {};
+
+      const feedback: string[] = [];
+      if (ai?.comments) feedback.push(ai.comments);
+      if (ai?.encouragement) feedback.push(ai.encouragement);
+      if (typeof ai?.relevance_score === "number") {
+        feedback.push(`Mức bám đề: ${ai.relevance_score}/1`);
+      }
+      if (typeof ai?.language_score === "number") {
+        feedback.push(`Ngôn ngữ: ${ai.language_score}/1`);
+      }
+      if (typeof ai?.completeness_score === "number") {
+        feedback.push(`Độ đầy đủ: ${ai.completeness_score}/1`);
+      }
+      if (ai?.off_topic) {
+        feedback.push("AI nhận diện bài có dấu hiệu lệch đề.");
+      }
+
+      setAiScore(typeof ai?.score === "number" ? ai.score : null);
+      setAiFeedback(
+        feedback.length > 0
+          ? feedback
+          : ["Đã chấm bài thành công nhưng chưa có nhận xét chi tiết."],
+      );
+    } catch (e: any) {
+      const message =
+        e?.response?.data?.message || "Không thể chấm bài lúc này. Vui lòng thử lại.";
+      setAiScore(0);
+      setAiFeedback([String(message)]);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!content) {
@@ -245,8 +356,9 @@ export default function WritingDetailPage() {
             <button
               onClick={handleGenerateTopic}
               className="rounded-xl bg-[#0369A1] px-4 py-2.5 text-sm font-black text-white"
+              disabled={generating}
             >
-              Tạo đề bằng AI
+              {generating ? "Đang tạo đề..." : "Tạo đề bằng AI"}
             </button>
             <button
               onClick={handleGetAiFeedback}
@@ -257,11 +369,44 @@ export default function WritingDetailPage() {
           </div>
 
           {generatedTopic && (
-            <div className="mt-4 rounded-xl border border-[#CAE7FF] bg-[#EEF8FF] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#0369A1]">
+            <div className="mt-4 rounded-2xl border border-[#CAE7FF] bg-[#EEF8FF] p-4 md:p-5">
+              <div className="mb-3 inline-flex items-center rounded-full border border-[#B7DDFB] bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-[#0369A1]">
                 Đề AI vừa tạo
               </div>
-              <p className="mt-1 text-sm font-bold text-slate-700">{generatedTopic}</p>
+              <div className="space-y-2.5 text-sm">
+                {generatedTopic
+                  .split("\n")
+                  .filter(Boolean)
+                  .map((line) => {
+                    const [labelRaw, ...rest] = line.split(":");
+                    const label = labelRaw?.trim();
+                    const value = rest.join(":").trim();
+                    if (!label || !value) {
+                      return (
+                        <div
+                          key={line}
+                          className="rounded-xl border border-white/80 bg-white px-3.5 py-2.5 font-semibold text-slate-700"
+                        >
+                          {line}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={line}
+                        className="rounded-xl border border-white/80 bg-white px-3.5 py-2.5"
+                      >
+                        <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#0369A1]">
+                          {label}
+                        </div>
+                        <div className="mt-0.5 font-semibold leading-6 text-slate-700">
+                          {value}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
 
@@ -278,31 +423,35 @@ export default function WritingDetailPage() {
               <button
                 onClick={handleGradeWriting}
                 className="rounded-xl bg-[#7C3AED] px-6 py-2.5 text-sm font-black text-white shadow-[0_8px_18px_rgba(124,58,237,0.35)] transition hover:brightness-110"
+                disabled={submitting}
               >
-                Chấm bài
+                {submitting ? "Đang chấm..." : "Chấm bài"}
               </button>
             </div>
           </div>
 
           {(aiScore !== null || aiFeedback.length > 0) && (
             <div className="mt-4 rounded-xl border border-[#C8F3DE] bg-[#EEFFF7] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-[#0F766E]">
-                  Phản hồi AI
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#0F766E]">
+                Phản hồi AI
+              </div>
+              {aiScore !== null && (
+                <div className="mt-3 inline-flex rounded-full bg-white px-4 py-2 text-base font-black text-[#0F766E]">
+                  Điểm AI: {aiScore}
                 </div>
-                {aiScore !== null && (
-                  <div className="rounded-full bg-white px-3 py-1 text-sm font-black text-[#0F766E]">
-                    Điểm gợi ý: {aiScore}/100
-                  </div>
-                )}
-              </div>
-              <div className="mt-3 space-y-2">
-                {aiFeedback.map((note) => (
-                  <div key={note} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                    {note}
-                  </div>
-                ))}
-              </div>
+              )}
+              {aiFeedback.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {aiFeedback.map((note) => (
+                    <div
+                      key={note}
+                      className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                    >
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
