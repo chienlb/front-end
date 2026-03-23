@@ -1,9 +1,26 @@
 import api from "@/utils/api";
 
+const firstSuccessful = async <T,>(fns: Array<() => Promise<T>>): Promise<T> => {
+  let lastErr: unknown;
+  for (const fn of fns) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+};
+
 export const liveClassService = {
   // Lấy danh sách lớp của học sinh
   getMyClasses: async () => {
-    return api.get("/classes/my-enrollments");
+    return firstSuccessful([
+      () => api.get("/classes/my-enrollments"),
+      () => api.get("/classes/my-classes"),
+      () => api.get("/classes/enrollments/me"),
+      () => api.get("/booking/list"),
+    ]);
   },
 
   // Lấy chi tiết lộ trình 1 lớp (Kèm lịch học)

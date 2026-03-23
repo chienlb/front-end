@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
@@ -11,14 +11,12 @@ import {
   Trophy,
   ArrowUpRight,
   Video,
-  MonitorPlay,
   Zap,
+  Loader2,
 } from "lucide-react";
-import {
-  ASSIGNMENTS,
-  type Assignment,
-  type AssignmentSource,
-} from "./data";
+import { assignmentsService } from "@/services/assignments.service";
+import { lessonService } from "@/services/lessons.service";
+import { type Assignment, type AssignmentSource } from "./data";
 
 export default function AssignmentsPage() {
   const [activeTab, setActiveTab] = useState<"TODO" | "DONE">("TODO");
@@ -26,8 +24,243 @@ export default function AssignmentsPage() {
   const [sourceFilter, setSourceFilter] = useState<"ALL" | AssignmentSource>(
     "ALL",
   );
+  const [loading, setLoading] = useState(true);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
 
-  const filteredList = ASSIGNMENTS.filter((item) => {
+  const normalizeStatus = (raw: any): Assignment["status"] => {
+    const s = String(raw || "").toUpperCase();
+    if (["GRADED", "DONE", "COMPLETED"].includes(s)) return "GRADED";
+    if (["SUBMITTED", "WAITING", "PENDING_REVIEW"].includes(s))
+      return "SUBMITTED";
+    if (["LATE", "OVERDUE"].includes(s)) return "LATE";
+    return "PENDING";
+  };
+
+  const mapAssignment = (item: any): Assignment => {
+    const status = normalizeStatus(item?.status);
+    const source: AssignmentSource = item?.lessonId
+      ? "COURSE"
+      : item?.classId
+        ? "LIVE_CLASS"
+        : "SYSTEM";
+
+    const lessonIdKey = String(
+      item?.lessonId?._id || item?.lessonId?.id || item?.lessonId || "",
+    );
+    const classIdKey = String(
+      item?.classId?._id || item?.classId?.id || item?.classId || "",
+    );
+
+    const firstAttachmentStringUrl =
+      Array.isArray(item?.attachments) && typeof item?.attachments[0] === "string"
+        ? item.attachments[0]
+        : undefined;
+
+    const attachmentUrl =
+      item?.attachmentUrl ||
+      item?.fileUrl ||
+      item?.attachment?.url ||
+      item?.attachment?.fileUrl ||
+      item?.file?.url ||
+      item?.file?.fileUrl ||
+      firstAttachmentStringUrl ||
+      (Array.isArray(item?.attachments) && item.attachments[0]?.url) ||
+      (Array.isArray(item?.attachments) && item.attachments[0]?.fileUrl) ||
+      undefined;
+
+    const attachmentName =
+      item?.attachmentName ||
+      item?.fileName ||
+      item?.attachment?.name ||
+      item?.attachment?.fileName ||
+      item?.file?.name ||
+      item?.file?.fileName ||
+      (firstAttachmentStringUrl ? firstAttachmentStringUrl.split("/").pop() : undefined) ||
+      (Array.isArray(item?.attachments) && item.attachments[0]?.name) ||
+      (Array.isArray(item?.attachments) && item.attachments[0]?.fileName) ||
+      undefined;
+
+    return {
+      id: String(item?._id || item?.id || ""),
+      title: item?.title || item?.name || "Bài tập chưa đặt tên",
+      subject: item?.subject || item?.type || "Bài tập",
+      source,
+      sourceName:
+        item?.classId?.name ||
+        item?.classId?.title ||
+        item?.lessonId?.title ||
+        "Không rõ nguồn",
+      teacher: item?.teacherId?.fullName || item?.teacherName || undefined,
+      deadline: item?.deadline || item?.dueDate || "Chưa có hạn nộp",
+      status,
+      score:
+        typeof item?.score === "number"
+          ? item.score
+          : typeof item?.grade === "number"
+            ? item.grade
+            : undefined,
+      duration: item?.duration || item?.timeLimit || undefined,
+      priority: item?.priority === "HIGH" ? "HIGH" : "NORMAL",
+      content: item?.description || item?.content || undefined,
+      requirements: Array.isArray(item?.requirements) ? item.requirements : [],
+      attachmentUrl,
+      attachmentName,
+
+      classId: classIdKey || undefined,
+      className: item?.classId?.name || item?.classId?.title || undefined,
+      lessonId: lessonIdKey || undefined,
+      lessonTitle: item?.lessonId?.title || item?.lessonId?.name || undefined,
+    };
+  };
+
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        setLoading(true);
+        const rawUser =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("currentUser")
+            : null;
+        let userId = "";
+        if (rawUser) {
+          try {
+            const parsed = JSON.parse(rawUser);
+            userId = parsed?._id || parsed?.id || parsed?.data?._id || "";
+          } catch {
+            userId = "";
+          }
+        }
+        if (!userId) {
+          setAssignments([]);
+          return;
+        }
+
+        const extractLessonIdKey = (item: any) =>
+          String(item?.lessonId?._id || item?.lessonId?.id || item?.lessonId || "");
+
+        // 1) Lấy danh sách lesson đã học từ lesson-progress (GET /lesson-progress/user/:userId)
+        const learnedLessonIdsSet = new Set<string>();
+        try {
+          const progressRes: any = await lessonService.getLessonProgressByUserId(
+            userId,
+            { page: 1, limit: 5000 },
+          );
+          const progressPayload = progressRes?.data || progressRes;
+          const progressList: any[] = Array.isArray(progressPayload)
+            ? progressPayload
+            : Array.isArray(progressPayload?.data)
+              ? progressPayload.data
+              : [];
+
+          // "đã học" = completed hoặc progress >= 100
+          for (const p of progressList) {
+            const lessonIdKey = String(
+              p?.lessonId?._id ||
+                p?.lessonId?.id ||
+                p?.lessonId ||
+                "",
+            );
+            if (!lessonIdKey) continue;
+            const statusLower = String(p?.status || "").toLowerCase();
+            const progNum = Number(p?.progress);
+            const isLearned =
+              statusLower === "completed" ||
+              statusLower === "complete" ||
+              (Number.isFinite(progNum) && progNum >= 100);
+            if (isLearned) learnedLessonIdsSet.add(lessonIdKey);
+          }
+        } catch (err) {
+          // Backend đang trả 500 ở endpoint lesson-progress/user/:userId.
+          // Fallback: cứ lấy lessonId từ assignments của user để không làm trang bị rỗng.
+          console.error("Lỗi lấy lesson-progress, fallback theo assignments:", err);
+        }
+
+        // 2) Lấy assignments theo user để có status/score đúng
+        const userRes: any = await assignmentsService.getAssignmentsByUserId(
+          userId,
+          1,
+          2000,
+          "createdAt",
+          "desc",
+        );
+        const userPayload = userRes?.data || userRes;
+        const userList: any[] = Array.isArray(userPayload)
+          ? userPayload
+          : Array.isArray(userPayload?.assignments)
+            ? userPayload.assignments
+            : [];
+
+        // fallback: nếu chưa lấy được lesson đã học (khác format status), lấy lessonId từ assignments của user
+        const fallbackLessonIdsSet = new Set<string>(
+          userList.map(extractLessonIdKey).filter(Boolean),
+        );
+        const allowedLessonIdsSet =
+          learnedLessonIdsSet.size > 0 ? learnedLessonIdsSet : fallbackLessonIdsSet;
+
+        const userById = new Map<string, any>();
+        for (const item of userList) {
+          const lessonIdKey = extractLessonIdKey(item);
+          if (lessonIdKey && !allowedLessonIdsSet.has(lessonIdKey)) continue;
+          const aid = String(item?._id || item?.id || "");
+          if (aid) userById.set(aid, item);
+        }
+
+        if (userById.size === 0) {
+          setAssignments([]);
+          return;
+        }
+
+        const lessonIds = Array.from(allowedLessonIdsSet);
+
+        // 3) Gọi assignments theo lessonId, rồi chỉ lấy các assignment mà user có
+        const settled = await Promise.allSettled(
+          lessonIds.map((lessonId) =>
+            assignmentsService.getAssignmentsByLessonId(
+              lessonId,
+              1,
+              100,
+              "createdAt",
+              "desc",
+            ),
+          ),
+        );
+
+        const lessonDetailsById = new Map<string, any>();
+        for (const st of settled) {
+          if (st.status !== "fulfilled") continue;
+          const res: any = st.value;
+          const payload = res?.data || res;
+          const list = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.assignments)
+              ? payload.assignments
+              : [];
+
+          for (const item of list) {
+            const aid = String(item?._id || item?.id || "");
+            if (!aid) continue;
+            if (!userById.has(aid)) continue;
+            if (!lessonDetailsById.has(aid)) lessonDetailsById.set(aid, item);
+          }
+        }
+
+        const mergedList = Array.from(userById.entries()).map(([aid, userItem]) => {
+          const lessonItem = lessonDetailsById.get(aid);
+          return lessonItem ? { ...lessonItem, ...userItem } : userItem;
+        });
+
+        setAssignments(mergedList.map(mapAssignment));
+      } catch (e) {
+        console.error("Lỗi tải assignments:", e);
+        setAssignments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAssignments();
+  }, []);
+
+  const filteredList = assignments.filter((item) => {
     // 1. Filter by Tab (Status)
     const isTodo = item.status === "PENDING" || item.status === "LATE";
     if (activeTab === "TODO" && !isTodo) return false;
@@ -42,6 +275,57 @@ export default function AssignmentsPage() {
 
     return true;
   });
+
+  const groupedAssignments = useMemo(() => {
+    // groupId (classId) -> lessonId -> items
+    const classGroups = new Map<string, Map<string, Assignment[]>>();
+
+    for (const item of filteredList) {
+      const groupKey = item.classId || "SYSTEM";
+      const groupLabel =
+        item.className ||
+        item.sourceName ||
+        (item.source === "SYSTEM" ? "Nhiệm vụ ngày" : "Nhóm học");
+
+      const lessonKey = item.lessonId || "NO_LESSON";
+      const lessonLabel = item.lessonTitle || "Bài học";
+
+      // We keep groupKey/lessonKey as identity, but we render using the latest labels.
+      if (!classGroups.has(groupKey)) classGroups.set(groupKey, new Map());
+      const lessonGroups = classGroups.get(groupKey)!;
+
+      if (!lessonGroups.has(lessonKey)) lessonGroups.set(lessonKey, []);
+      lessonGroups.get(lessonKey)!.push(item);
+    }
+
+    return Array.from(classGroups.entries()).map(([groupKey, lessonsMap]) => {
+      const firstItem = lessonsMap.values().next().value?.[0] as Assignment | undefined;
+      const groupLabel =
+        firstItem?.className ||
+        firstItem?.sourceName ||
+        (firstItem?.source === "SYSTEM" ? "Nhiệm vụ ngày" : "Nhóm học") ||
+        groupKey;
+
+      return {
+        groupKey,
+        groupLabel,
+        lessons: Array.from(lessonsMap.entries()).map(([lessonKey, items]) => {
+          const lessonFirst = items[0];
+          const lessonTitle = lessonFirst?.lessonTitle || "Bài học";
+          return { lessonKey, lessonTitle, items };
+        }),
+      };
+    });
+  }, [filteredList]);
+
+  const totalPending = useMemo(
+    () => assignments.filter((a) => a.status === "PENDING" || a.status === "LATE").length,
+    [assignments],
+  );
+  const totalDone = useMemo(
+    () => assignments.filter((a) => a.status === "GRADED" || a.status === "SUBMITTED").length,
+    [assignments],
+  );
 
   const getStatusBadge = (item: Assignment) => {
     switch (item.status) {
@@ -79,7 +363,7 @@ export default function AssignmentsPage() {
   const getSourceIcon = (source: AssignmentSource) => {
     switch (source) {
       case "LIVE_CLASS":
-        return <MonitorPlay size={14} className="text-red-500" />;
+        return <BookOpen size={14} className="text-indigo-500" />;
       case "COURSE":
         return <Video size={14} className="text-blue-500" />;
       case "SYSTEM":
@@ -90,7 +374,7 @@ export default function AssignmentsPage() {
   const getSourceLabel = (source: AssignmentSource) => {
     switch (source) {
       case "LIVE_CLASS":
-        return "Lớp Live";
+        return "Nhóm học";
       case "COURSE":
         return "Khóa học Video";
       case "SYSTEM":
@@ -118,7 +402,7 @@ export default function AssignmentsPage() {
               </div>
               <div>
                 <p className="text-3xl font-black">
-                  {ASSIGNMENTS.filter((a) => a.status === "PENDING").length}
+                  {totalPending}
                 </p>
                 <p className="text-xs text-blue-100 uppercase font-bold">
                   Cần làm ngay
@@ -131,7 +415,7 @@ export default function AssignmentsPage() {
               </div>
               <div>
                 <p className="text-3xl font-black">
-                  {ASSIGNMENTS.filter((a) => a.status === "GRADED").length}
+                  {totalDone}
                 </p>
                 <p className="text-xs text-blue-100 uppercase font-bold">
                   Đã hoàn thành
@@ -162,19 +446,13 @@ export default function AssignmentsPage() {
             </button>
           </div>
 
-          {/* [NEW] Source Filter */}
+          {/* Source Filter */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
             <button
               onClick={() => setSourceFilter("ALL")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border transition ${sourceFilter === "ALL" ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
             >
               Tất cả
-            </button>
-            <button
-              onClick={() => setSourceFilter("LIVE_CLASS")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border transition flex items-center gap-1 ${sourceFilter === "LIVE_CLASS" ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
-            >
-              <MonitorPlay size={12} /> Lớp Live
             </button>
             <button
               onClick={() => setSourceFilter("SYSTEM")}
@@ -199,104 +477,152 @@ export default function AssignmentsPage() {
           </div>
         </div>
 
-        {/* ASSIGNMENT GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredList.length > 0 ? (
-            filteredList.map((item) => (
+        {/* ASSIGNMENT GROUPS (groupId + lessonId) */}
+        <div className="space-y-6">
+          {loading ? (
+            <div className="py-16 text-center bg-white rounded-3xl border border-slate-200">
+              <Loader2 className="animate-spin w-8 h-8 text-blue-600 mx-auto mb-3" />
+              <p className="text-slate-500 font-semibold">
+                Đang tải danh sách bài tập...
+              </p>
+            </div>
+          ) : groupedAssignments.length > 0 ? (
+            groupedAssignments.map((group) => (
               <div
-                key={item.id}
-                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition group flex flex-col h-full"
+                key={group.groupKey}
+                className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm"
               >
-                {/* Header Card: Subject & Source */}
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex gap-2">
-                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                      {item.subject}
-                    </span>
-                    {/* Badge hiển thị nguồn gốc bài tập */}
-                    <span className="bg-slate-50 text-slate-500 border border-slate-100 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1">
-                      {getSourceIcon(item.source)} {getSourceLabel(item.source)}
-                    </span>
-                  </div>
-                  {getStatusBadge(item)}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 mb-4">
-                  <Link
-                    href={`/assignments/${item.id}`}
-                    className="font-bold text-lg text-slate-800 mb-1 group-hover:text-blue-600 transition line-clamp-2 hover:underline underline-offset-4 block"
-                  >
-                    {item.title}
-                  </Link>
-                  {/* Hiển thị tên lớp/khóa học nguồn */}
-                  <p className="text-xs text-slate-400 font-medium mb-3 line-clamp-1">
-                    Từ:{" "}
-                    <span className="text-slate-600">{item.sourceName}</span>
-                  </p>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    {item.teacher && (
-                      <span className="flex items-center gap-1">
-                        <PenTool size={12} /> {item.teacher}
-                      </span>
-                    )}
-                    {item.teacher && <span>•</span>}
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} /> {item.duration}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Footer Info */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <div className="text-xs">
-                    <p className="text-slate-400 font-bold">Hạn nộp</p>
-                    <p
-                      className={`font-bold ${item.status === "LATE" ? "text-red-600" : "text-slate-700"}`}
-                    >
-                      {item.deadline}
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 font-bold uppercase">
+                      Nhóm học
                     </p>
+                    <h2 className="text-xl font-black text-slate-800 mt-1">
+                      {group.groupLabel}
+                    </h2>
                   </div>
+                  <div className="text-xs text-slate-400 font-bold">
+                    {group.lessons.reduce((acc, l) => acc + l.items.length, 0)} bài
+                  </div>
+                </div>
 
-                  {item.status === "PENDING" || item.status === "LATE" ? (
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/assignments/${item.id}`}
-                        className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
-                      >
-                        Xem nội dung
-                      </Link>
-                      <Link
-                        href={`/assignments/${item.id}/submit`}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
-                      >
-                        Nộp file <ArrowUpRight size={14} />
-                      </Link>
+                <div className="space-y-5">
+                  {group.lessons.map((lesson, idx) => (
+                    <div key={lesson.lessonKey} className="pt-2">
+                      <p className="text-sm font-black text-slate-600 mb-3 flex items-center gap-2">
+                        <BookOpen size={14} className="text-blue-500" />
+                        {lesson.lessonTitle}
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {lesson.items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition group flex flex-col h-full"
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex gap-2">
+                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                                  {item.subject}
+                                </span>
+                                <span className="bg-slate-50 text-slate-500 border border-slate-100 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                                  {getSourceIcon(item.source)}{" "}
+                                  {getSourceLabel(item.source)}
+                                </span>
+                              </div>
+                              {getStatusBadge(item)}
+                            </div>
+
+                            <div className="flex-1 mb-4">
+                              <Link
+                                href={`/assignments/${item.id}`}
+                                className="font-bold text-lg text-slate-800 mb-1 group-hover:text-blue-600 transition line-clamp-2 hover:underline underline-offset-4 block"
+                              >
+                                {item.title}
+                              </Link>
+
+                              <p className="text-xs text-slate-400 font-medium mb-3 line-clamp-1">
+                                Từ:{" "}
+                                <span className="text-slate-600">
+                                  {item.sourceName}
+                                </span>
+                              </p>
+
+                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                                {item.teacher && (
+                                  <span className="flex items-center gap-1">
+                                    <PenTool size={12} /> {item.teacher}
+                                  </span>
+                                )}
+                                {item.teacher && <span>•</span>}
+                                <span className="flex items-center gap-1">
+                                  <Clock size={12} /> {item.duration}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                              <div className="text-xs">
+                                <p className="text-slate-400 font-bold">
+                                  Hạn nộp
+                                </p>
+                                <p
+                                  className={`font-bold ${
+                                    item.status === "LATE"
+                                      ? "text-red-600"
+                                      : "text-slate-700"
+                                  }`}
+                                >
+                                  {item.deadline}
+                                </p>
+                              </div>
+
+                              {item.status === "PENDING" ||
+                              item.status === "LATE" ? (
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/assignments/${item.id}`}
+                                    className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
+                                  >
+                                    Xem nội dung
+                                  </Link>
+                                  <Link
+                                    href={`/assignments/${item.id}/submit`}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
+                                  >
+                                    Nộp file{" "}
+                                    <ArrowUpRight size={14} />
+                                  </Link>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-3">
+                                  {item.score && (
+                                    <span className="text-xl font-black text-green-600 flex items-center gap-1">
+                                      {item.score}
+                                      <span className="text-xs text-green-400 font-bold">
+                                        đ
+                                      </span>
+                                    </span>
+                                  )}
+                                  <Link
+                                    href={`/assignments/${item.id}/review`}
+                                    className="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
+                                  >
+                                    Xem lại
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      {item.score && (
-                        <span className="text-xl font-black text-green-600 flex items-center gap-1">
-                          {item.score}
-                          <span className="text-xs text-green-400 font-bold">
-                            đ
-                          </span>
-                        </span>
-                      )}
-                      <Link
-                        href={`/assignments/${item.id}/review`}
-                        className="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
-                      >
-                        Xem lại
-                      </Link>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             ))
           ) : (
-            <div className="col-span-1 md:col-span-2 py-16 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+            <div className="py-16 text-center bg-white rounded-3xl border border-dashed border-slate-300">
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trophy size={40} className="text-blue-300" />
               </div>

@@ -33,5 +33,46 @@ export const assignmentsService = {
       () => api.post(`/homeworks/${id}/submit`, payload),
     ]);
   },
+
+  getAssignmentsByClassId: async (
+    classId: string,
+    page = 1,
+    limit = 10,
+    sort = "createdAt",
+    order: "asc" | "desc" = "desc",
+  ) => {
+    const id = classId.trim();
+    const params = { page, limit, sort, order };
+    return api.get(`/assignments/class/${id}`, { params });
+  },
+
+  getAssignmentsByLessonId: async (
+    lessonId: string,
+    page = 1,
+    limit = 10,
+    sort = "createdAt",
+    order: "asc" | "desc" = "desc",
+  ) => {
+    const id = lessonId.trim();
+    const params = { page, limit, sort, order };
+    return api.get(`/assignments/lesson/${id}`, { params });
+  },
+
+  getAssignmentsByUserId: async (
+    userId: string,
+    page = 1,
+    limit = 20,
+    sort = "createdAt",
+    order: "asc" | "desc" = "desc",
+  ) => {
+    const id = userId.trim();
+    const params = { page, limit, sort, order };
+    return api.get(`/assignments/user/${id}`, { params });
+  },
+
+  getAssignmentById: async (assignmentId: string) => {
+    const id = assignmentId.trim();
+    return api.get(`/assignments/${id}`);
+  },
 };
 

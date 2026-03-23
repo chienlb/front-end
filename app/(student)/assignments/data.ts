@@ -17,6 +17,11 @@ export interface Assignment {
   requirements?: string[];
   attachmentUrl?: string;
   attachmentName?: string;
+  // Dữ liệu hỗ trợ hiển thị theo nhóm học + lesson
+  classId?: string;
+  className?: string;
+  lessonId?: string;
+  lessonTitle?: string;
 }
 
 export const ASSIGNMENTS: Assignment[] = [

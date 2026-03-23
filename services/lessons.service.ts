@@ -94,6 +94,17 @@ export const lessonService = {
   },
 
   /**
+   * Lấy toàn bộ lesson progress của 1 user.
+   * API: GET /lesson-progress/user/:userId?page=&limit=
+   *
+   * Backend controller trả về dạng:
+   * { data: LessonProgressDocument[], total, totalPages, currentPage, hasNextPage, ... }
+   */
+  getLessonProgressByUserId: async (userId: string, params?: { page?: number; limit?: number }) => {
+    return api.get(`/lesson-progress/user/${userId}`, { params });
+  },
+
+  /**
    * Lấy tiến độ lesson theo unit (danh sách lesson đã hoàn thành).
    * Dùng để khóa lesson sau nếu lesson trước chưa học xong.
    *
