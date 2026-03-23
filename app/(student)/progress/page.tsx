@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Trophy,
   Star,
@@ -17,6 +17,7 @@ import {
   MonitorPlay,
   Video,
 } from "lucide-react";
+import { lessonService } from "@/services/lessons.service";
 
 // --- TYPES ---
 type CourseType = "PAID_LIVE" | "PAID_VIDEO" | "FREE_PRACTICE";
@@ -59,6 +60,15 @@ interface RoadmapStep {
   lessons: number;
   completedLessons: number;
   status: "COMPLETED" | "IN_PROGRESS" | "LOCKED";
+}
+
+interface LearnedLessonItem {
+  id: string;
+  title: string;
+  unitName?: string;
+  progress: number;
+  status: string;
+  updatedAt?: string;
 }
 
 // --- MOCK DATA ---
@@ -204,9 +214,177 @@ const getTypeBadge = (type: CourseType) => {
 
 export default function ProgressPage() {
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "GRADES">("OVERVIEW");
+  const [learnedLessons, setLearnedLessons] = useState<LearnedLessonItem[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(true);
 
-  // Filter Logic
-  const filteredCourses = COURSES;
+  useEffect(() => {
+    const fetchLearnedLessons = async () => {
+      try {
+        setLessonsLoading(true);
+
+        const rawUser =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("currentUser")
+            : null;
+
+        let userId = "";
+        if (rawUser) {
+          try {
+            const t = rawUser.trim();
+            if (t) {
+              const parsed = JSON.parse(t);
+              userId =
+                parsed?._id ||
+                parsed?.id ||
+                parsed?.data?._id ||
+                "";
+            }
+          } catch {
+            userId = "";
+          }
+        }
+
+        if (!userId) {
+          setLearnedLessons([]);
+          return;
+        }
+
+        const allRows: any[] = [];
+        let page = 1;
+        let hasNextPage = true;
+
+        while (hasNextPage && page <= 20) {
+          const res: any = await lessonService.getLessonProgressByUserId(userId, {
+            page,
+            limit: 100,
+          });
+          const payload = res?.data ?? res;
+          const rows: any[] = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : [];
+          allRows.push(...rows);
+
+          /**
+           * Một số backend trả metadata chưa chuẩn (vd: total=0,totalPages=0 nhưng data vẫn có).
+           * Ưu tiên hasNextPage nếu tin cậy; fallback theo kích thước trang.
+           */
+          const hasNextFromApi =
+            typeof payload?.hasNextPage === "boolean"
+              ? payload.hasNextPage
+              : null;
+          const totalPages = Number(payload?.totalPages || 0);
+          const byTotalPages = totalPages > 0 ? page < totalPages : null;
+          const pageLimit = Number(payload?.limit || 100);
+          const byRowsLength =
+            rows.length > 0 && rows.length >= Math.max(1, pageLimit);
+
+          if (hasNextFromApi !== null) {
+            hasNextPage =
+              hasNextFromApi || (hasNextFromApi === false && byRowsLength);
+          } else if (byTotalPages !== null) {
+            hasNextPage = byTotalPages || byRowsLength;
+          } else {
+            hasNextPage = byRowsLength;
+          }
+          page += 1;
+        }
+
+        const mapped = allRows
+          .map((row) => {
+            const progressNum = Number(row?.progress ?? 0);
+            const status = String(row?.status ?? "").toLowerCase();
+            const isLearned =
+              status === "completed" ||
+              status === "complete" ||
+              status === "in_progress" ||
+              progressNum > 0;
+            if (!isLearned) return null;
+
+            const lessonRef = row?.lessonId;
+            const lid = String(
+              lessonRef?._id || lessonRef?.id || row?.lessonId || "",
+            );
+            if (!lid) return null;
+
+            const title =
+              lessonRef?.title ||
+              lessonRef?.name ||
+              row?.title ||
+              `Bài học ${lid.slice(-6)}`;
+
+            const unitName =
+              lessonRef?.unitId?.name ||
+              lessonRef?.unit?.name ||
+              row?.unitName ||
+              undefined;
+
+            const updatedAt =
+              row?.updatedAt || row?.lastActivityAt || row?.createdAt || undefined;
+
+            return {
+              id: lid,
+              title: String(title),
+              unitName,
+              progress: Number.isFinite(progressNum) ? progressNum : 0,
+              status: String(row?.status || ""),
+              updatedAt,
+            } as LearnedLessonItem;
+          })
+          .filter(Boolean) as LearnedLessonItem[];
+
+        const unique = new Map<string, LearnedLessonItem>();
+        for (const item of mapped) {
+          if (!unique.has(item.id)) unique.set(item.id, item);
+        }
+
+        setLearnedLessons(Array.from(unique.values()));
+      } catch (error) {
+        console.error("Lỗi tải danh sách bài học đã học:", error);
+        setLearnedLessons([]);
+      } finally {
+        setLessonsLoading(false);
+      }
+    };
+
+    fetchLearnedLessons();
+  }, []);
+
+  // Dữ liệu thật tổng hợp từ lesson-progress
+  const completedLessons = useMemo(
+    () =>
+      learnedLessons.filter((x) => {
+        const st = String(x.status || "").toLowerCase();
+        return st === "completed" || st === "complete" || x.progress >= 100;
+      }).length,
+    [learnedLessons],
+  );
+
+  const averageProgress = useMemo(() => {
+    if (learnedLessons.length === 0) return 0;
+    const total = learnedLessons.reduce((sum, x) => sum + Number(x.progress || 0), 0);
+    return Math.round((total / learnedLessons.length) * 10) / 10;
+  }, [learnedLessons]);
+
+  const filteredCourses: CourseProgress[] =
+    learnedLessons.length > 0
+      ? [
+          {
+            id: "SELF-PRACTICE",
+            name: "Tiến độ học tập của bạn",
+            type: "FREE_PRACTICE",
+            totalLessons: learnedLessons.length,
+            completedLessons,
+            averageScore: averageProgress,
+            lastAccess: learnedLessons[0]?.updatedAt
+              ? new Date(learnedLessons[0].updatedAt as string).toLocaleDateString("vi-VN")
+              : "—",
+            image:
+              "https://img.freepik.com/free-vector/online-tutorials-concept_52683-37480.jpg",
+          },
+        ]
+      : [];
 
   // Helper: Calculate % completion
   const getProgress = (done: number, total: number) =>
@@ -237,21 +415,21 @@ export default function ProgressPage() {
           {/* Quick Stats Box */}
           <div className="flex gap-4">
             <div className="text-center p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md">
-              <p className="text-2xl font-black text-yellow-300">12</p>
+              <p className="text-2xl font-black text-yellow-300">{completedLessons}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">
-                Ngày Streak
+                Bài hoàn thành
               </p>
             </div>
             <div className="text-center p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md">
-              <p className="text-2xl font-black text-green-300">9.2</p>
+              <p className="text-2xl font-black text-green-300">{averageProgress}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">
-                Điểm TB
+                Tiến độ TB (%)
               </p>
             </div>
             <div className="text-center p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md">
-              <p className="text-2xl font-black text-pink-300">5</p>
+              <p className="text-2xl font-black text-pink-300">{learnedLessons.length}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">
-                Huy hiệu
+                Đã học
               </p>
             </div>
           </div>
@@ -278,14 +456,58 @@ export default function ProgressPage() {
 
           {activeTab === "OVERVIEW" && (
             <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl border border-indigo-100 text-sm font-bold">
-              Lộ trình đang áp dụng: Lớp 1
+              Dữ liệu đồng bộ từ lesson-progress
             </div>
           )}
         </div>
 
         {/* === TAB 1: OVERVIEW === */}
         {activeTab === "OVERVIEW" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
+                  <BookOpen size={18} className="text-indigo-500" /> Bài học đã học
+                </h3>
+                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  {learnedLessons.length} bài
+                </span>
+              </div>
+
+              {lessonsLoading ? (
+                <p className="text-sm text-slate-500">Đang tải danh sách bài học...</p>
+              ) : learnedLessons.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Chưa có bài học nào trong lịch sử học tập.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {learnedLessons.slice(0, 12).map((lesson) => (
+                    <div
+                      key={lesson.id}
+                      className="rounded-2xl border border-slate-200 p-3 hover:border-indigo-200 hover:bg-indigo-50/40 transition"
+                    >
+                      <p className="font-bold text-slate-800 line-clamp-1">{lesson.title}</p>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">
+                        {lesson.unitName || "Không rõ chương"}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between text-xs">
+                        <span className="font-bold text-indigo-600">
+                          Tiến độ: {Math.max(0, Math.min(100, Math.round(lesson.progress)))}%
+                        </span>
+                        <span className="text-slate-400">
+                          {lesson.updatedAt
+                            ? new Date(lesson.updatedAt).toLocaleDateString("vi-VN")
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Col: Course Progress */}
             <div className="lg:col-span-2 space-y-4">
               {filteredCourses.length > 0 ? (
@@ -361,73 +583,34 @@ export default function ProgressPage() {
                 </div>
               )}
 
-              {/* Roadmap detail for Grade 1 */}
               <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 className="font-black text-lg text-slate-800 mb-4">
-                  Lộ trình chi tiết - Lớp 1
+                  Bài học gần đây
                 </h3>
-                <div className="space-y-3">
-                  {ROADMAP_STEPS.map((step) => {
-                    const percent = getProgress(
-                      step.completedLessons,
-                      step.lessons,
-                    );
-                    const tone =
-                      step.status === "COMPLETED"
-                        ? "border-green-200 bg-green-50"
-                        : step.status === "IN_PROGRESS"
-                          ? "border-blue-200 bg-blue-50"
-                          : "border-slate-200 bg-slate-50";
-                    const label =
-                      step.status === "COMPLETED"
-                        ? "Hoàn thành"
-                        : step.status === "IN_PROGRESS"
-                          ? "Đang học"
-                          : "Chưa mở";
-
-                    return (
+                {learnedLessons.length === 0 ? (
+                  <p className="text-sm text-slate-500">Chưa có dữ liệu bài học.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {learnedLessons.slice(0, 8).map((lesson) => (
                       <div
-                        key={step.id}
-                        className={`rounded-2xl border p-4 ${tone}`}
+                        key={`recent-${lesson.id}`}
+                        className="rounded-2xl border border-slate-200 p-3 bg-slate-50"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-black text-slate-800">
-                              {step.title}
-                            </p>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {step.goal}
-                            </p>
-                          </div>
-                          <span className="text-[11px] font-bold px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 whitespace-nowrap">
-                            {label}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-slate-800 line-clamp-1">
+                            {lesson.title}
+                          </p>
+                          <span className="text-xs font-black text-indigo-600">
+                            {Math.round(lesson.progress)}%
                           </span>
                         </div>
-
-                        <div className="mt-3">
-                          <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                            <span>
-                              {step.completedLessons}/{step.lessons} bài
-                            </span>
-                            <span>{percent}%</span>
-                          </div>
-                          <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-slate-200">
-                            <div
-                              className={`h-full ${
-                                step.status === "COMPLETED"
-                                  ? "bg-green-500"
-                                  : step.status === "IN_PROGRESS"
-                                    ? "bg-blue-500"
-                                    : "bg-slate-300"
-                              }`}
-                              style={{ width: `${percent}%` }}
-                            ></div>
-                          </div>
-                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {lesson.unitName || "Không rõ chương"}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -436,27 +619,29 @@ export default function ProgressPage() {
               <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-2">
                 <Medal className="text-orange-500" size={24} /> Thành tích
               </h3>
-              <div className="grid grid-cols-2 gap-3">
-                {BADGES.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className={`flex flex-col items-center text-center p-3 rounded-2xl border-2 transition ${badge.isLocked ? "border-slate-100 bg-slate-50 grayscale opacity-70" : "border-yellow-200 bg-yellow-50"}`}
-                  >
-                    <div className="text-3xl mb-1 drop-shadow-md">
-                      {badge.icon}
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 mb-0.5 line-clamp-1">
-                      {badge.name}
-                    </p>
-                    {!badge.isLocked && (
-                      <span className="text-[9px] font-bold text-green-600 bg-white px-1.5 py-0.5 rounded-full border border-green-100">
-                        Đã đạt
-                      </span>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500 font-bold">Bài hoàn thành</p>
+                  <p className="text-xl font-black text-green-600">{completedLessons}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500 font-bold">Đang học</p>
+                  <p className="text-xl font-black text-blue-600">
+                    {
+                      learnedLessons.filter((x) => {
+                        const st = String(x.status || "").toLowerCase();
+                        return st === "in_progress" || (x.progress > 0 && x.progress < 100);
+                      }).length
+                    }
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500 font-bold">Tổng bài đã ghi nhận</p>
+                  <p className="text-xl font-black text-indigo-600">{learnedLessons.length}</p>
+                </div>
               </div>
             </div>
+          </div>
           </div>
         )}
 
@@ -465,10 +650,10 @@ export default function ProgressPage() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4">
             <div className="p-6 border-b border-slate-100 bg-slate-50/50">
               <h3 className="font-black text-lg text-slate-800">
-                Lịch sử điểm số
+                Lịch sử bài học
               </h3>
               <p className="text-sm text-slate-500">
-                Xem lại kết quả các bài kiểm tra gần đây.
+                Dữ liệu thật từ lesson-progress.
               </p>
             </div>
 
@@ -476,72 +661,54 @@ export default function ProgressPage() {
               <table className="w-full text-left">
                 <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase">
                   <tr>
-                    <th className="p-5 pl-8">Tên bài kiểm tra</th>
-                    <th className="p-5">Môn học</th>
-                    <th className="p-5 text-center">Loại</th>
-                    <th className="p-5 text-center">Điểm số</th>
-                    <th className="p-5">Nhận xét</th>
+                    <th className="p-5 pl-8">Tên bài học</th>
+                    <th className="p-5">Chương</th>
+                    <th className="p-5 text-center">Trạng thái</th>
+                    <th className="p-5 text-center">Tiến độ</th>
+                    <th className="p-5">Ngày cập nhật</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-                  {GRADES.map((grade) => (
+                  {learnedLessons.map((lesson) => (
                     <tr
-                      key={grade.id}
+                      key={`history-${lesson.id}`}
                       className="hover:bg-slate-50 transition group"
                     >
                       <td className="p-5 pl-8">
                         <p className="font-bold text-slate-800">
-                          {grade.title}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Calendar size={12} /> {grade.date}
+                          {lesson.title}
                         </p>
                       </td>
                       <td className="p-5">
                         <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold border border-slate-200">
-                          {grade.subject}
+                          {lesson.unitName || "Không rõ chương"}
                         </span>
                       </td>
                       <td className="p-5 text-center">
-                        {grade.type === "EXAM" && (
-                          <span className="text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded">
-                            THI
-                          </span>
-                        )}
-                        {grade.type === "QUIZ" && (
-                          <span className="text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded">
-                            QUIZ
-                          </span>
-                        )}
-                        {grade.type === "HOMEWORK" && (
-                          <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">
-                            BTVN
-                          </span>
-                        )}
+                        <span className="text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded uppercase">
+                          {lesson.status || "unknown"}
+                        </span>
                       </td>
                       <td className="p-5 text-center">
                         <div
                           className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto border-4 font-black text-sm ${
-                            grade.score >= 9
+                            lesson.progress >= 100
                               ? "border-green-100 text-green-600 bg-green-50"
-                              : grade.score >= 7
+                              : lesson.progress >= 50
                                 ? "border-blue-100 text-blue-600 bg-blue-50"
                                 : "border-orange-100 text-orange-600 bg-orange-50"
                           }`}
                         >
-                          {grade.score}
+                          {Math.round(lesson.progress)}%
                         </div>
                       </td>
                       <td className="p-5 max-w-xs">
-                        {grade.feedback ? (
-                          <p className="text-slate-600 text-xs italic bg-yellow-50 p-2 rounded-lg border border-yellow-100 border-l-4 border-l-yellow-400">
-                            "{grade.feedback}"
-                          </p>
-                        ) : (
-                          <span className="text-slate-300 text-xs">
-                            - Chưa có nhận xét -
-                          </span>
-                        )}
+                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                          <Calendar size={12} />
+                          {lesson.updatedAt
+                            ? new Date(lesson.updatedAt).toLocaleDateString("vi-VN")
+                            : "—"}
+                        </p>
                       </td>
                     </tr>
                   ))}

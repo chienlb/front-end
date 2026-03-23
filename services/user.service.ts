@@ -10,6 +10,15 @@ export const userService = {
     return api.get("/users", { params });
   },
 
+  /**
+   * Backend mới:
+   * GET /api/v1/users/role/:role
+   * role: "student" | "teacher"
+   */
+  getUsersByRole: async (role: "student" | "teacher") => {
+    return api.get(`/users/role/${encodeURIComponent(role)}`);
+  },
+
   updateStatus: async (id: string, isActive: boolean) => {
     return api.patch(`/users/${id}/status`, { isActive });
   },

@@ -16,6 +16,7 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { liveService } from "@/services/live.service";
+import { userService } from "@/services/user.service";
 
 export default function TutorManager() {
   const [tutors, setTutors] = useState<any[]>([]);
@@ -45,8 +46,15 @@ export default function TutorManager() {
   const fetchTutors = async () => {
     setLoading(true);
     try {
-      const res: any = await liveService.getTutors();
-      const data = Array.isArray(res) ? res : res?.data || [];
+      const res: any = await userService.getUsersByRole("teacher");
+      const payload = res?.data ?? res;
+      const data = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.users)
+            ? payload.users
+            : [];
       setTutors(data);
     } catch (error) {
       console.error(error);
@@ -71,7 +79,7 @@ export default function TutorManager() {
 
   const handleOpenEdit = (tutor: any) => {
     setIsEditing(true);
-    setCurrentId(tutor._id);
+    setCurrentId(String(tutor._id || tutor.id || ""));
     setFormData({
       fullName: tutor.fullName || "",
       email: tutor.email || "",
@@ -121,8 +129,10 @@ export default function TutorManager() {
   // Filter Logic
   const filteredTutors = tutors.filter(
     (t) =>
-      t.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.email.toLowerCase().includes(searchTerm.toLowerCase()),
+      String(t.fullName || t.name || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      String(t.email || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -195,7 +205,7 @@ export default function TutorManager() {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredTutors.map((t) => (
                   <tr
-                    key={t._id}
+                    key={String(t._id || t.id)}
                     className="hover:bg-blue-50/30 transition group"
                   >
                     <td className="p-5 pl-6">
@@ -204,18 +214,20 @@ export default function TutorManager() {
                           <img
                             src={
                               t.avatar ||
-                              `https://ui-avatars.com/api/?name=${t.fullName}`
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                String(t.fullName || t.name || "Tutor"),
+                              )}`
                             }
                             className="w-full h-full object-cover"
-                            alt={t.fullName}
+                            alt={t.fullName || t.name}
                           />
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 text-base">
-                            {t.fullName}
+                            {t.fullName || t.name}
                           </div>
                           <div className="text-xs text-slate-400 font-mono">
-                            ID: {t._id.slice(-6).toUpperCase()}
+                            ID: {String(t._id || t.id || "").slice(-6).toUpperCase()}
                           </div>
                         </div>
                       </div>
@@ -224,9 +236,9 @@ export default function TutorManager() {
                       <div className="flex flex-col gap-1 text-slate-600">
                         <div className="flex items-center gap-2">
                           <Mail size={14} className="text-slate-400" />
-                          <span className="font-medium">{t.email}</span>
+                          <span className="font-medium">{t.email || "—"}</span>
                         </div>
-                        {t.phone && (
+                        {(t.phone || "").trim() && (
                           <div className="flex items-center gap-2">
                             <Phone size={14} className="text-slate-400" />
                             <span>{t.phone}</span>
@@ -235,9 +247,15 @@ export default function TutorManager() {
                       </div>
                     </td>
                     <td className="p-5 text-center">
-                      <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200">
-                        <ShieldCheck size={12} strokeWidth={3} /> Active
-                      </span>
+                      {t.isActive === false ? (
+                        <span className="inline-flex items-center gap-1.5 bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold border border-red-200">
+                          <ShieldCheck size={12} strokeWidth={3} /> Inactive
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200">
+                          <ShieldCheck size={12} strokeWidth={3} /> Active
+                        </span>
+                      )}
                     </td>
                     <td className="p-5 pr-6 text-right">
                       <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -249,7 +267,7 @@ export default function TutorManager() {
                           <Pencil size={18} />
                         </button>
                         <button
-                          onClick={() => handleDelete(t._id)}
+                          onClick={() => handleDelete(String(t._id || t.id || ""))}
                           className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition"
                           title="Xóa tài khoản"
                         >

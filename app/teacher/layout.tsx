@@ -42,57 +42,43 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
   const menuGroups = [
     {
-      group: "GIẢNG DẠY",
+      group: "GIÁO VIÊN",
       items: [
-        { name: "Tổng quan", href: "/teacher", icon: LayoutDashboard },
         {
-          name: "Báo cáo tiến độ",
-          href: "/teacher/analytics",
-          icon: BarChart3,
-        },
-        { name: "Lịch dạy", href: "/teacher/schedule", icon: CalendarDays },
-        { name: "Lớp chủ nhiệm", href: "/teacher/classes", icon: School },
-      ],
-    },
-    {
-      group: "SOẠN THẢO",
-      items: [
-        { name: "Giáo trình", href: "/teacher/courses", icon: BookOpen },
-        {
-          name: "Ngân hàng câu hỏi",
-          href: "/teacher/questions",
-          icon: Database,
+          name: "Dashboard",
+          href: "/teacher",
+          icon: LayoutDashboard,
         },
         {
-          name: "Bài tập & Kiểm tra",
+          name: "Quản lý nhóm học tập",
+          href: "/teacher/classes",
+          icon: School,
+        },
+        {
+          name: "Quản lý học viên",
+          href: "/teacher/students",
+          icon: Users,
+        },
+        {
+          name: "Bài tập",
           href: "/teacher/assignments",
           icon: ClipboardList,
         },
-        { name: "Luyện tập", href: "/teacher/practice", icon: Dumbbell }, // Changed to Dumbbell
-        { name: "Cuộc thi", href: "/teacher/competitions", icon: Trophy },
-        { name: "Thư viện Media", href: "/teacher/resources", icon: Library },
-      ],
-    },
-    {
-      group: "QUẢN LÝ",
-      items: [
-        { name: "Quản lý học sinh", href: "/teacher/students", icon: Users }, // Changed to Users
-        { name: "Sổ tay học sinh", href: "/teacher/handbook", icon: Contact },
-        { name: "Chấm điểm", href: "/teacher/grading", icon: PenTool }, // Changed to PenTool
         {
-          name: "Giao tiếp",
-          href: "/teacher/communication",
-          icon: MessageSquareText,
+          name: "Lịch sử luyện tập học sinh",
+          href: "/teacher/practice",
+          icon: Dumbbell,
         },
-      ],
-    },
-    {
-      group: "HỆ THỐNG",
-      items: [
-        { name: "Hồ sơ cá nhân", href: "/teacher/profile", icon: UserCog },
-        { name: "Yêu cầu hỗ trợ", href: "/teacher/requests", icon: FileInput },
-        { name: "Cài đặt", href: "/teacher/settings", icon: Settings },
-        { name: "Trợ giúp", href: "/teacher/support", icon: Headset },
+        {
+          name: "Bảng điểm học viên",
+          href: "/teacher/grading",
+          icon: PenTool,
+        },
+        {
+          name: "Quản lý tài khoản",
+          href: "/teacher/profile",
+          icon: UserCog,
+        },
       ],
     },
   ];

@@ -83,7 +83,7 @@ export const lessonService = {
    */
   getProgressByUserAndLessonId: async (lessonId: string) => {
     try {
-      const res = await api.get(`/lesson-progress/user/${lessonId}`);
+      const res = await api.get(`/lesson-progress/user/lessons/${lessonId}`);
       const body = res as any;
       return body?.data ?? body;
     } catch (err: any) {
@@ -95,13 +95,13 @@ export const lessonService = {
 
   /**
    * Lấy toàn bộ lesson progress của 1 user.
-   * API: GET /lesson-progress/user/:userId?page=&limit=
+   * API: GET /lesson-progress/user/lessons/:userId?page=&limit=
    *
    * Backend controller trả về dạng:
    * { data: LessonProgressDocument[], total, totalPages, currentPage, hasNextPage, ... }
    */
   getLessonProgressByUserId: async (userId: string, params?: { page?: number; limit?: number }) => {
-    return api.get(`/lesson-progress/user/${userId}`, { params });
+    return api.get(`/lesson-progress/user/lessons/${userId}`, { params });
   },
 
   /**

@@ -2,22 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  BookOpen,
-  Library,
+  Users,
   Heart,
-  FileQuestion,
-  Headset,
-  FileInput,
-  Trophy,
-  Settings,
   NotebookPen,
-  BarChart3,
-  MessageSquareText,
   UserCog,
-  CalendarDays,
   School,
-  Contact,
+  ClipboardCheck,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
@@ -37,75 +27,33 @@ export default function TeacherSidebar({
 
   const menuGroups = [
     {
-      group: "GIẢNG DẠY",
+      group: "GIÁO VIÊN",
       items: [
         {
-          name: "Tổng quan",
-          href: "/teacher",
-          icon: LayoutDashboard,
-        },
-        { name: "Lịch dạy", href: "/teacher/schedule", icon: CalendarDays },
-        { name: "Lớp chủ nhiệm", href: "/teacher/classes", icon: School },
-      ],
-    },
-    {
-      group: "SOẠN THẢO & NỘI DUNG",
-      items: [
-        {
-          name: "Giáo trình & Bài giảng",
-          href: "/teacher/courses",
-          icon: BookOpen,
+          name: "Quản lý nhóm học tập",
+          href: "/teacher/classes",
+          icon: School,
         },
         {
-          name: "Ngân hàng câu hỏi",
-          href: "/teacher/questions",
-          icon: FileQuestion,
-        },
-        {
-          name: "Bài tập & Kiểm tra",
+          name: "Bài tập",
           href: "/teacher/assignments",
           icon: NotebookPen,
         },
         {
-          name: "Cuộc thi & Sự kiện",
-          href: "/teacher/competitions",
-          icon: Trophy,
+          name: "Quản lý học viên",
+          href: "/teacher/students",
+          icon: Users,
         },
-        { name: "Thư viện Media", href: "/teacher/resources", icon: Library },
-      ],
-    },
-    {
-      group: "QUẢN LÝ HỌC SINH",
-      items: [
-        { name: "Sổ tay học sinh", href: "/teacher/handbook", icon: Contact },
         {
-          name: "Chấm điểm & Feedback",
+          name: "Quản lý tài khoản",
+          href: "/teacher/profile",
+          icon: UserCog,
+        },
+        {
+          name: "Bảng điểm học viên",
           href: "/teacher/grading",
-          icon: NotebookPen,
-        },
-        {
-          name: "Báo cáo tiến độ",
-          href: "/teacher/analytics",
-          icon: BarChart3,
-        },
-        {
-          name: "Trung tâm giao tiếp",
-          href: "/teacher/communication",
-          icon: MessageSquareText,
-        },
-      ],
-    },
-    {
-      group: "CÁ NHÂN & HỖ TRỢ",
-      items: [
-        { name: "Hồ sơ & Hợp đồng", href: "/teacher/profile", icon: UserCog },
-        {
-          name: "Yêu cầu & Đề xuất",
-          href: "/teacher/requests",
-          icon: FileInput,
-        },
-        { name: "Cài đặt", href: "/teacher/settings", icon: Settings },
-        { name: "Hỗ trợ Kỹ thuật", href: "/teacher/support", icon: Headset },
+          icon: ClipboardCheck,
+        }
       ],
     },
   ];

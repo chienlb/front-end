@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   Filter,
@@ -13,7 +13,9 @@ import {
   Eye,
   ShieldAlert,
   GraduationCap,
+  Loader2,
 } from "lucide-react";
+import { userService } from "@/services/user.service";
 
 // --- TYPES ---
 type UserStatus = "ACTIVE" | "BLOCKED" | "INACTIVE";
@@ -32,50 +34,63 @@ interface Student {
   streak: number; // Chuỗi ngày học
 }
 
-// --- MOCK DATA ---
-const STUDENTS: Student[] = [
-  {
-    id: "STU-001",
-    name: "Nguyễn Văn An",
-    email: "an.nguyen@gmail.com",
-    avatar: "https://i.pravatar.cc/150?img=12",
-    phone: "0912.345.678",
-    package: "PREMIUM",
-    level: "B1 (Intermediate)",
-    joinedDate: "15/08/2023",
-    status: "ACTIVE",
-    streak: 12,
-  },
-  {
-    id: "STU-002",
-    name: "Trần Bảo Ngọc",
-    email: "ngoc.tran@gmail.com",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    package: "FREE",
-    level: "A1 (Beginner)",
-    joinedDate: "01/11/2023",
-    status: "ACTIVE",
-    streak: 3,
-  },
-  {
-    id: "STU-003",
-    name: "Lê Minh Tuấn",
-    email: "tuan.le@gmail.com",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    package: "BASIC",
-    level: "A2 (Elementary)",
-    joinedDate: "20/05/2023",
-    status: "BLOCKED",
-    streak: 0,
-  },
-];
-
 export default function AdminStudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | UserStatus>("ALL");
+  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState<Student[]>([]);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        const res: any = await userService.getUsersByRole("student");
+        const payload = res?.data ?? res;
+        const list: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.users)
+              ? payload.users
+              : [];
+
+        const mapped: Student[] = list.map((u) => {
+          const rawPkg = String(u?.package || u?.packageType || "FREE").toUpperCase();
+          const pkg: PackageType =
+            rawPkg === "PREMIUM" ? "PREMIUM" : rawPkg === "BASIC" ? "BASIC" : "FREE";
+          const active = Boolean(u?.isActive ?? true);
+          return {
+            id: String(u?._id || u?.id || ""),
+            name: String(u?.fullName || u?.name || "Học viên"),
+            email: String(u?.email || ""),
+            avatar:
+              u?.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                String(u?.fullName || u?.name || "Student"),
+              )}`,
+            phone: u?.phone || "",
+            package: pkg,
+            level: String(u?.level || u?.currentLevel || "N/A"),
+            joinedDate: u?.createdAt
+              ? new Date(u.createdAt).toLocaleDateString("vi-VN")
+              : "—",
+            status: active ? "ACTIVE" : "BLOCKED",
+            streak: Number(u?.streak || 0),
+          };
+        });
+        setStudents(mapped);
+      } catch (error) {
+        console.error("Lỗi lấy danh sách học viên:", error);
+        setStudents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
 
   // Logic lọc dữ liệu
-  const filteredStudents = STUDENTS.filter((s) => {
+  const filteredStudents = students.filter((s) => {
     const matchSearch =
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.email.includes(searchTerm);
@@ -173,7 +188,12 @@ export default function AdminStudentsPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {loading ? (
+          <div className="p-10 text-center text-slate-500">
+            <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+            Đang tải danh sách học viên...
+          </div>
+        ) : (
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-200">
             <tr>
@@ -242,6 +262,7 @@ export default function AdminStudentsPage() {
             ))}
           </tbody>
         </table>
+        )}
 
         {filteredStudents.length === 0 && (
           <div className="p-10 text-center text-slate-400 text-sm">

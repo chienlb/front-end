@@ -69,7 +69,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
                     </span>
 
                     {!collapsed && (
-                      <span className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="block text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                         {item.name}
                       </span>
                     )}
@@ -109,6 +109,13 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+  const activeMenuItem =
+    ADMIN_MENU.flatMap((group) => group.items).find((item) =>
+      item.href === "/admin"
+        ? pathname === "/admin"
+        : pathname === item.href || pathname.startsWith(item.href + "/"),
+    ) ?? null;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -130,9 +137,11 @@ export default function AdminLayout({
             >
               <Menu size={20} />
             </button>
-            <h1 className="text-lg font-bold text-gray-800 hidden md:block">
-              Tổng quan hệ thống
-            </h1>
+            <div className="hidden md:block">
+              <h1 className="text-lg font-bold text-gray-800">
+                {activeMenuItem?.name ?? "Tổng quan hệ thống"}
+              </h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-6">
