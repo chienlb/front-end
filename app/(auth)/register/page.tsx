@@ -24,6 +24,12 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Email verification modal
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [verifyDismissed, setVerifyDismissed] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyEmail, setVerifyEmail] = useState("");
+
   // Password Visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -71,8 +77,13 @@ export default function RegisterPage() {
 
         router.push(`/become-teacher?${params}`);
       } else {
-        alert("Đăng ký thành công! Vui lòng đăng nhập.");
-        router.push("/login");
+        // Không redirect ngay để user có thể nhập mã xác thực trên cùng trang.
+        setVerifyEmail(formData.email);
+        setVerifyCode("");
+        setVerifyModalOpen(true);
+        setVerifyDismissed(false);
+        // Vẫn giữ thông báo tối thiểu thay vì alert để tránh che modal.
+        setError("");
       }
     } catch (err: any) {
       setError(
@@ -332,8 +343,95 @@ export default function RegisterPage() {
               Đăng nhập
             </Link>
           </div>
+
+          {/* Re-open button if user closed verification modal */}
+          {verifyDismissed && !verifyModalOpen && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setVerifyModalOpen(true);
+                  setVerifyDismissed(false);
+                }}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-extrabold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.99] inline-flex items-center gap-2"
+              >
+                <Mail size={16} />
+                Mở lại nhập mã xác thực
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Email verification modal */}
+      {verifyModalOpen && (
+        <div
+          className="fixed inset-0 z-[2500] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+          onMouseDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            setVerifyModalOpen(false);
+            setVerifyDismissed(true);
+          }}
+        >
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black">
+                  Xác thực email
+                </h3>
+                <p className="text-sm text-orange-50/90 mt-1">
+                  Mã đã được gửi tới{" "}
+                  <span className="font-bold text-white">
+                    {verifyEmail}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setVerifyModalOpen(false);
+                  setVerifyDismissed(true);
+                }}
+                className="px-3 py-1 rounded-xl bg-white/15 hover:bg-white/20 text-white font-bold"
+                aria-label="Đóng"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase">
+                  Mã xác thực
+                </label>
+                <input
+                  value={verifyCode}
+                  onChange={(e) => setVerifyCode(e.target.value)}
+                  placeholder="Nhập mã (ví dụ 6 số)"
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 outline-none focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100 transition"
+                />
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Nếu bạn vừa tắt popup, hãy dùng nút “Mở lại nhập mã xác thực” để mở lại.
+                </p>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Hiện tại frontend chỉ đảm bảo UI nhập mã.
+                    // Sau khi bạn cung cấp endpoint verify backend, mình sẽ nối API ở đây.
+                    router.push("/login");
+                  }}
+                  className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-extrabold shadow-lg shadow-pink-500/20 transition-all active:scale-[0.99]"
+                >
+                  Tiếp tục đăng nhập
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
