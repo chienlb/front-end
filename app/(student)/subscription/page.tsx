@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, X, Loader2, ShieldCheck, ArrowRight, Zap } from "lucide-react";
+import { packagesService, type PackageApiItem } from "@/services/packages.service";
+import { subscriptionsService } from "@/services/subscriptions.service";
 
 // --- TYPES ---
 interface PackageBenefit {
@@ -16,10 +18,13 @@ interface Package {
   name: string;
   monthlyPrice: number;
   yearlyPrice: number; 
+  durationDays?: number;
   icon: string;
   isPopular?: boolean;
   theme: "basic" | "standard" | "premium";
   features: PackageBenefit[];
+  durationLabel?: string;
+  yearlyEligible?: boolean;
 }
 
 // --- MOCK DATA ---
@@ -31,6 +36,8 @@ const PACKAGES_DATA: Package[] = [
     yearlyPrice: 0,
     icon: "🐣",
     theme: "basic",
+    yearlyEligible: false,
+    durationDays: 36500,
     features: [
       { text: "Học 2 bài miễn phí mỗi ngày", included: true },
       { text: "Truy cập kho từ vựng cơ bản", included: true },
@@ -48,6 +55,8 @@ const PACKAGES_DATA: Package[] = [
     icon: "🚀",
     isPopular: true,
     theme: "standard",
+    yearlyEligible: false,
+    durationDays: 30,
     features: [
       { text: "Mở khóa TOÀN BỘ bài học", included: true },
       { text: "Không giới hạn thời gian học", included: true },
@@ -64,6 +73,8 @@ const PACKAGES_DATA: Package[] = [
     yearlyPrice: 2388000, // Tương đương 199k/tháng
     icon: "💎",
     theme: "premium",
+    yearlyEligible: true,
+    durationDays: 365,
     features: [
       { text: "Tất cả quyền lợi gói Thám Hiểm", included: true },
       { text: "Chat AI không giới hạn", included: true },
@@ -79,44 +90,158 @@ export default function SubscriptionPage() {
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(true);
+  const [packages, setPackages] = useState<Package[]>(PACKAGES_DATA);
+  const [creatingSubscriptionId, setCreatingSubscriptionId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Giả lập loading để tạo hiệu ứng mượt mà
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    const mapTypeToTheme = (type: string | undefined): Package["theme"] => {
+      const t = String(type || "").toLowerCase();
+      if (t === "vip" || t === "premium") return "premium";
+      if (t === "standard") return "standard";
+      return "basic";
+    };
+
+    const mapThemeToIcon = (theme: Package["theme"]) => {
+      if (theme === "premium") return "💎";
+      if (theme === "standard") return "🚀";
+      return "🐣";
+    };
+
+    const buildDurationLabel = (item: PackageApiItem) => {
+      const duration = Number(item.durationInDays);
+      const type = String(item.type || "").toLowerCase();
+      // Theo yêu cầu: gói free hiển thị vĩnh viễn.
+      if (type === "free") return "Vĩnh viễn";
+      // Một số backend trả number rất lớn cho "không giới hạn".
+      if (Number.isFinite(duration) && duration >= 36500) return "Vĩnh viễn";
+      if (!Number.isFinite(duration) || duration <= 0) return "Không giới hạn";
+      return `${duration} ngày`;
+    };
+
+    const fetchPackages = async () => {
+      try {
+        setLoading(true);
+        const res: any = await packagesService.getPackages({
+          page: 1,
+          limit: 100,
+        });
+        const payload = res?.data || res;
+        const list: PackageApiItem[] = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+        if (list.length === 0) {
+          setPackages(PACKAGES_DATA);
+          return;
+        }
+
+        const mapped = list
+          .filter((x) => x?.isActive !== false)
+          .map((item) => {
+            const theme = mapTypeToTheme(item.type);
+            const price = Number(item.price || 0);
+            const duration = Number(item.durationInDays || 0);
+            // Giá hiển thị cho toggle:
+            // - Nếu đúng 1 năm -> yearlyPrice = price, monthlyPrice = price/12 (xấp xỉ)
+            // - Còn lại -> monthlyPrice = price, yearlyPrice = price*12 (xấp xỉ)
+            const yearly = Number.isFinite(duration) && duration >= 365;
+            const monthlyPrice = yearly && price > 0 ? Math.round(price / 12) : price;
+            const yearlyPrice = yearly && price > 0 ? price : price * 12;
+
+            return {
+              id: String(item._id || item.id || ""),
+              name: item.name || "Gói nâng cấp",
+              monthlyPrice,
+              yearlyPrice,
+              durationDays: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+              icon: mapThemeToIcon(theme),
+              isPopular: theme === "standard" || theme === "premium",
+              theme,
+              durationLabel: buildDurationLabel(item),
+              yearlyEligible:
+                String(item.type || "").toLowerCase() === "vip" &&
+                Number.isFinite(duration) &&
+                duration >= 365,
+              features: Array.isArray(item.features)
+                ? item.features.map((f) => ({ text: f, included: true }))
+                : [],
+            } satisfies Package;
+          });
+
+        setPackages(mapped);
+      } catch (error) {
+        console.error("Lỗi tải packages:", error);
+        setPackages(PACKAGES_DATA);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPackages();
   }, []);
 
   // Tính toán giá hiển thị dựa trên billingCycle
   const displayPackages = useMemo(() => {
-    return PACKAGES_DATA.map((pkg) => {
-      const price = billingCycle === "yearly" ? pkg.yearlyPrice : pkg.monthlyPrice;
+    const visiblePackages = packages.filter((pkg) =>
+      billingCycle === "yearly" ? !!pkg.yearlyEligible : !pkg.yearlyEligible,
+    );
+
+    return visiblePackages.map((pkg) => {
+      const useYearly = billingCycle === "yearly" && !!pkg.yearlyEligible;
+      const price = useYearly ? pkg.yearlyPrice : pkg.monthlyPrice;
       // Nếu là gói năm, tính giá chia đều theo tháng để so sánh
-      const pricePerMonth = billingCycle === "yearly" && pkg.yearlyPrice > 0 
+      const pricePerMonth = useYearly && pkg.yearlyPrice > 0 
         ? Math.round(pkg.yearlyPrice / 12) 
         : pkg.monthlyPrice;
       
       // Tính % tiết kiệm
-      const savings = pkg.monthlyPrice > 0 
+      const savings = pkg.monthlyPrice > 0 && useYearly
         ? Math.round(((pkg.monthlyPrice * 12 - pkg.yearlyPrice) / (pkg.monthlyPrice * 12)) * 100)
         : 0;
 
-      return { ...pkg, price, pricePerMonth, savings };
+      return { ...pkg, price, pricePerMonth, savings, useYearly };
     });
-  }, [billingCycle]);
+  }, [billingCycle, packages]);
 
-  const handleSubscribe = (pkg: any) => {
+  const handleSubscribe = async (pkg: any) => {
     if (pkg.price === 0) return; // Gói Free không cần thanh toán
+    const effectiveCycle = pkg.useYearly ? "yearly" : "monthly";
+    try {
+      setCreatingSubscriptionId(pkg.id);
+      const startDate = new Date();
+      const durationDays = Number(pkg.durationDays || 30);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + Math.max(1, durationDays));
 
-    const params = new URLSearchParams({
-      type: "PACKAGE",
-      id: pkg.id,
-      name: pkg.name,
-      price: pkg.price.toString(),
-      cycle: billingCycle,
-      desc: `Đăng ký gói ${pkg.name} (${billingCycle === "yearly" ? "1 năm" : "1 tháng"})`,
-    });
+      const created: any = await subscriptionsService.createSubscription({
+        packageId: pkg.id,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        autoRenew: true,
+      });
+      const subscriptionId = subscriptionsService.extractSubscriptionId(created);
+      if (!subscriptionId) throw new Error("Không tạo được subscription.");
 
-    router.push(`/checkout?${params.toString()}`);
+      const params = new URLSearchParams({
+        type: "PACKAGE",
+        id: pkg.id,
+        subscriptionId,
+        name: pkg.name,
+        price: pkg.price.toString(),
+        durationDays: String(pkg.durationDays || 30),
+        cycle: effectiveCycle,
+        desc: `Đăng ký gói ${pkg.name} (${effectiveCycle === "yearly" ? "1 năm" : "1 tháng"})`,
+      });
+
+      router.push(`/checkout?${params.toString()}`);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Không thể tạo subscription.";
+      alert(Array.isArray(msg) ? msg.join(", ") : msg);
+    } finally {
+      setCreatingSubscriptionId(null);
+    }
   };
 
   const formatCurrency = (amount: number) =>
@@ -221,7 +346,8 @@ export default function SubscriptionPage() {
                           {pkg.name}
                         </h3>
                         <p className={`text-sm ${isPremium ? "text-slate-400" : "text-slate-500"}`}>
-                          {pkg.theme === 'basic' ? 'Dành cho người mới bắt đầu' : pkg.theme === 'standard' ? 'Tăng tốc học tập' : 'Trải nghiệm toàn diện nhất'}
+                          {pkg.durationLabel ||
+                            (pkg.theme === 'basic' ? 'Dành cho người mới bắt đầu' : pkg.theme === 'standard' ? 'Tăng tốc học tập' : 'Trải nghiệm toàn diện nhất')}
                         </p>
                       </div>
                       <div className="text-4xl">{pkg.icon}</div>
@@ -231,7 +357,7 @@ export default function SubscriptionPage() {
                     <div className="mb-8">
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-extrabold tracking-tight">
-                          {formatCurrency(billingCycle === "yearly" && pkg.price > 0 ? pkg.pricePerMonth : pkg.price)}
+                          {formatCurrency(pkg.useYearly && pkg.price > 0 ? pkg.pricePerMonth : pkg.price)}
                         </span>
                         {pkg.price > 0 && (
                           <span className={`text-sm font-medium ${isPremium ? "text-slate-400" : "text-slate-500"}`}>
@@ -241,7 +367,7 @@ export default function SubscriptionPage() {
                       </div>
                       
                       {/* Yearly Info */}
-                      {billingCycle === "yearly" && pkg.price > 0 && (
+                      {pkg.useYearly && pkg.price > 0 && (
                         <div className={`mt-2 text-sm font-medium px-3 py-1 rounded-lg w-fit
                           ${isPremium ? "bg-white/10 text-green-400" : "bg-green-50 text-green-700"}`}>
                           Thanh toán {formatCurrency(pkg.price)}/năm (Tiết kiệm {pkg.savings}%)
@@ -274,7 +400,7 @@ export default function SubscriptionPage() {
                   <div className="p-8 pt-0 mt-auto">
                     <button
                       onClick={() => handleSubscribe(pkg)}
-                      disabled={pkg.price === 0}
+                      disabled={pkg.price === 0 || creatingSubscriptionId === pkg.id}
                       className={`w-full py-4 rounded-xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group
                         ${pkg.price === 0
                           ? "bg-slate-100 text-slate-400 cursor-not-allowed"
@@ -283,7 +409,11 @@ export default function SubscriptionPage() {
                             : "bg-slate-900 hover:bg-blue-600 text-white hover:shadow-lg hover:shadow-blue-200 hover:scale-[1.02]"
                         }`}
                     >
-                      {pkg.price === 0 ? "Gói hiện tại" : "Chọn gói này"}
+                      {pkg.price === 0
+                        ? "Gói hiện tại"
+                        : creatingSubscriptionId === pkg.id
+                          ? "Đang tạo đăng ký..."
+                          : "Chọn gói này"}
                       {pkg.price > 0 && <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>}
                     </button>
                     {isPremium && (

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   CreditCard,
@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Star,
 } from "lucide-react";
+import { packagesService, type PackageApiItem } from "@/services/packages.service";
+import { paymentsService } from "@/services/payments.service";
+import { subscriptionsService } from "@/services/subscriptions.service";
 
 // --- TYPES ---
 interface ChildSubInfo {
@@ -24,10 +27,11 @@ interface ChildSubInfo {
 
 interface Package {
   id: string;
-  code: "BASIC" | "PREMIUM";
+  code: string;
   name: string;
   price: number;
   duration: string;
+  durationDays?: number;
   features: string[];
   recommend?: boolean;
   color: string;
@@ -122,17 +126,144 @@ export default function SubscriptionPage() {
   );
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packages, setPackages] = useState<Package[]>(PACKAGES);
+  const [paymentMethod, setPaymentMethod] = useState<"paypal" | "vnpay">("paypal");
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>("");
 
-  const handleSelectPackage = (pkg: Package) => {
-    setSelectedPackage(pkg);
-    setShowPaymentModal(true);
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        const res: any = await packagesService.getPackages({
+          page: 1,
+          limit: 100,
+        });
+        const payload = res?.data || res;
+        const list: PackageApiItem[] = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+        if (list.length === 0) return;
+
+        const mapped: Package[] = list
+          .filter((x) => x?.isActive !== false)
+          .map((item) => {
+            const type = String(item.type || "").toLowerCase();
+            const duration = Number(item.durationInDays || 0);
+            const durationLabel =
+              type === "free" || (Number.isFinite(duration) && duration >= 36500)
+                ? "vĩnh viễn"
+                : Number.isFinite(duration) && duration > 0
+                  ? `${duration} ngày`
+                  : "không giới hạn";
+
+            return {
+              id: String(item._id || item.id || ""),
+              code: String(item.type || "PACKAGE").toUpperCase(),
+              name: item.name || "Gói nâng cấp",
+              price: Number(item.price || 0),
+              duration: durationLabel,
+              durationDays: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+              features: Array.isArray(item.features) ? item.features : [],
+              recommend: type === "premium" || type === "standard",
+              color:
+                type === "premium" || type === "vip"
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-900"
+                  : type === "standard"
+                    ? "bg-blue-50 border-blue-200 text-blue-900"
+                    : "bg-slate-50 border-slate-200 text-slate-900",
+            };
+          });
+
+        setPackages(mapped);
+      } catch (error) {
+        console.error("Lỗi tải gói cước:", error);
+      }
+    };
+
+    fetchPackages();
+  }, []);
+
+  const handleSelectPackage = async (pkg: Package) => {
+    try {
+      setPaymentError("");
+      const startDate = new Date();
+      const durationDays = Number(pkg.durationDays || 30);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + Math.max(1, durationDays));
+
+      const created: any = await subscriptionsService.createSubscription({
+        packageId: pkg.id,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        autoRenew: true,
+      });
+      const subscriptionId = subscriptionsService.extractSubscriptionId(created);
+      if (!subscriptionId) throw new Error("Không tạo được subscription.");
+      setSelectedSubscriptionId(subscriptionId);
+      setSelectedPackage(pkg);
+      setShowPaymentModal(true);
+      setPaymentMethod("paypal");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Không thể tạo subscription.";
+      setPaymentError(Array.isArray(msg) ? msg.join(", ") : msg);
+    }
   };
 
-  const handlePayment = () => {
-    alert(
-      `Đang chuyển hướng sang cổng thanh toán cho gói ${selectedPackage?.name}...`,
-    );
-    setShowPaymentModal(false);
+  const handlePayment = async () => {
+    if (!selectedPackage) return;
+    try {
+      setPaying(true);
+      setPaymentError("");
+      const subscriptionId = selectedSubscriptionId;
+      if (!subscriptionId) {
+        throw new Error("Thiếu subscriptionId để thanh toán.");
+      }
+
+      const normalizedAmount =
+        paymentMethod === "vnpay"
+          ? Math.round(Number(selectedPackage.price || 0))
+          : Number(selectedPackage.price || 0);
+      const currency = paymentMethod === "vnpay" ? "VND" : "USD";
+
+      const res: any = await paymentsService.createPayment({
+        subscriptionId,
+        amount: normalizedAmount,
+        method: paymentMethod,
+        currency,
+        description: `Thanh toán gói ${selectedPackage.name} cho ${selectedChild.name}`,
+      });
+
+      const paymentUrl =
+        res?.data?.paymentUrl ||
+        res?.paymentUrl ||
+        res?.data?.checkoutUrl ||
+        res?.checkoutUrl ||
+        res?.data?.approvalUrl ||
+        res?.approvalUrl ||
+        res?.data?.url ||
+        res?.url;
+
+      if (paymentUrl && typeof window !== "undefined") {
+        window.location.href = paymentUrl;
+        return;
+      }
+
+      // Fallback khi backend không trả URL cổng thanh toán.
+      setShowPaymentModal(false);
+      alert("Tạo yêu cầu thanh toán thành công.");
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Không thể tạo thanh toán. Vui lòng thử lại.";
+      setPaymentError(Array.isArray(msg) ? msg.join(", ") : msg);
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -243,7 +374,7 @@ export default function SubscriptionPage() {
               <CreditCard className="text-blue-600" /> Chọn gói nâng cấp
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {PACKAGES.map((pkg) => (
+              {packages.map((pkg) => (
                 <div
                   key={pkg.id}
                   className={`relative p-6 rounded-2xl border-2 transition hover:shadow-xl ${pkg.recommend ? "border-indigo-500 shadow-md scale-[1.02]" : "border-slate-200 bg-white"}`}
@@ -405,15 +536,32 @@ export default function SubscriptionPage() {
               </div>
             </div>
 
-            <div className="space-y-3 mb-8">
+            <div className="space-y-3 mb-4">
               <p className="text-xs font-bold text-slate-400 uppercase">
-                Chọn phương thức
+                Phương thức thanh toán
               </p>
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
+              <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition ${paymentMethod === "paypal" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50"}`}>
                 <input
                   type="radio"
                   name="payment"
-                  defaultChecked
+                  checked={paymentMethod === "paypal"}
+                  onChange={() => setPaymentMethod("paypal")}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <div className="w-8 h-6 bg-slate-200 rounded flex items-center justify-center text-slate-500">
+                  <CreditCard size={16} />
+                </div>
+                <span className="font-bold text-sm text-slate-700">
+                  PayPal
+                </span>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition ${paymentMethod === "vnpay" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50"}`}>
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === "vnpay"}
+                  onChange={() => setPaymentMethod("vnpay")}
                   className="w-4 h-4 text-blue-600"
                 />
                 <img
@@ -422,49 +570,31 @@ export default function SubscriptionPage() {
                   alt="VNPay"
                 />
                 <span className="font-bold text-sm text-slate-700">
-                  Ví VNPay / QR Code
-                </span>
-              </label>
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
-                <input
-                  type="radio"
-                  name="payment"
-                  className="w-4 h-4 text-blue-600"
-                />
-                <div className="w-8 h-6 bg-slate-200 rounded flex items-center justify-center text-slate-500">
-                  <CreditCard size={16} />
-                </div>
-                <span className="font-bold text-sm text-slate-700">
-                  Thẻ ATM / Visa / Master
-                </span>
-              </label>
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
-                <input
-                  type="radio"
-                  name="payment"
-                  className="w-4 h-4 text-blue-600"
-                />
-                <div className="w-8 h-6 bg-slate-200 rounded flex items-center justify-center text-slate-500">
-                  <History size={16} />
-                </div>
-                <span className="font-bold text-sm text-slate-700">
-                  Chuyển khoản Ngân hàng
+                  VNPay
                 </span>
               </label>
             </div>
 
+            {paymentError && (
+              <div className="mb-4 p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm font-semibold">
+                {paymentError}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowPaymentModal(false)}
+                disabled={paying}
                 className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition"
               >
                 Hủy bỏ
               </button>
               <button
                 onClick={handlePayment}
-                className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg transition"
+                disabled={paying}
+                className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg transition disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Thanh toán ngay
+                {paying ? "Đang tạo thanh toán..." : "Thanh toán ngay"}
               </button>
             </div>
           </div>
