@@ -157,9 +157,6 @@ export default function DictionaryPage() {
               Smart Dictionary
             </h1>
           </div>
-          <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full hidden sm:block">
-            Powered by AI ✨
-          </div>
         </div>
       </div>
 
@@ -218,7 +215,7 @@ export default function DictionaryPage() {
               className="space-y-6"
             >
               {/* 1. WORD HEADER CARD */}
-              <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm relative overflow-hidden">
+              <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-primary-card relative overflow-hidden">
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
                     <h2 className="text-5xl font-black text-slate-900 mb-3 capitalize tracking-tight">
@@ -259,7 +256,7 @@ export default function DictionaryPage() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-primary-card hover:shadow-md transition-shadow"
                   >
                     <div className="p-6 md:p-8">
                       {/* Definition Header */}
