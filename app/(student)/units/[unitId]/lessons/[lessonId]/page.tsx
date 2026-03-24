@@ -279,7 +279,7 @@ export default function LessonPage() {
               type="button"
               onClick={playWordAudio}
               disabled={!vocabAudioUrl || vocabAudioLoading}
-              className="group inline-flex items-center gap-2.5 rounded-full border border-[#D8E8FF] bg-transparent px-4 py-2.5 text-sm font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-60"
+              className="group inline-flex items-center gap-2.5 rounded-full bg-transparent px-4 py-2.5 text-sm font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="grid h-7 w-7 place-items-center rounded-full bg-transparent text-[#4F7AC7] ring-1 ring-[#D8E8FF]">
                 <Volume2 size={14} className="group-hover:scale-110 transition-transform" />

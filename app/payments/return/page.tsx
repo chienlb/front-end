@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { paymentsService } from "@/services/payments.service";
 
-export default function PaymentReturnPage() {
+function PaymentReturnContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<boolean | null>(null);
@@ -84,6 +84,24 @@ export default function PaymentReturnPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentReturnPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-xl p-8 text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-black text-slate-900 mb-2">Đang xử lý</h1>
+            <p className="text-slate-600">Đang xác nhận thanh toán...</p>
+          </div>
+        </div>
+      }
+    >
+      <PaymentReturnContent />
+    </Suspense>
   );
 }
 

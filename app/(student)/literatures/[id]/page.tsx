@@ -82,8 +82,8 @@ export default function LiteratureReadPage() {
         return;
       }
 
-      const words = Array.from(
-        new Set(
+      const words: string[] = Array.from(
+        new Set<string>(
           vocab
             .map((v: any) => String(v?.word || "").trim().toLowerCase())
             .filter(Boolean),
@@ -519,7 +519,7 @@ export default function LiteratureReadPage() {
                           type="button"
                           onClick={() => playVocabularyAudio(v.word)}
                           disabled={!vocabAudioMap[String(v.word || "").trim().toLowerCase()]}
-                          className="group inline-flex items-center gap-1.5 rounded-full border border-[#D8E8FF] bg-transparent px-3 py-1.5 text-[11px] font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                          className="group inline-flex items-center gap-1.5 rounded-full bg-transparent px-3 py-1.5 text-[11px] font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="grid h-5 w-5 place-items-center rounded-full bg-transparent text-[#4F7AC7] ring-1 ring-[#D8E8FF]">
                             <Volume2 size={11} className="group-hover:scale-110 transition-transform" />

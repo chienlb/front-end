@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { paymentsService } from "@/services/payments.service";
 import { subscriptionsService } from "@/services/subscriptions.service";
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams();
   const [method, setMethod] = useState<"paypal" | "vnpay">("paypal");
   const [loading, setLoading] = useState(false);
@@ -189,6 +189,24 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-xl rounded-3xl border border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl p-6 md:p-7 text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-black text-slate-900 mb-2">Đang xử lý</h1>
+            <p className="text-slate-600">Đang tải thông tin thanh toán...</p>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }
 
