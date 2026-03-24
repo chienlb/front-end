@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
 import api from "@/utils/api";
 import { showAlert } from "@/utils/dialog";
 
@@ -28,6 +27,7 @@ interface Definition {
   meaning: string; // Nghĩa chính
   explanation: string; // Giải thích chi tiết
   examples: Example[]; // Danh sách ví dụ minh họa
+  level?: string;
 }
 
 interface DictionaryResult {
@@ -54,81 +54,48 @@ export default function DictionaryPage() {
     setResult(null); // Reset kết quả cũ để hiện loading
 
     try {
-      // BƯỚC 1: Lấy Audio & Phiên âm từ Free Dictionary API
-      let phonetic = "";
-      let audioSrc = "";
-      try {
-        const dictRes = await axios.get(
-          `https://api.dictionaryapi.dev/api/v2/entries/en/${keyword}`,
-        );
-        const data = dictRes.data[0];
+      // Chỉ dùng API này cho trang từ điển
+      const aiRes: any = await api.post("/chatbot/dictionary/pronunciation", {
+        word: keyword.trim(),
+        targetLanguage: "vi",
+        voiceName: "Kore",
+        languageCode: "en-US",
+      });
 
-        // Logic tìm phiên âm ưu tiên text có sẵn
-        phonetic =
-          data.phonetic || data.phonetics.find((p: any) => p.text)?.text || "";
+      const payload = aiRes?.data || aiRes;
+      const dictionary = payload?.data?.dictionary || payload?.dictionary || {};
+      const pronunciation =
+        payload?.data?.pronunciation || payload?.pronunciation || {};
+      const ipa = dictionary?.ipa || {};
+      const phonetic =
+        dictionary?.phoneticSpelling || ipa?.uk || ipa?.us || `/${keyword}/`;
+      const audioSrc = String(pronunciation?.audioUrl || "").trim();
 
-        // Logic tìm file audio: Lấy file đầu tiên không rỗng
-        audioSrc =
-          data.phonetics.find((p: any) => p.audio && p.audio !== "")?.audio ||
-          "";
-      } catch (e) {
-        console.log(
-          "Dictionary API: Không tìm thấy audio/phonetic, sẽ dùng fallback.",
-        );
-      }
+      const senses = Array.isArray(dictionary?.senses) ? dictionary.senses : [];
+      const definitions: Definition[] = senses.map((s: any) => {
+        const examplesEn = Array.isArray(s?.examples) ? s.examples : [];
+        const examplesVi = Array.isArray(s?.examplesVi) ? s.examplesVi : [];
+        const maxLen = Math.max(examplesEn.length, examplesVi.length);
+        const examples: Example[] = Array.from({ length: maxLen }).map((_, i) => ({
+          en: String(examplesEn[i] || ""),
+          vi: String(examplesVi[i] || ""),
+        })).filter((x) => x.en || x.vi);
 
-      // BƯỚC 2: Gọi AI để lấy Nghĩa & Ví dụ (Thông minh hơn API thường)
-      // Prompt được tinh chỉnh để trả về JSON thuần túy
-      const prompt = `
-        Đóng vai một từ điển Anh-Việt cao cấp.
-        Giải thích từ: "${keyword}".
-        Yêu cầu Output: Chỉ trả về JSON (không markdown, không giải thích thêm) theo cấu trúc sau:
-        {
-          "definitions": [
-            {
-              "type": "từ loại (viết tắt tiếng Anh: noun/verb/adj...)",
-              "meaning": "Nghĩa tiếng Việt ngắn gọn, chuẩn xác",
-              "explanation": "Giải thích nghĩa bằng tiếng Việt dễ hiểu",
-              "examples": [
-                { "en": "Câu ví dụ tiếng Anh ngắn", "vi": "Dịch tiếng Việt tương ứng" },
-                { "en": "Câu ví dụ tiếng Anh khác", "vi": "Dịch tiếng Việt tương ứng" }
-              ]
-            }
-          ]
-        }
-      `;
-
-      const aiRes: any = await api.post("/chat/talk", { message: prompt });
-
-      // Xử lý dữ liệu trả về từ AI (Clean JSON string)
-      let aiData: { definitions: Definition[] } = { definitions: [] };
-      try {
-        // Loại bỏ các ký tự markdown thừa nếu AI lỡ thêm vào (VD: ```json ... ```)
-        const cleanJson = aiRes.reply.replace(/```json|```/g, "").trim();
-        aiData = JSON.parse(cleanJson);
-      } catch (parseError) {
-        console.error("Lỗi parse JSON từ AI:", parseError);
-        // Fallback data nếu AI trả về lỗi
-        aiData = {
-          definitions: [
-            {
-              type: "Unknown",
-              meaning: "Không thể phân tích",
-              explanation: "Hệ thống chưa hiểu rõ từ này, bạn thử lại nhé.",
-              examples: [],
-            },
-          ],
+        return {
+          type: String(s?.partOfSpeech || "Unknown"),
+          meaning: String(s?.meaningVi || s?.meaning || "Chưa có nghĩa."),
+          explanation: String(s?.meaning || s?.meaningVi || "Chưa có giải thích."),
+          examples,
+          level: String(s?.level || ""),
         };
-      }
+      });
 
       // Set kết quả cuối cùng để hiển thị
       setResult({
-        word: keyword.toLowerCase(),
-        phonetic: phonetic || `/${keyword}/`,
+        word: String(dictionary?.word || keyword).toLowerCase(),
+        phonetic,
         audio: audioSrc,
-        definitions: Array.isArray(aiData.definitions)
-          ? aiData.definitions
-          : [],
+        definitions,
       });
     } catch (err) {
       console.error(err);
