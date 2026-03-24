@@ -13,8 +13,10 @@ import {
   ChevronRight,
   Images,
   Music,
+  Volume2,
 } from "lucide-react";
 import { literatureService } from "@/services/literatures.service";
+import { dictionaryService } from "@/services/dictionary.service";
 
 interface LiteratureDetail {
   _id: string;
@@ -37,6 +39,8 @@ export default function LiteratureReadPage() {
   const [error, setError] = useState<string | null>(null);
   const [openAnswers, setOpenAnswers] = useState<Record<number, boolean>>({});
   const [comicPage, setComicPage] = useState(0);
+  const [vocabAudioMap, setVocabAudioMap] = useState<Record<string, string>>({});
+  const [playingWord, setPlayingWord] = useState<string>("");
 
   const comicImages = useMemo(() => {
     const images = (data as any)?.images;
@@ -69,6 +73,41 @@ export default function LiteratureReadPage() {
     setComicPage(0);
     setOpenAnswers({});
   }, [id]);
+
+  useEffect(() => {
+    const fetchVocabularyAudio = async () => {
+      const vocab = Array.isArray((data as any)?.vocabulary) ? (data as any).vocabulary : [];
+      if (!vocab.length) {
+        setVocabAudioMap({});
+        return;
+      }
+
+      const words = Array.from(
+        new Set(
+          vocab
+            .map((v: any) => String(v?.word || "").trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      );
+
+      const settled = await Promise.allSettled(
+        words.map(async (word) => ({
+          word,
+          audioUrl: await dictionaryService.getFirstAudioUrl(word),
+        })),
+      );
+
+      const nextMap: Record<string, string> = {};
+      settled.forEach((it) => {
+        if (it.status === "fulfilled" && it.value.audioUrl) {
+          nextMap[it.value.word] = it.value.audioUrl;
+        }
+      });
+      setVocabAudioMap(nextMap);
+    };
+
+    void fetchVocabularyAudio();
+  }, [data]);
 
   if (loading) {
     return (
@@ -150,6 +189,20 @@ export default function LiteratureReadPage() {
   const primaryContent = enContent || vnContent;
   const contentCardClass =
     "rounded-[2rem] border border-[#ECE7F6] bg-white shadow-primary-card";
+  const playVocabularyAudio = async (word: string) => {
+    const key = String(word || "").trim().toLowerCase();
+    if (!key) return;
+    const audioUrl = vocabAudioMap[key];
+    if (!audioUrl) return;
+    try {
+      setPlayingWord(key);
+      const audio = new Audio(audioUrl);
+      await audio.play();
+      audio.onended = () => setPlayingWord("");
+    } catch {
+      setPlayingWord("");
+    }
+  };
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#FFF8FC_0%,#F5FAFF_42%,#FFFDF4_100%)] pb-16 pt-24 font-sans">
@@ -456,11 +509,26 @@ export default function LiteratureReadPage() {
                           </span>
                         )}
                       </div>
-                      {v.ipa && (
-                        <span className="text-xs font-mono text-slate-500">
-                          {v.ipa}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {v.ipa && (
+                          <span className="text-xs font-mono text-slate-500">
+                            {v.ipa}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => playVocabularyAudio(v.word)}
+                          disabled={!vocabAudioMap[String(v.word || "").trim().toLowerCase()]}
+                          className="group inline-flex items-center gap-1.5 rounded-full border border-[#D8E8FF] bg-transparent px-3 py-1.5 text-[11px] font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-transparent text-[#4F7AC7] ring-1 ring-[#D8E8FF]">
+                            <Volume2 size={11} className="group-hover:scale-110 transition-transform" />
+                          </span>
+                          {playingWord === String(v.word || "").trim().toLowerCase()
+                            ? "Đang phát"
+                            : "Nghe"}
+                        </button>
+                      </div>
                     </div>
                     {v.meaning && (
                       <p className="text-sm text-slate-600">

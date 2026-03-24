@@ -16,6 +16,7 @@ import {
   ArrowRight,
   BookOpen,
   Play,
+  Volume2,
 } from "lucide-react";
 import Confetti from "react-confetti";
 
@@ -28,6 +29,7 @@ import FlashcardGame from "@/components/student/games/FlashcardGame";
 import RewardPopup from "@/components/student/RewardPopup";
 
 import { lessonService } from "@/services/lessons.service";
+import { dictionaryService } from "@/services/dictionary.service";
 
 const SHARED_BG =
   "/images/3d-illustration-world-book-day-celebration/10444286.jpg";
@@ -88,6 +90,8 @@ export default function LessonPage() {
   const [unlockedStepIndex, setUnlockedStepIndex] = useState(0);
   const [bgImage, setBgImage] = useState<string>("");
   const [lessonTitle, setLessonTitle] = useState<string>("");
+  const [vocabAudioUrl, setVocabAudioUrl] = useState<string>("");
+  const [vocabAudioLoading, setVocabAudioLoading] = useState(false);
 
   // Trạng thái chung
   const [isGameDone, setIsGameDone] = useState(false);
@@ -143,6 +147,23 @@ export default function LessonPage() {
       setStatus("correct");
     }
   }, [currentData, currentStepIndex]);
+
+  useEffect(() => {
+    const run = async () => {
+      if (currentData?.type !== "vocab" || !currentData?.word) {
+        setVocabAudioUrl("");
+        return;
+      }
+      try {
+        setVocabAudioLoading(true);
+        const url = await dictionaryService.getFirstAudioUrl(String(currentData.word));
+        setVocabAudioUrl(url || "");
+      } finally {
+        setVocabAudioLoading(false);
+      }
+    };
+    run();
+  }, [currentData?.type, currentData?.word]);
 
   const ReadingCard = ({ title, subtitle, items }: any) => {
     const normalizedItems: string[] = Array.isArray(items)
@@ -224,6 +245,12 @@ export default function LessonPage() {
   };
 
   const VocabView = ({ data }: any) => {
+    const playWordAudio = () => {
+      if (!vocabAudioUrl) return;
+      const audio = new Audio(vocabAudioUrl);
+      void audio.play();
+    };
+
     return (
       <div className="w-full overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_24px_80px_rgba(148,163,184,0.18)]">
         <div className="bg-[linear-gradient(135deg,#FFF1DC_0%,#FFF7EA_48%,#FFFDF7_100%)] px-6 py-5">
@@ -246,6 +273,19 @@ export default function LessonPage() {
           </div>
           <div className="mt-3 text-4xl sm:text-5xl font-black text-[#53629E]">
             {data?.word}
+          </div>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={playWordAudio}
+              disabled={!vocabAudioUrl || vocabAudioLoading}
+              className="group inline-flex items-center gap-2.5 rounded-full border border-[#D8E8FF] bg-transparent px-4 py-2.5 text-sm font-black text-[#365B93] transition hover:bg-transparent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-transparent text-[#4F7AC7] ring-1 ring-[#D8E8FF]">
+                <Volume2 size={14} className="group-hover:scale-110 transition-transform" />
+              </span>
+              {vocabAudioLoading ? "Đang tải phát âm..." : "Nghe phát âm chuẩn"}
+            </button>
           </div>
           {data?.ipa && (
             <div className="mt-3 inline-flex rounded-full bg-[#EEF6FF] px-3 py-1 text-sm font-extrabold text-slate-500">
