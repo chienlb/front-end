@@ -13,6 +13,7 @@ import {
   Gamepad2,
   Users,
   Newspaper,
+  BookA,
   Lightbulb,
   GraduationCap,
   Target,
@@ -184,16 +185,24 @@ export default function Navbar() {
           desc: "Diễn đàn trao đổi",
         },
         {
-          name: "Từ điển",
-          path: "/dictionary",
-          icon: Search,
-          desc: "Tra cứu nhanh",
-        },
-        {
           name: "Feedback",
           path: "/feedback",
           icon: MessageSquare,
           desc: "Góp ý cho hệ thống",
+        },
+      ],
+    },
+    {
+      label: "Từ điển",
+      icon: BookA,
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-50",
+      items: [
+        {
+          name: "Tra từ điển",
+          path: "/dictionary",
+          icon: BookA,
+          desc: "Tra cứu từ vựng nhanh",
         },
       ],
     },

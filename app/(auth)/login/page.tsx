@@ -16,6 +16,16 @@ import {
   GraduationCap,
 } from "lucide-react";
 
+function resolveUserRole(rawUser: any): string {
+  const roleRaw =
+    rawUser?.role?.name ??
+    rawUser?.role?.code ??
+    rawUser?.role ??
+    rawUser?.userRole ??
+    "";
+  return String(roleRaw).trim().toUpperCase();
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -47,16 +57,21 @@ export default function LoginPage() {
       localStorage.setItem("deviceId", deviceId);
 
       const result = await authService.login({ email, password, deviceId });
-      console.log("RES:", result)
+      const payload = result?.data ?? result;
+      const accessToken = payload?.accessToken ?? payload?.data?.accessToken;
+      const refreshToken = payload?.refreshToken ?? payload?.data?.refreshToken;
+      const user = payload?.user ?? payload?.data?.user ?? null;
 
-      if (result.accessToken) {
-        localStorage.setItem("access_token", result.accessToken);
+      if (accessToken) {
+        localStorage.setItem("access_token", accessToken);
       }
+      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
 
-      if (result.user) {
-        localStorage.setItem("currentUser", JSON.stringify(result.user));
+      if (user) {
+        localStorage.setItem("currentUser", JSON.stringify(user));
+        const role = resolveUserRole(user);
 
-        switch (result.user.role) {
+        switch (role) {
           case "ADMIN":
             router.push("/admin");
             break;

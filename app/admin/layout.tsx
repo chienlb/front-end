@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, Search, Menu, GraduationCap, MessageSquare } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Bell,
+  Search,
+  Menu,
+  GraduationCap,
+  MessageSquare,
+  LogOut,
+  Settings,
+  UserCircle2,
+  ChevronDown,
+} from "lucide-react";
 import { ADMIN_MENU } from "@/components/admin/admin-constants";
+import { authService } from "@/services/auth.service";
 
 function AdminSidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
@@ -109,13 +120,55 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [openUserMenu, setOpenUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const activeMenuItem =
     ADMIN_MENU.flatMap((group) => group.items).find((item) =>
       item.href === "/admin"
         ? pathname === "/admin"
         : pathname === item.href || pathname.startsWith(item.href + "/"),
     ) ?? null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("currentUser");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      setUser(parsed);
+    } catch {
+      setUser(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(e.target as Node)) {
+        setOpenUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // ignore network/server logout errors
+    } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("currentUser");
+      }
+      router.replace("/login");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -167,18 +220,61 @@ export default function AdminLayout({
               </button>
             </div>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-200 cursor-pointer">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-700">Admin</p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  Super User
-                </p>
-              </div>
-              <img
-                src="https://ui-avatars.com/api/?name=Admin+Supper&background=0F172A&color=fff"
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-                alt="Avatar"
-              />
+            <div className="relative pl-4 border-l border-gray-200" ref={userMenuRef}>
+              <button
+                onClick={() => setOpenUserMenu((v) => !v)}
+                className="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 hover:bg-slate-100 transition"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-bold text-gray-700">
+                    {user?.fullName || user?.name || "Admin"}
+                  </p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                    {String(user?.role?.name || user?.role || "ADMIN")}
+                  </p>
+                </div>
+                <img
+                  src={
+                    user?.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      String(user?.fullName || user?.name || "Admin User"),
+                    )}&background=0F172A&color=fff`
+                  }
+                  className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                  alt="Avatar"
+                />
+                <ChevronDown size={14} className="text-slate-500 hidden sm:block" />
+              </button>
+
+              {openUserMenu && (
+                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-xl py-2 z-50">
+                  <button
+                    onClick={() => {
+                      setOpenUserMenu(false);
+                      router.push("/admin/settings");
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <Settings size={16} /> Cài đặt tài khoản
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpenUserMenu(false);
+                      router.push("/admin");
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <UserCircle2 size={16} /> Trang quản trị
+                  </button>
+                  <hr className="my-1 border-slate-100" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
+                  >
+                    <LogOut size={16} /> Đăng xuất
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
