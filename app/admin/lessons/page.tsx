@@ -9,8 +9,10 @@ import {
   RefreshCw,
   CheckCircle2,
   Clock3,
+  X,
 } from "lucide-react";
 import { lessonService } from "@/services/lessons.service";
+import { unitService } from "@/services/units.service";
 
 type LessonStatus = "ACTIVE" | "INACTIVE";
 type LessonRow = {
@@ -25,11 +27,29 @@ type LessonRow = {
   updatedAt: string;
 };
 
+type UnitOption = { id: string; name: string };
+
 export default function AdminLessonsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | LessonStatus>("ALL");
   const [loading, setLoading] = useState(true);
   const [lessons, setLessons] = useState<LessonRow[]>([]);
+
+  const [openCreate, setOpenCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createSuccess, setCreateSuccess] = useState("");
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [lessonForm, setLessonForm] = useState({
+    unitId: "",
+    title: "",
+    description: "",
+    type: "vocabulary",
+    orderIndex: "1",
+    duration: "30",
+    isActive: "true",
+  });
 
   const fetchLessons = async () => {
     try {
@@ -74,9 +94,88 @@ export default function AdminLessonsPage() {
     }
   };
 
+  const fetchUnitsForSelect = async () => {
+    try {
+      const res: any = await unitService.getAllUnits({ page: 1, limit: 500 });
+      const payload = res?.data ?? res;
+      const list: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : [];
+      setUnitOptions(
+        list.map((u) => ({
+          id: String(u?._id || u?.id || ""),
+          name: String(u?.name || u?.title || "Unit"),
+        })),
+      );
+    } catch {
+      setUnitOptions([]);
+    }
+  };
+
   useEffect(() => {
     fetchLessons();
+    fetchUnitsForSelect();
   }, []);
+
+  const resetLessonForm = () => {
+    setLessonForm({
+      unitId: "",
+      title: "",
+      description: "",
+      type: "vocabulary",
+      orderIndex: "1",
+      duration: "30",
+      isActive: "true",
+    });
+    setThumbnailFile(null);
+    setCreateError("");
+    setCreateSuccess("");
+  };
+
+  const handleCreateLesson = async () => {
+    if (!lessonForm.unitId.trim()) {
+      setCreateError("Vui lòng chọn chủ đề (unit).");
+      return;
+    }
+    if (!lessonForm.title.trim()) {
+      setCreateError("Vui lòng nhập tiêu đề bài học.");
+      return;
+    }
+    try {
+      setCreating(true);
+      setCreateError("");
+      setCreateSuccess("");
+
+      const fd = new FormData();
+      fd.append("unitId", lessonForm.unitId.trim());
+      fd.append("title", lessonForm.title.trim());
+      fd.append("name", lessonForm.title.trim());
+      fd.append("description", lessonForm.description.trim());
+      fd.append("type", lessonForm.type);
+      fd.append("orderIndex", lessonForm.orderIndex || "0");
+      fd.append("duration", lessonForm.duration || "0");
+      fd.append("isActive", lessonForm.isActive);
+      if (thumbnailFile) fd.append("thumbnail", thumbnailFile);
+      fd.append("content", JSON.stringify({}));
+
+      await lessonService.createLesson(fd);
+      setCreateSuccess("Tạo bài học thành công.");
+      await fetchLessons();
+      setTimeout(() => {
+        setOpenCreate(false);
+        resetLessonForm();
+      }, 600);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setCreateError(
+        Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tạo bài học.",
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     return lessons.filter((l) => {
@@ -127,7 +226,14 @@ export default function AdminLessonsPage() {
             >
               <RefreshCw size={16} /> Làm mới
             </button>
-            <button className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                resetLessonForm();
+                setOpenCreate(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2"
+            >
               <Plus size={18} /> Tạo lesson
             </button>
           </div>
@@ -222,6 +328,150 @@ export default function AdminLessonsPage() {
           ) : null}
         </div>
       </div>
+
+      {openCreate && (
+        <div className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
+          <div className="min-h-full w-full flex justify-center p-3 md:p-6">
+            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h2 className="text-lg font-black text-slate-800">Tạo bài học mới</h2>
+                <button
+                  type="button"
+                  onClick={() => setOpenCreate(false)}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto">
+                {createError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                    {createError}
+                  </div>
+                )}
+                {createSuccess && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 font-semibold">
+                    {createSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3">
+                  <label className="text-xs font-bold text-slate-600">
+                    Chủ đề (Unit) *
+                    <select
+                      value={lessonForm.unitId}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, unitId: e.target.value }))
+                      }
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 bg-white"
+                    >
+                      <option value="">— Chọn unit —</option>
+                      {unitOptions.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <input
+                    value={lessonForm.title}
+                    onChange={(e) =>
+                      setLessonForm((p) => ({ ...p, title: e.target.value }))
+                    }
+                    placeholder="Tiêu đề bài học *"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <textarea
+                    value={lessonForm.description}
+                    onChange={(e) =>
+                      setLessonForm((p) => ({ ...p, description: e.target.value }))
+                    }
+                    placeholder="Mô tả ngắn"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-24"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={lessonForm.type}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, type: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="vocabulary">Từ vựng</option>
+                      <option value="grammar">Ngữ pháp</option>
+                      <option value="reading">Đọc hiểu</option>
+                      <option value="listening">Nghe</option>
+                      <option value="speaking">Nói</option>
+                      <option value="writing">Viết</option>
+                      <option value="mixed">Tổng hợp</option>
+                    </select>
+                    <select
+                      value={lessonForm.isActive}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, isActive: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="true">Hoạt động</option>
+                      <option value="false">Tạm ẩn</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={lessonForm.orderIndex}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, orderIndex: e.target.value }))
+                      }
+                      placeholder="Thứ tự (order)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                    <input
+                      type="number"
+                      value={lessonForm.duration}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, duration: e.target.value }))
+                      }
+                      placeholder="Thời lượng (phút)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                  </div>
+                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Ảnh đại diện (tuỳ chọn)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setThumbnailFile(e.target.files?.[0] || null)
+                      }
+                      className="mt-1 block w-full text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setOpenCreate(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-white"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={handleCreateLesson}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {creating ? "Đang tạo..." : "Tạo bài học"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

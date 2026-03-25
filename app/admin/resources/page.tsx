@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookText, Search, RefreshCw, Filter, CheckCircle2 } from "lucide-react";
+import {
+  BookText,
+  Search,
+  RefreshCw,
+  Filter,
+  CheckCircle2,
+  Plus,
+  X,
+} from "lucide-react";
 import { literatureService } from "@/services/literatures.service";
 
 type LiteratureRow = {
@@ -52,6 +60,21 @@ export default function ResourceLibraryPage() {
   const [selectedType, setSelectedType] = useState("all");
   const [rows, setRows] = useState<LiteratureRow[]>([]);
 
+  const [openCreate, setOpenCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createSuccess, setCreateSuccess] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [litForm, setLitForm] = useState({
+    title: "",
+    author: "",
+    type: "poem",
+    grade: "A1",
+    contentEnglish: "",
+    contentVietnamese: "",
+    isPublished: "false",
+  });
+
   const fetchLiteratures = async () => {
     try {
       setLoading(true);
@@ -95,6 +118,58 @@ export default function ResourceLibraryPage() {
     fetchLiteratures();
   }, [selectedType]);
 
+  const resetLitForm = () => {
+    setLitForm({
+      title: "",
+      author: "",
+      type: "poem",
+      grade: "A1",
+      contentEnglish: "",
+      contentVietnamese: "",
+      isPublished: "false",
+    });
+    setCoverFile(null);
+    setCreateError("");
+    setCreateSuccess("");
+  };
+
+  const handleCreateLiterature = async () => {
+    if (!litForm.title.trim()) {
+      setCreateError("Vui lòng nhập tiêu đề bài thơ / văn.");
+      return;
+    }
+    try {
+      setCreating(true);
+      setCreateError("");
+      setCreateSuccess("");
+
+      const fd = new FormData();
+      fd.append("title", litForm.title.trim());
+      fd.append("author", litForm.author.trim());
+      fd.append("type", litForm.type);
+      fd.append("grade", litForm.grade.trim());
+      fd.append("contentEnglish", litForm.contentEnglish);
+      fd.append("contentVietnamese", litForm.contentVietnamese);
+      fd.append("isPublished", litForm.isPublished);
+      if (coverFile) fd.append("image", coverFile);
+
+      await literatureService.createLiterature(fd);
+      setCreateSuccess("Tạo tác phẩm thành công.");
+      await fetchLiteratures();
+      setTimeout(() => {
+        setOpenCreate(false);
+        resetLitForm();
+      }, 600);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setCreateError(
+        Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tạo tác phẩm.",
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       const q = search.toLowerCase();
@@ -121,12 +196,24 @@ export default function ResourceLibraryPage() {
               Danh sách văn/thơ đồng bộ từ API `GET /literatures`.
             </p>
           </div>
-          <button
-            onClick={fetchLiteratures}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition inline-flex items-center gap-2"
-          >
-            <RefreshCw size={16} /> Làm mới
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchLiteratures}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition inline-flex items-center gap-2"
+            >
+              <RefreshCw size={16} /> Làm mới
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetLitForm();
+                setOpenCreate(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2"
+            >
+              <Plus size={18} /> Thêm thơ / văn
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,6 +315,140 @@ export default function ResourceLibraryPage() {
           ) : null}
         </div>
       </div>
+
+      {openCreate && (
+        <div className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
+          <div className="min-h-full w-full flex justify-center p-3 md:p-6">
+            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h2 className="text-lg font-black text-slate-800">Thêm thơ / văn</h2>
+                <button
+                  type="button"
+                  onClick={() => setOpenCreate(false)}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto">
+                {createError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                    {createError}
+                  </div>
+                )}
+                {createSuccess && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 font-semibold">
+                    {createSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3">
+                  <input
+                    value={litForm.title}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, title: e.target.value }))
+                    }
+                    placeholder="Tiêu đề *"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <input
+                    value={litForm.author}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, author: e.target.value }))
+                    }
+                    placeholder="Tác giả"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={litForm.type}
+                      onChange={(e) =>
+                        setLitForm((p) => ({ ...p, type: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="poem">Thơ</option>
+                      <option value="story">Truyện</option>
+                      <option value="essay">Văn xuôi</option>
+                      <option value="comic">Truyện tranh</option>
+                      <option value="song">Bài hát</option>
+                    </select>
+                    <input
+                      value={litForm.grade}
+                      onChange={(e) =>
+                        setLitForm((p) => ({ ...p, grade: e.target.value }))
+                      }
+                      placeholder="Khối / cấp độ (VD: A1, B2)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                  </div>
+                  <textarea
+                    value={litForm.contentEnglish}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, contentEnglish: e.target.value }))
+                    }
+                    placeholder="Nội dung tiếng Anh"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
+                  />
+                  <textarea
+                    value={litForm.contentVietnamese}
+                    onChange={(e) =>
+                      setLitForm((p) => ({
+                        ...p,
+                        contentVietnamese: e.target.value,
+                      }))
+                    }
+                    placeholder="Nội dung tiếng Việt (bản dịch / ghi chú)"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
+                  />
+                  <select
+                    value={litForm.isPublished}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, isPublished: e.target.value }))
+                    }
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  >
+                    <option value="false">Lưu nháp</option>
+                    <option value="true">Xuất bản</option>
+                  </select>
+                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Ảnh bìa (tuỳ chọn)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setCoverFile(e.target.files?.[0] || null)
+                      }
+                      className="mt-1 block w-full text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setOpenCreate(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-white"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={handleCreateLiterature}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {creating ? "Đang tạo..." : "Tạo tác phẩm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

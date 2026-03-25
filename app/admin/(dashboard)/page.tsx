@@ -23,6 +23,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { adminService } from "@/services/admin.service";
+import { downloadDashboardExcel } from "@/lib/export-dashboard-excel";
 
 function pickArray(raw: any): any[] {
   if (Array.isArray(raw)) return raw;
@@ -232,20 +233,65 @@ export default function AdminDashboardPage() {
 
   const handleExport = async () => {
     setExporting(true);
+    setError("");
+    const date = new Date().toISOString().slice(0, 10);
+    const defaultFileName = `admin-dashboard-${date}.xlsx`;
+
+    const runClientExport = () => {
+      downloadDashboardExcel({
+        fileName: defaultFileName,
+        kpis,
+        monthly: chartData,
+        users: state.recentUsers.map((u: any) => ({
+          id: String(u?._id || u?.id || u?.userId || ""),
+          name: String(u?.fullName || u?.name || u?.email || "Người dùng"),
+          email: String(u?.email || ""),
+          role: String(u?.role?.name ?? u?.role ?? "N/A"),
+          status: String(u?.status || u?.accountStatus || "N/A"),
+          phone: String(u?.phone || u?.phoneNumber || ""),
+          createdAt: u?.createdAt
+            ? new Date(u.createdAt).toLocaleString("vi-VN")
+            : "N/A",
+        })),
+        payments: successfulPayments.map((row: any) => ({
+          paymentId: String(
+            row?._id ||
+              row?.id ||
+              row?.paymentId ||
+              row?.orderId ||
+              row?.transactionId ||
+              "",
+          ),
+          user: getPaymentUserLabel(row),
+          amount: pickNumber(row, ["amount", "totalAmount", "value"]),
+          currency: String(row?.currency || "VND"),
+          method: String(row?.paymentMethod || row?.method || "N/A"),
+          status: String(row?.status || "N/A"),
+          time:
+            row?.paidAt || row?.createdAt
+              ? new Date(row.paidAt || row.createdAt).toLocaleString("vi-VN")
+              : "N/A",
+          note: String(row?.note || row?.description || row?.packageName || ""),
+        })),
+      });
+    };
+
     try {
       const blob = await adminService.exportToExcel({ type: "statistics" });
-      const date = new Date().toISOString().slice(0, 10);
-      const fileName = `admin-report-statistics-${date}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName;
+      a.download = `admin-report-statistics-${date}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      setError(e?.message || "Xuất file thất bại");
+    } catch {
+      try {
+        runClientExport();
+      } catch (e: any) {
+        setError(e?.message || "Xuất file thất bại");
+      }
     } finally {
       setExporting(false);
     }
