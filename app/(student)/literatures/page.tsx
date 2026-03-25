@@ -45,6 +45,22 @@ function getTypeLabel(type: string, hasAudio?: boolean) {
   return "Truyện";
 }
 
+function pickLiteratureImageUrl(l: any): string {
+  const candidates = [
+    l?.imageUrl,
+    l?.image,
+    l?.thumbnail,
+    l?.thumbnailUrl,
+    l?.cover,
+    l?.coverUrl,
+    l?.banner,
+    l?.bannerUrl,
+    l?.imageURL,
+  ];
+  const raw = candidates.find((x) => typeof x === "string" && x.trim().length > 0);
+  return typeof raw === "string" ? raw : "";
+}
+
 function LiteraturesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -113,7 +129,7 @@ function LiteraturesPageContent() {
             id: l._id,
             title: l.title,
             description: shortDesc,
-            thumbnail: l.imageUrl,
+            thumbnail: pickLiteratureImageUrl(l),
             grade: l.level || "starter",
             type,
             hasAudio: !!(l.audioUrl && String(l.audioUrl).trim()),

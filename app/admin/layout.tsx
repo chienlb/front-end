@@ -280,7 +280,7 @@ export default function AdminLayout({
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-8 relative overflow-hidden">
+        <main className="flex-1 p-8 relative overflow-x-hidden">
           {/* Background Pattern */}
           <div
             className="absolute inset-0 pointer-events-none z-0 opacity-40"
@@ -290,7 +290,7 @@ export default function AdminLayout({
             }}
           ></div>
 
-          <div className="relative z-10 mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500">
             {children}
           </div>
         </main>

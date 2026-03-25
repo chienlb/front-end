@@ -173,6 +173,17 @@ export default function LiteratureReadPage() {
   const safeRemoteSrc = (src?: string): string | undefined =>
     typeof src === "string" && src.length > 0 ? encodeURI(src) : undefined;
 
+  const heroImageUrl =
+    imageUrl ||
+    (data as any)?.image ||
+    (data as any)?.thumbnail ||
+    (data as any)?.thumbnailUrl ||
+    (data as any)?.cover ||
+    (data as any)?.coverUrl ||
+    (data as any)?.banner ||
+    (data as any)?.bannerUrl ||
+    "";
+
   const getYoutubeEmbedUrl = (url: string) => {
     const u = url.trim();
     const watchMatch = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -290,7 +301,7 @@ export default function LiteratureReadPage() {
             </div>
             <div className="relative min-h-[260px] bg-[linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0.12))] sm:min-h-[320px] md:min-h-[420px]">
               {(() => {
-                const imageSrc = safeRemoteSrc(imageUrl);
+                const imageSrc = safeRemoteSrc(heroImageUrl);
                 return imageSrc ? (
                   <Image
                     src={imageSrc}

@@ -6,15 +6,12 @@ import {
   Search,
   Edit,
   Trash2,
-  Eye,
   FileText,
-  Image as ImageIcon,
   X,
   Save,
   Loader2,
 } from "lucide-react";
 import { postService } from "@/services/post.service";
-import { courseService } from "@/services/course.service";
 
 // Load ReactQuill ở phía Client
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
@@ -33,11 +30,10 @@ export default function ManagePostsPage() {
   // Form Data
   const [formData, setFormData] = useState({
     title: "",
-    category: "NEWS",
+    author: "",
     content: "",
-    thumbnail: "",
-    excerpt: "",
-    isPublished: true,
+    isActive: true,
+    isFeatured: false,
   });
 
   const fetchData = async () => {
@@ -62,21 +58,19 @@ export default function ManagePostsPage() {
       setEditingId(post._id);
       setFormData({
         title: post.title,
-        category: post.category,
+        author: post.author || "",
         content: post.content,
-        thumbnail: post.thumbnail,
-        excerpt: post.excerpt,
-        isPublished: post.isPublished,
+        isActive: Boolean(post.isActive),
+        isFeatured: Boolean(post.isFeatured),
       });
     } else {
       setEditingId(null);
       setFormData({
         title: "",
-        category: "NEWS",
+        author: "",
         content: "",
-        thumbnail: "",
-        excerpt: "",
-        isPublished: true,
+        isActive: true,
+        isFeatured: false,
       });
     }
     setIsModalOpen(true);
@@ -88,16 +82,12 @@ export default function ManagePostsPage() {
     setPosts((prev) => prev.filter((p) => p._id !== id));
   };
 
-  const handleUploadThumb = async (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      const res: any = await courseService.uploadFile(file); // Tận dụng service upload cũ
-      setFormData({ ...formData, thumbnail: res.url || res });
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.title.trim() || !formData.content.trim() || !formData.author.trim()) {
+      alert("Vui lòng nhập đủ Tiêu đề, Tác giả và Nội dung.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (editingId) {
@@ -162,9 +152,9 @@ export default function ManagePostsPage() {
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
             <tr>
               <th className="p-4">Bài viết</th>
-              <th className="p-4">Danh mục</th>
+              <th className="p-4">Tác giả</th>
               <th className="p-4">Trạng thái</th>
-              <th className="p-4 text-center">Lượt xem</th>
+              <th className="p-4 text-center">Nổi bật</th>
               <th className="p-4 text-right">Hành động</th>
             </tr>
           </thead>
@@ -173,44 +163,43 @@ export default function ManagePostsPage() {
               <tr key={post._id} className="hover:bg-slate-50">
                 <td className="p-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={post.thumbnail || "https://via.placeholder.com/50"}
-                      className="w-12 h-12 rounded-lg object-cover bg-slate-200"
-                    />
+                    <div className="w-12 h-12 rounded-lg grid place-items-center bg-slate-100 text-slate-500">
+                      <FileText size={18} />
+                    </div>
                     <div>
                       <div className="font-bold text-slate-800 line-clamp-1">
                         {post.title}
                       </div>
-                      <div className="text-xs text-slate-500">
-                        Tác giả: {post.author?.fullName || "Admin"}
-                      </div>
+                      <div className="text-xs text-slate-500">Slug: {post.slug || "—"}</div>
                     </div>
                   </div>
                 </td>
                 <td className="p-4">
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-bold ${
-                      post.category === "TIPS"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {post.category}
+                  <span className="text-sm font-semibold text-slate-700">
+                    {post.author || "—"}
                   </span>
                 </td>
                 <td className="p-4">
-                  {post.isPublished ? (
+                  {post.isActive ? (
                     <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">
-                      Công khai
+                      Active
                     </span>
                   ) : (
                     <span className="text-slate-500 font-bold text-xs bg-slate-100 px-2 py-1 rounded">
-                      Bản nháp
+                      Inactive
                     </span>
                   )}
                 </td>
                 <td className="p-4 text-center font-bold text-slate-600">
-                  <Eye size={14} className="inline mr-1" /> {post.views}
+                  {post.isFeatured ? (
+                    <span className="text-amber-700 font-bold text-xs bg-amber-50 px-2 py-1 rounded">
+                      Nổi bật
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 font-bold text-xs bg-slate-100 px-2 py-1 rounded">
+                      Thường
+                    </span>
+                  )}
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
@@ -267,68 +256,46 @@ export default function ManagePostsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-600 mb-1">
-                      Danh mục
+                      Tác giả
                     </label>
-                    <select
+                    <input
                       className="w-full border p-2 rounded-lg text-sm"
-                      value={formData.category}
+                      value={formData.author}
                       onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
-                      }
-                    >
-                      <option value="NEWS">Tin tức</option>
-                      <option value="TIPS">Bí quyết học tập</option>
-                      <option value="ANNOUNCEMENT">Thông báo</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-600 mb-1">
-                      Ảnh bìa (Thumbnail)
-                    </label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:bg-slate-50 relative group">
-                      <input
-                        type="file"
-                        onChange={handleUploadThumb}
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      {formData.thumbnail ? (
-                        <img
-                          src={formData.thumbnail}
-                          className="w-full h-32 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="text-slate-400 text-xs">
-                          <ImageIcon className="mx-auto mb-1" /> Upload ảnh
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-600 mb-1">
-                      Mô tả ngắn
-                    </label>
-                    <textarea
-                      className="w-full border p-2 rounded-lg text-sm h-24"
-                      value={formData.excerpt}
-                      onChange={(e) =>
-                        setFormData({ ...formData, excerpt: e.target.value })
+                        setFormData({ ...formData, author: e.target.value })
                       }
                     />
                   </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={formData.isPublished}
+                      checked={formData.isActive}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          isPublished: e.target.checked,
+                          isActive: e.target.checked,
                         })
                       }
                       className="w-5 h-5 accent-blue-600"
                     />
                     <label className="text-sm font-bold text-slate-700">
-                      Công khai bài viết ngay
+                      Kích hoạt bài viết
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.isFeatured}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          isFeatured: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5 accent-amber-600"
+                    />
+                    <label className="text-sm font-bold text-slate-700">
+                      Đánh dấu nổi bật
                     </label>
                   </div>
                 </div>

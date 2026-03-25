@@ -1,105 +1,206 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Globe,
-  Smartphone,
-  ShieldAlert,
-  Share2,
-  Database,
-  Save,
-  UploadCloud,
-  Monitor,
+  Palette,
+  UserCircle2,
   Lock,
+  CheckCircle2,
   AlertTriangle,
+  Save,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { userService } from "@/services/user.service";
+import { authService } from "@/services/auth.service";
+
+type SettingsTab = "APPEARANCE" | "ACCOUNT" | "SECURITY";
+
+type ThemeOption = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+const THEME_OPTIONS: ThemeOption[] = [
+  { id: "slate", label: "Slate", value: "#f8fafc" },
+  { id: "blue", label: "Blue", value: "#eff6ff" },
+  { id: "violet", label: "Violet", value: "#f5f3ff" },
+  { id: "rose", label: "Rose", value: "#fff1f2" },
+  { id: "amber", label: "Amber", value: "#fffbeb" },
+];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("GENERAL");
-  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("APPEARANCE");
 
-  // Mock State
-  const [formData, setFormData] = useState({
-    appName: "SmartKids - Tiếng Anh cho bé",
-    supportEmail: "support@smartkids.vn",
-    supportPhone: "1900 1000",
-    appLogo: "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
+  const [bgTheme, setBgTheme] = useState<string>(THEME_OPTIONS[0].value);
+  const [savingTheme, setSavingTheme] = useState(false);
 
-    maintenanceMode: false,
-    maintenanceMessage:
-      "Hệ thống đang bảo trì để nâng cấp tính năng mới. Bé quay lại sau nhé!",
-
-    minIosVersion: "1.2.0",
-    minAndroidVersion: "1.3.5",
-    iosStoreLink: "https://apps.apple.com/...",
-    androidStoreLink: "https://play.google.com/...",
-
-    facebookUrl: "https://facebook.com/smartkids",
-    youtubeUrl: "https://youtube.com/smartkids",
-    gaMeasurementId: "G-XXXXXXXX",
+  const [userId, setUserId] = useState("");
+  const [profileForm, setProfileForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    avatar: "",
   });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState("");
 
-  const handleSave = () => {
-    setIsSaving(true);
-    // Simulate API Call
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const rawTheme = localStorage.getItem("admin_settings_bg_theme");
+      if (rawTheme) setBgTheme(rawTheme);
+      const rawUser = localStorage.getItem("currentUser");
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        const uid = String(u?._id || u?.id || "");
+        setUserId(uid);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res: any = await userService.getProfile();
+        const data = res?.data ?? res;
+        setProfileForm({
+          fullName: String(data?.fullName || data?.name || ""),
+          email: String(data?.email || ""),
+          phone: String(data?.phone || ""),
+          avatar: String(data?.avatar || ""),
+        });
+        const uid = String(data?._id || data?.id || userId || "");
+        if (uid) setUserId(uid);
+      } catch {
+        // keep current values
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const activeTheme = useMemo(
+    () => THEME_OPTIONS.find((x) => x.value === bgTheme) || THEME_OPTIONS[0],
+    [bgTheme],
+  );
+
+  const handleSaveTheme = () => {
+    setSavingTheme(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("admin_settings_bg_theme", bgTheme);
+    }
     setTimeout(() => {
-      setIsSaving(false);
-      alert("Đã lưu cấu hình thành công! 💾");
-    }, 1000);
+      setSavingTheme(false);
+      alert("Đã lưu giao diện nền.");
+    }, 400);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!userId) {
+      setProfileMessage("Không xác định được user hiện tại. Vui lòng đăng nhập lại.");
+      return;
+    }
+    try {
+      setSavingProfile(true);
+      setProfileMessage("");
+      await userService.updateMyProfile(userId, {
+        fullName: profileForm.fullName.trim(),
+        email: profileForm.email.trim(),
+        phone: profileForm.phone.trim(),
+        avatar: profileForm.avatar.trim(),
+      });
+      setProfileMessage("Đã cập nhật thông tin tài khoản.");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setProfileMessage(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể cập nhật tài khoản.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.oldPassword || !passwordForm.newPassword) {
+      setPasswordMessage("Vui lòng nhập mật khẩu cũ và mật khẩu mới.");
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordMessage("Mật khẩu mới phải từ 6 ký tự.");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+    try {
+      setChangingPassword(true);
+      setPasswordMessage("");
+      await authService.changePassword({
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordMessage("Đổi mật khẩu thành công.");
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setPasswordMessage(Array.isArray(msg) ? msg.join(", ") : msg || "Không đổi được mật khẩu.");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const tabs = [
     {
-      id: "GENERAL",
-      label: "Thông tin chung",
-      icon: <Globe size={18} />,
-      desc: "Tên App, Logo, Liên hệ",
+      id: "APPEARANCE",
+      label: "Giao diện",
+      icon: <Palette size={18} />,
+      desc: "Đổi nền trang admin",
     },
     {
-      id: "MOBILE",
-      label: "Mobile App",
-      icon: <Smartphone size={18} />,
-      desc: "Phiên bản, Store Links",
+      id: "ACCOUNT",
+      label: "Tài khoản",
+      icon: <UserCircle2 size={18} />,
+      desc: "Thông tin cá nhân",
     },
     {
-      id: "SOCIAL",
-      label: "Mạng xã hội & SEO",
-      icon: <Share2 size={18} />,
-      desc: "Facebook, Google Analytics",
+      id: "SECURITY",
+      label: "Đổi mật khẩu",
+      icon: <Lock size={18} />,
+      desc: "Bảo mật tài khoản",
     },
-    {
-      id: "SYSTEM",
-      label: "Hệ thống & Bảo trì",
-      icon: <ShieldAlert size={18} />,
-      desc: "Bảo trì, Cache, Logs",
-    },
-  ];
+  ] as const;
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col space-y-6">
+    <div
+      className="h-[calc(100vh-100px)] flex flex-col space-y-6"
+      style={{ backgroundColor: bgTheme }}
+    >
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Monitor className="text-gray-600" /> Cài đặt hệ thống
+            <UserCircle2 className="text-gray-600" /> Cài đặt tài khoản
           </h1>
           <p className="text-gray-500 text-sm">
-            Quản lý các thông số kỹ thuật và vận hành toàn bộ ứng dụng.
+            Tùy chỉnh nền giao diện, thông tin cá nhân và bảo mật.
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
-        >
-          {isSaving ? (
-            "Đang lưu..."
-          ) : (
-            <>
-              <Save size={18} /> Lưu thay đổi
-            </>
-          )}
-        </button>
+        <div className="text-xs text-slate-500 bg-white px-3 py-2 rounded-lg border border-slate-200">
+          Nền hiện tại: <span className="font-bold text-slate-700">{activeTheme.label}</span>
+        </div>
       </div>
 
       <div className="flex-1 flex gap-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -108,7 +209,7 @@ export default function SettingsPage() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={`text-left p-3 rounded-xl flex items-start gap-3 transition-all
                 ${
                   activeTab === tab.id
@@ -135,309 +236,223 @@ export default function SettingsPage() {
 
         {/* --- RIGHT CONTENT FORM --- */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-          {/* TAB 1: GENERAL */}
-          {activeTab === "GENERAL" && (
+          {activeTab === "APPEARANCE" && (
             <div className="space-y-6 max-w-2xl animate-fade-in">
               <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Thông tin Ứng dụng
+                Đổi nền giao diện admin
               </h3>
-
-              <div className="flex items-start gap-6">
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-blue-400 transition relative overflow-hidden group">
-                  <img
-                    src={formData.appLogo}
-                    className="w-20 h-20 object-contain"
-                  />
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold">
-                    Đổi Logo
-                  </div>
-                </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1">
-                      Tên Ứng dụng (App Name)
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full border p-2 rounded-lg text-sm font-medium"
-                      value={formData.appName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, appName: e.target.value })
-                      }
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {THEME_OPTIONS.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setBgTheme(theme.value)}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      bgTheme === theme.value
+                        ? "border-blue-500 ring-2 ring-blue-100"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div
+                      className="h-14 rounded-lg border border-slate-200"
+                      style={{ backgroundColor: theme.value }}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1">
-                      Mô tả ngắn (Slogan)
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full border p-2 rounded-lg text-sm"
-                      defaultValue="Học tiếng Anh vui nhộn cùng Mr. Lion"
-                    />
-                  </div>
+                    <div className="mt-2 text-sm font-bold text-slate-700">{theme.label}</div>
+                  </button>
+                ))}
+              </div>
+              <div
+                className="rounded-2xl border border-slate-200 p-4"
+                style={{ backgroundColor: bgTheme }}
+              >
+                <div className="text-sm font-semibold text-slate-700">Xem trước nền</div>
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
+                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
+                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
                 </div>
               </div>
+              <button
+                onClick={handleSaveTheme}
+                disabled={savingTheme}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
+              >
+                <Save size={18} /> {savingTheme ? "Đang lưu..." : "Lưu nền"}
+              </button>
+            </div>
+          )}
 
-              <div className="grid grid-cols-2 gap-4">
+          {activeTab === "ACCOUNT" && (
+            <div className="space-y-6 max-w-2xl animate-fade-in">
+              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
+                Cài đặt tài khoản
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Email hỗ trợ
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full border p-2 rounded-lg text-sm"
-                    value={formData.supportEmail}
-                    onChange={(e) =>
-                      setFormData({ ...formData, supportEmail: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Hotline
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Họ và tên</label>
                   <input
                     type="text"
                     className="w-full border p-2 rounded-lg text-sm"
-                    value={formData.supportPhone}
+                    value={profileForm.fullName}
                     onChange={(e) =>
-                      setFormData({ ...formData, supportPhone: e.target.value })
+                      setProfileForm((p) => ({ ...p, fullName: e.target.value }))
                     }
                   />
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: MOBILE APP */}
-          {activeTab === "MOBILE" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Phiên bản & Store
-              </h3>
-
-              <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-sm text-yellow-800 flex gap-2">
-                <AlertTriangle size={20} className="flex-shrink-0" />
-                <p>
-                  <strong>Lưu ý:</strong> Thay đổi "Phiên bản tối thiểu" sẽ bắt
-                  buộc người dùng cập nhật ứng dụng. Nếu họ đang dùng bản thấp
-                  hơn, họ sẽ không thể đăng nhập.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                    🍎 iOS (Apple Store)
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">
-                        Min Version
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full border p-2 rounded-lg text-sm"
-                        value={formData.minIosVersion}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            minIosVersion: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">
-                        Store Link
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full border p-2 rounded-lg text-sm"
-                        value={formData.iosStoreLink}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            iosStoreLink: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                    🤖 Android (Google Play)
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">
-                        Min Version
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full border p-2 rounded-lg text-sm"
-                        value={formData.minAndroidVersion}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            minAndroidVersion: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">
-                        Store Link
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full border p-2 rounded-lg text-sm"
-                        value={formData.androidStoreLink}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            androidStoreLink: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: SYSTEM */}
-          {activeTab === "SYSTEM" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Bảo trì & Vận hành
-              </h3>
-
-              <div
-                className={`p-4 rounded-xl border-2 transition-all flex justify-between items-center
-                ${
-                  formData.maintenanceMode
-                    ? "border-red-500 bg-red-50"
-                    : "border-green-500 bg-green-50"
-                }`}
-              >
                 <div>
-                  <h4
-                    className={`font-bold ${
-                      formData.maintenanceMode
-                        ? "text-red-700"
-                        : "text-green-700"
-                    }`}
-                  >
-                    Chế độ Bảo trì (Maintenance Mode)
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Khi bật, chỉ Admin mới có thể truy cập hệ thống.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Email</label>
                   <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={formData.maintenanceMode}
+                    type="email"
+                    className="w-full border p-2 rounded-lg text-sm"
+                    value={profileForm.email}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maintenanceMode: e.target.checked,
-                      })
+                      setProfileForm((p) => ({ ...p, email: e.target.value }))
                     }
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Số điện thoại</label>
+                  <input
+                    type="text"
+                    className="w-full border p-2 rounded-lg text-sm"
+                    value={profileForm.phone}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, phone: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Avatar URL</label>
+                  <input
+                    type="text"
+                    className="w-full border p-2 rounded-lg text-sm"
+                    value={profileForm.avatar}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, avatar: e.target.value }))
+                    }
+                  />
+                </div>
               </div>
-
-              {formData.maintenanceMode && (
-                <div className="animate-fade-in">
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Thông báo hiển thị cho User
-                  </label>
-                  <textarea
-                    className="w-full border p-3 rounded-lg text-sm text-red-600 font-medium bg-red-50/50"
-                    rows={3}
-                    value={formData.maintenanceMessage}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        maintenanceMessage: e.target.value,
-                      })
-                    }
-                  />
+              {!!profileForm.avatar && (
+                <div className="w-20 h-20 rounded-full overflow-hidden border border-slate-200">
+                  <img src={profileForm.avatar} alt="avatar" className="w-full h-full object-cover" />
                 </div>
               )}
-
-              <div className="mt-8 pt-8 border-t">
-                <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <Database size={16} /> Cache & Data
-                </h4>
-                <div className="flex gap-4">
-                  <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 font-bold hover:bg-gray-100">
-                    Xóa Cache Hệ thống
-                  </button>
-                  <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 font-bold hover:bg-gray-100">
-                    Reload AI Models
-                  </button>
+              {profileMessage && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-green-600" />
+                  {profileMessage}
                 </div>
+              )}
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
+              >
+                <Save size={18} /> {savingProfile ? "Đang lưu..." : "Lưu tài khoản"}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "SECURITY" && (
+            <div className="space-y-6 max-w-2xl animate-fade-in">
+              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
+                Đổi mật khẩu
+              </h3>
+              <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-sm text-yellow-800 flex gap-2">
+                <AlertTriangle size={20} className="flex-shrink-0" />
+                <div>
+                  Mật khẩu mới nên có ít nhất 6 ký tự, gồm chữ hoa, chữ thường và số để an toàn hơn.
+                </div>
+              </div>
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="block text-xs font-bold text-gray-500 mb-1">Mật khẩu cũ</span>
+                  <div className="relative">
+                    <input
+                      type={showOld ? "text" : "password"}
+                      className="w-full border p-2 rounded-lg text-sm pr-10"
+                      value={passwordForm.oldPassword}
+                      onChange={(e) =>
+                        setPasswordForm((p) => ({ ...p, oldPassword: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOld((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-bold text-gray-500 mb-1">Mật khẩu mới</span>
+                  <div className="relative">
+                    <input
+                      type={showNew ? "text" : "password"}
+                      className="w-full border p-2 rounded-lg text-sm pr-10"
+                      value={passwordForm.newPassword}
+                      onChange={(e) =>
+                        setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-bold text-gray-500 mb-1">Xác nhận mật khẩu mới</span>
+                  <div className="relative">
+                    <input
+                      type={showConfirm ? "text" : "password"}
+                      className="w-full border p-2 rounded-lg text-sm pr-10"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) =>
+                        setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
+                {passwordMessage && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-green-600" />
+                    {passwordMessage}
+                  </div>
+                )}
+                <button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
+                >
+                  <Lock size={16} /> {changingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
+                </button>
               </div>
             </div>
           )}
 
-          {/* TAB 4: SOCIAL */}
-          {activeTab === "SOCIAL" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Kết nối & Theo dõi
-              </h3>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  Facebook Fanpage
-                </label>
+          {/* fallback hidden old tabs */}
+          {false && (
+            <div>
+              <label className="relative inline-flex items-center cursor-pointer">
                 <input
-                  type="text"
-                  className="w-full border p-2 rounded-lg text-sm"
-                  value={formData.facebookUrl}
-                  onChange={(e) =>
-                    setFormData({ ...formData, facebookUrl: e.target.value })
-                  }
+                  type="checkbox"
+                  className="sr-only peer"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  Youtube Channel
-                </label>
-                <input
-                  type="text"
-                  className="w-full border p-2 rounded-lg text-sm"
-                  value={formData.youtubeUrl}
-                  onChange={(e) =>
-                    setFormData({ ...formData, youtubeUrl: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">
-                  Google Analytics ID
-                </label>
-                <input
-                  type="text"
-                  className="w-full border p-2 rounded-lg text-sm font-mono"
-                  value={formData.gaMeasurementId}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      gaMeasurementId: e.target.value,
-                    })
-                  }
-                />
-              </div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer"></div>
+              </label>
             </div>
           )}
         </div>

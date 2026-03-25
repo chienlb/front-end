@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Clock3,
   X,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { lessonService } from "@/services/lessons.service";
 import { unitService } from "@/services/units.service";
@@ -17,6 +19,7 @@ import { unitService } from "@/services/units.service";
 type LessonStatus = "ACTIVE" | "INACTIVE";
 type LessonRow = {
   id: string;
+  unitId: string;
   name: string;
   description?: string;
   unitName: string;
@@ -41,15 +44,174 @@ export default function AdminLessonsPage() {
   const [createSuccess, setCreateSuccess] = useState("");
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editThumbnailFile, setEditThumbnailFile] = useState<File | null>(null);
+  const [editForm, setEditForm] = useState({
+    id: "",
+    unitId: "",
+    title: "",
+    description: "",
+    type: "vocabulary",
+    level: "A1",
+    skillFocus: "vocabulary",
+    orderIndex: "1",
+    duration: "30",
+    isActive: "active",
+    contentJson: "",
+  });
   const [lessonForm, setLessonForm] = useState({
     unitId: "",
     title: "",
     description: "",
     type: "vocabulary",
+    level: "A1",
+    skillFocus: "vocabulary",
     orderIndex: "1",
     duration: "30",
-    isActive: "true",
+    isActive: "active",
+    contentJson: "",
   });
+
+  const buildDefaultContentJson = (type: string) => {
+    const t = String(type || "").toLowerCase();
+    if (t === "vocabulary") {
+      return JSON.stringify(
+        {
+          type: "vocabulary",
+          description: "",
+          words: [{ word: "", definition: "", ipa: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "grammar") {
+      return JSON.stringify(
+        {
+          type: "grammar",
+          description: "",
+          rule: "",
+          explanation_vi: "",
+          explanation_en: "",
+          examples: [{ example: "", translation: "" }],
+          tags: [],
+          commonMistakes: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "dialogue") {
+      return JSON.stringify(
+        {
+          type: "dialogue",
+          description: "",
+          script: "",
+          audio: "",
+          translation: "",
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "reading") {
+      return JSON.stringify(
+        {
+          type: "reading",
+          description: "",
+          passage: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "exercises") {
+      return JSON.stringify(
+        {
+          type: "exercises",
+          description: "",
+          exerciseType: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "quizzes") {
+      return JSON.stringify(
+        {
+          type: "quizzes",
+          description: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "reviews") {
+      return JSON.stringify(
+        {
+          type: "reviews",
+          description: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "summaries") {
+      return JSON.stringify(
+        {
+          type: "summaries",
+          description: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "games") {
+      return JSON.stringify(
+        {
+          type: "games",
+          description: "",
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    if (t === "songs") {
+      return JSON.stringify(
+        {
+          type: "songs",
+          description: "",
+          lyrics: "",
+          translation: "",
+          audio: "",
+          video: "",
+          vocabulary: [{ word: "", definition: "", ipa: "", image: "", audio: "" }],
+          questionsAndAnswers: [{ question: "", answer: "" }],
+          tags: [],
+        },
+        null,
+        2,
+      );
+    }
+    // fallback (backend expects union object)
+    return JSON.stringify({ type: t || "vocabulary", description: "" }, null, 2);
+  };
 
   const fetchLessons = async () => {
     try {
@@ -65,12 +227,19 @@ export default function AdminLessonsPage() {
       const mapped: LessonRow[] = list.map((l) => {
         const statusRaw = String(l?.isActive ?? "").toLowerCase();
         const lessonStatus: LessonStatus =
-          statusRaw === "active" || statusRaw === ""
+          statusRaw === "active" ||
+          statusRaw === "true" ||
+          statusRaw === "1" ||
+          statusRaw === ""
             ? "ACTIVE"
             : "INACTIVE";
         const updatedIso = l?.updatedAt || l?.createdAt || "";
+        const unitId = String(
+          l?.unitId?._id || l?.unitId?.id || l?.unit?._id || l?.unit?.id || l?.unitId || "",
+        );
         return {
           id: String(l?._id || l?.id || ""),
+          unitId,
           name: String(l?.title || l?.name || "Bài học chưa đặt tên"),
           description: l?.description || "",
           unitName: String(
@@ -119,19 +288,49 @@ export default function AdminLessonsPage() {
     fetchUnitsForSelect();
   }, []);
 
+  useEffect(() => {
+    setLessonForm((p) =>
+      p.contentJson?.trim()
+        ? p
+        : { ...p, contentJson: buildDefaultContentJson(p.type) },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const resetLessonForm = () => {
     setLessonForm({
       unitId: "",
       title: "",
       description: "",
       type: "vocabulary",
+      level: "A1",
+      skillFocus: "vocabulary",
       orderIndex: "1",
       duration: "30",
-      isActive: "true",
+      isActive: "active",
+      contentJson: buildDefaultContentJson("vocabulary"),
     });
     setThumbnailFile(null);
     setCreateError("");
     setCreateSuccess("");
+  };
+
+  const resetEditForm = () => {
+    setEditForm({
+      id: "",
+      unitId: "",
+      title: "",
+      description: "",
+      type: "vocabulary",
+      level: "A1",
+      skillFocus: "vocabulary",
+      orderIndex: "1",
+      duration: "30",
+      isActive: "active",
+      contentJson: buildDefaultContentJson("vocabulary"),
+    });
+    setEditThumbnailFile(null);
+    setEditError("");
   };
 
   const handleCreateLesson = async () => {
@@ -149,16 +348,22 @@ export default function AdminLessonsPage() {
       setCreateSuccess("");
 
       const fd = new FormData();
-      fd.append("unitId", lessonForm.unitId.trim());
+      fd.append("unit", lessonForm.unitId.trim());
       fd.append("title", lessonForm.title.trim());
-      fd.append("name", lessonForm.title.trim());
       fd.append("description", lessonForm.description.trim());
-      fd.append("type", lessonForm.type);
+      fd.append("type", String(lessonForm.type || "").toLowerCase());
+      fd.append("level", lessonForm.level);
       fd.append("orderIndex", lessonForm.orderIndex || "0");
-      fd.append("duration", lessonForm.duration || "0");
+      fd.append("estimatedDuration", lessonForm.duration || "0");
+      fd.append("skillFocus", String(lessonForm.skillFocus || "").toLowerCase());
       fd.append("isActive", lessonForm.isActive);
       if (thumbnailFile) fd.append("thumbnail", thumbnailFile);
-      fd.append("content", JSON.stringify({}));
+      fd.append(
+        "content",
+        lessonForm.contentJson?.trim()
+          ? lessonForm.contentJson
+          : buildDefaultContentJson(lessonForm.type),
+      );
 
       await lessonService.createLesson(fd);
       setCreateSuccess("Tạo bài học thành công.");
@@ -174,6 +379,82 @@ export default function AdminLessonsPage() {
       );
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteLesson = async (id: string) => {
+    const ok = window.confirm("Bạn có chắc muốn xóa bài học này?");
+    if (!ok) return;
+    try {
+      await lessonService.deleteLesson(id);
+      await fetchLessons();
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Không thể xóa bài học.");
+    }
+  };
+
+  const handleOpenEdit = (row: LessonRow) => {
+    setEditError("");
+    setEditThumbnailFile(null);
+    setEditForm({
+      id: row.id,
+      unitId: row.unitId || "",
+      title: row.name || "",
+      description: row.description || "",
+      type: row.type && row.type !== "N/A" ? row.type : "vocabulary",
+      level: "A1",
+      skillFocus: "vocabulary",
+      orderIndex: String(row.orderIndex ?? 0),
+      duration: String(row.duration ?? 0),
+      isActive: row.status === "ACTIVE" ? "active" : "inactive",
+      contentJson: buildDefaultContentJson(
+        row.type && row.type !== "N/A" ? row.type : "vocabulary",
+      ),
+    });
+    setOpenEdit(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.id) return;
+    if (!editForm.unitId.trim()) {
+      setEditError("Vui lòng chọn chủ đề (unit).");
+      return;
+    }
+    if (!editForm.title.trim()) {
+      setEditError("Vui lòng nhập tiêu đề bài học.");
+      return;
+    }
+    try {
+      setSavingEdit(true);
+      setEditError("");
+
+      const fd = new FormData();
+      fd.append("unit", editForm.unitId.trim());
+      fd.append("title", editForm.title.trim());
+      fd.append("description", editForm.description.trim());
+      fd.append("type", String(editForm.type || "").toLowerCase());
+      fd.append("level", editForm.level);
+      fd.append("orderIndex", editForm.orderIndex || "0");
+      fd.append("estimatedDuration", editForm.duration || "0");
+      fd.append("skillFocus", String(editForm.skillFocus || "").toLowerCase());
+      fd.append("isActive", editForm.isActive);
+      if (editThumbnailFile) fd.append("thumbnail", editThumbnailFile);
+      fd.append(
+        "content",
+        editForm.contentJson?.trim()
+          ? editForm.contentJson
+          : buildDefaultContentJson(editForm.type),
+      );
+
+      await lessonService.updateLesson(editForm.id, fd);
+      setOpenEdit(false);
+      resetEditForm();
+      await fetchLessons();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setEditError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể cập nhật bài học.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -293,6 +574,7 @@ export default function AdminLessonsPage() {
                 <th className="p-4 text-center">Thời lượng</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Cập nhật</th>
+                <th className="p-4 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -314,6 +596,22 @@ export default function AdminLessonsPage() {
                   </td>
                   <td className="p-4 text-center">{statusBadge(l.status)}</td>
                   <td className="p-4 text-slate-500">{l.updatedAt}</td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleOpenEdit(l)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 inline-flex items-center gap-1"
+                      >
+                        <Pencil size={13} /> Sửa
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLesson(l.id)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 inline-flex items-center gap-1"
+                      >
+                        <Trash2 size={13} /> Xóa
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -394,7 +692,12 @@ export default function AdminLessonsPage() {
                     <select
                       value={lessonForm.type}
                       onChange={(e) =>
-                        setLessonForm((p) => ({ ...p, type: e.target.value }))
+                        setLessonForm((p) => ({
+                          ...p,
+                          type: e.target.value,
+                          skillFocus: e.target.value,
+                          contentJson: buildDefaultContentJson(e.target.value),
+                        }))
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     >
@@ -404,7 +707,22 @@ export default function AdminLessonsPage() {
                       <option value="listening">Nghe</option>
                       <option value="speaking">Nói</option>
                       <option value="writing">Viết</option>
-                      <option value="mixed">Tổng hợp</option>
+                      <option value="dialogue">Hội thoại</option>
+                      <option value="quiz">Quiz</option>
+                      <option value="review">Ôn tập</option>
+                    </select>
+                    <select
+                      value={lessonForm.level}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, level: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((lv) => (
+                        <option key={lv} value={lv}>
+                          Level {lv}
+                        </option>
+                      ))}
                     </select>
                     <select
                       value={lessonForm.isActive}
@@ -413,8 +731,8 @@ export default function AdminLessonsPage() {
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     >
-                      <option value="true">Hoạt động</option>
-                      <option value="false">Tạm ẩn</option>
+                      <option value="active">Hoạt động</option>
+                      <option value="inactive">Tạm ẩn</option>
                     </select>
                     <input
                       type="number"
@@ -435,6 +753,17 @@ export default function AdminLessonsPage() {
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     />
                   </div>
+                  <label className="text-xs font-bold text-slate-600">
+                    Content (JSON) *
+                    <textarea
+                      value={lessonForm.contentJson}
+                      onChange={(e) =>
+                        setLessonForm((p) => ({ ...p, contentJson: e.target.value }))
+                      }
+                      placeholder="Nội dung lesson theo schema backend (JSON)"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-40 font-mono"
+                    />
+                  </label>
                   <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
                     <span className="text-xs font-semibold text-slate-600">
                       Ảnh đại diện (tuỳ chọn)
@@ -466,6 +795,182 @@ export default function AdminLessonsPage() {
                   className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
                 >
                   {creating ? "Đang tạo..." : "Tạo bài học"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openEdit && (
+        <div className="fixed inset-0 z-[130] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
+          <div className="min-h-full w-full flex justify-center p-3 md:p-6">
+            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h2 className="text-lg font-black text-slate-800">Chỉnh sửa bài học</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenEdit(false);
+                    resetEditForm();
+                  }}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto">
+                {editError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                    {editError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3">
+                  <label className="text-xs font-bold text-slate-600">
+                    Chủ đề (Unit) *
+                    <select
+                      value={editForm.unitId}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, unitId: e.target.value }))
+                      }
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 bg-white"
+                    >
+                      <option value="">— Chọn unit —</option>
+                      {unitOptions.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <input
+                    value={editForm.title}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, title: e.target.value }))
+                    }
+                    placeholder="Tiêu đề bài học *"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, description: e.target.value }))
+                    }
+                    placeholder="Mô tả ngắn"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-24"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={editForm.type}
+                      onChange={(e) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          type: e.target.value,
+                          skillFocus: e.target.value,
+                          contentJson: buildDefaultContentJson(e.target.value),
+                        }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="vocabulary">Từ vựng</option>
+                      <option value="grammar">Ngữ pháp</option>
+                      <option value="reading">Đọc hiểu</option>
+                      <option value="listening">Nghe</option>
+                      <option value="speaking">Nói</option>
+                      <option value="writing">Viết</option>
+                      <option value="dialogue">Hội thoại</option>
+                      <option value="quiz">Quiz</option>
+                      <option value="review">Ôn tập</option>
+                    </select>
+                    <select
+                      value={editForm.level}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, level: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((lv) => (
+                        <option key={lv} value={lv}>
+                          Level {lv}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={editForm.isActive}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, isActive: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="active">Hoạt động</option>
+                      <option value="inactive">Tạm ẩn</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={editForm.orderIndex}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, orderIndex: e.target.value }))
+                      }
+                      placeholder="Thứ tự (order)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                    <input
+                      type="number"
+                      value={editForm.duration}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, duration: e.target.value }))
+                      }
+                      placeholder="Thời lượng (phút)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                  </div>
+                  <label className="text-xs font-bold text-slate-600">
+                    Content (JSON) *
+                    <textarea
+                      value={editForm.contentJson}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, contentJson: e.target.value }))
+                      }
+                      placeholder="Nội dung lesson theo schema backend (JSON)"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-40 font-mono"
+                    />
+                  </label>
+                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Cập nhật ảnh đại diện (tuỳ chọn)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setEditThumbnailFile(e.target.files?.[0] || null)
+                      }
+                      className="mt-1 block w-full text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenEdit(false);
+                    resetEditForm();
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-white"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={savingEdit}
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {savingEdit ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>
               </div>
             </div>

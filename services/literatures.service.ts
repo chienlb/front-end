@@ -29,6 +29,15 @@ export const literatureService = {
 
   // Update literature
   updateLiterature: async (id: string, data: any) => {
+    const isFormData =
+      typeof FormData !== "undefined" && data && typeof data === "object" && data instanceof FormData;
+    if (isFormData) {
+      return api.put(`/literatures/${id}`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    }
     return api.put(`/literatures/${id}`, data);
   },
 

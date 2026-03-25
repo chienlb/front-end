@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   BookText,
   Search,
@@ -9,6 +10,8 @@ import {
   CheckCircle2,
   Plus,
   X,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import { literatureService } from "@/services/literatures.service";
 
@@ -16,11 +19,49 @@ type LiteratureRow = {
   id: string;
   title: string;
   type: string;
-  grade: string;
-  author: string;
+  level: string;
   isPublished: boolean;
+  imageUrl?: string;
   updatedAt: string;
 };
+
+function getTypeLabelVi(type: string): string {
+  const t = String(type || "").toLowerCase();
+  if (t === "poem") return "Thơ";
+  if (t === "story") return "Truyện";
+  if (t === "article") return "Bài viết";
+  if (t === "dialogue") return "Hội thoại";
+  if (t === "comic") return "Truyện tranh";
+  if (t === "song") return "Bài hát";
+  if (!t || t === "n/a") return "—";
+  return type;
+}
+
+function getLevelLabelVi(level: string): string {
+  const l = String(level || "").toLowerCase();
+  if (l === "starter") return "Starter";
+  if (l === "beginner") return "Beginner";
+  if (l === "elementary") return "Elementary";
+  if (l === "pre-intermediate") return "Pre-Intermediate";
+  if (l === "intermediate") return "Intermediate";
+  return level || "—";
+}
+
+function pickLiteratureImageUrl(it: any): string {
+  const candidates = [
+    it?.imageUrl,
+    it?.image,
+    it?.thumbnail,
+    it?.thumbnailUrl,
+    it?.cover,
+    it?.coverUrl,
+    it?.banner,
+    it?.bannerUrl,
+    it?.imageURL,
+  ];
+  const raw = candidates.find((x) => typeof x === "string" && x.trim().length > 0);
+  return typeof raw === "string" ? raw : "";
+}
 
 function extractLiteratureList(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
@@ -65,11 +106,28 @@ export default function ResourceLibraryPage() {
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
+  const [openEdit, setOpenEdit] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [editCoverPreviewUrl, setEditCoverPreviewUrl] = useState<string>("");
+  const [editForm, setEditForm] = useState({
+    id: "",
+    title: "",
+    type: "poem",
+    level: "starter",
+    topic: "",
+    contentEnglish: "",
+    contentVietnamese: "",
+    isPublished: "false",
+  });
   const [litForm, setLitForm] = useState({
     title: "",
-    author: "",
     type: "poem",
-    grade: "A1",
+    level: "starter",
+    topic: "",
     contentEnglish: "",
     contentVietnamese: "",
     isPublished: "false",
@@ -88,18 +146,14 @@ export default function ResourceLibraryPage() {
 
       const mapped: LiteratureRow[] = list.map((it) => {
         const updatedIso = it?.updatedAt || it?.createdAt || "";
+        const imageUrl = pickLiteratureImageUrl(it);
         return {
           id: String(it?._id || it?.id || ""),
           title: String(it?.title || it?.name || "Văn bản chưa đặt tên"),
           type: String(it?.type || "N/A"),
-          grade: String(it?.grade || "N/A"),
-          author: String(
-            it?.author ||
-              it?.createdBy?.fullName ||
-              it?.createBy?.fullName ||
-              "—",
-          ),
+          level: String(it?.level || "—"),
           isPublished: Boolean(it?.isPublished ?? it?.status === "published"),
+          imageUrl,
           updatedAt: updatedIso
             ? new Date(updatedIso).toLocaleDateString("vi-VN")
             : "—",
@@ -118,17 +172,38 @@ export default function ResourceLibraryPage() {
     fetchLiteratures();
   }, [selectedType]);
 
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(coverFile);
+    setCoverPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [coverFile]);
+
+  useEffect(() => {
+    if (!editCoverFile) {
+      setEditCoverPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(editCoverFile);
+    setEditCoverPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [editCoverFile]);
+
   const resetLitForm = () => {
     setLitForm({
       title: "",
-      author: "",
       type: "poem",
-      grade: "A1",
+      level: "starter",
+      topic: "",
       contentEnglish: "",
       contentVietnamese: "",
       isPublished: "false",
     });
     setCoverFile(null);
+    setCoverPreviewUrl("");
     setCreateError("");
     setCreateSuccess("");
   };
@@ -145,9 +220,9 @@ export default function ResourceLibraryPage() {
 
       const fd = new FormData();
       fd.append("title", litForm.title.trim());
-      fd.append("author", litForm.author.trim());
       fd.append("type", litForm.type);
-      fd.append("grade", litForm.grade.trim());
+      fd.append("level", litForm.level);
+      fd.append("topic", litForm.topic.trim());
       fd.append("contentEnglish", litForm.contentEnglish);
       fd.append("contentVietnamese", litForm.contentVietnamese);
       fd.append("isPublished", litForm.isPublished);
@@ -175,11 +250,99 @@ export default function ResourceLibraryPage() {
       const q = search.toLowerCase();
       return (
         r.title.toLowerCase().includes(q) ||
-        r.author.toLowerCase().includes(q) ||
         r.type.toLowerCase().includes(q)
       );
     });
   }, [rows, search]);
+
+  const handleDeleteLiterature = async (id: string) => {
+    const ok = window.confirm("Bạn có chắc muốn xóa tác phẩm này?");
+    if (!ok) return;
+    try {
+      await literatureService.deleteLiterature(id);
+      await fetchLiteratures();
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Không thể xóa tác phẩm.");
+    }
+  };
+
+  const handleOpenEdit = async (row: LiteratureRow) => {
+    try {
+      setEditError("");
+      setEditSuccess("");
+      setSavingEdit(false);
+      setEditCoverFile(null);
+      setEditCoverPreviewUrl("");
+
+      const res: any = await literatureService.getLiteratureById(row.id);
+      const detail = res?.data ?? res;
+      setEditForm({
+        id: row.id,
+        title: String(detail?.title || ""),
+        type: String(detail?.type || "poem"),
+        level: String(detail?.level || "starter"),
+        topic: String(detail?.topic || ""),
+        contentEnglish: String(detail?.contentEnglish || ""),
+        contentVietnamese: String(detail?.contentVietnamese || ""),
+        isPublished: String(Boolean(detail?.isPublished) ? "true" : "false"),
+      });
+      setOpenEdit(true);
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Không thể mở dữ liệu chỉnh sửa.");
+    }
+  };
+
+  const resetEdit = () => {
+    setOpenEdit(false);
+    setSavingEdit(false);
+    setEditError("");
+    setEditSuccess("");
+    setEditCoverFile(null);
+    setEditCoverPreviewUrl("");
+    setEditForm({
+      id: "",
+      title: "",
+      type: "poem",
+      level: "starter",
+      topic: "",
+      contentEnglish: "",
+      contentVietnamese: "",
+      isPublished: "false",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.id) return;
+    if (!editForm.title.trim()) {
+      setEditError("Vui lòng nhập tiêu đề bài thơ / văn.");
+      return;
+    }
+    try {
+      setSavingEdit(true);
+      setEditError("");
+      setEditSuccess("");
+
+      const fd = new FormData();
+      fd.append("title", editForm.title.trim());
+      fd.append("type", editForm.type);
+      fd.append("level", editForm.level);
+      fd.append("topic", editForm.topic.trim());
+      fd.append("contentEnglish", editForm.contentEnglish);
+      fd.append("contentVietnamese", editForm.contentVietnamese);
+      fd.append("isPublished", editForm.isPublished);
+      if (editCoverFile) fd.append("image", editCoverFile);
+
+      await literatureService.updateLiterature(editForm.id, fd);
+      setEditSuccess("Cập nhật tác phẩm thành công.");
+      await fetchLiteratures();
+      setTimeout(() => resetEdit(), 500);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setEditError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể cập nhật tác phẩm.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const publishedCount = rows.filter((x) => x.isPublished).length;
 
@@ -240,6 +403,7 @@ export default function ResourceLibraryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tiêu đề, tác giả, thể loại..."
+              placeholder="Tìm theo tiêu đề, thể loại..."
               className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-indigo-400"
             />
           </div>
@@ -250,7 +414,10 @@ export default function ResourceLibraryPage() {
               { id: "all", label: "Tất cả" },
               { id: "poem", label: "Thơ" },
               { id: "story", label: "Truyện" },
-              { id: "essay", label: "Văn xuôi" },
+              { id: "dialogue", label: "Hội thoại" },
+              { id: "song", label: "Bài hát" },
+              { id: "comic", label: "Truyện tranh" },
+              { id: "article", label: "Bài viết" },
             ].map((type) => (
               <button
                 key={type.id}
@@ -272,11 +439,12 @@ export default function ResourceLibraryPage() {
             <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase">
               <tr>
                 <th className="p-4 pl-6">Tác phẩm</th>
+                <th className="p-4 text-center">Ảnh</th>
                 <th className="p-4">Thể loại</th>
-                <th className="p-4">Khối lớp</th>
-                <th className="p-4">Tác giả</th>
+                <th className="p-4">Level</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Cập nhật</th>
+                <th className="p-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -286,9 +454,20 @@ export default function ResourceLibraryPage() {
                     <p className="font-bold text-slate-800">{r.title}</p>
                     <p className="text-xs text-slate-400 mt-1">ID: {r.id}</p>
                   </td>
-                  <td className="p-4 text-slate-600">{r.type}</td>
-                  <td className="p-4 text-slate-600">{r.grade}</td>
-                  <td className="p-4 text-slate-600">{r.author}</td>
+                  <td className="p-4 text-center">
+                    {r.imageUrl ? (
+                      <img
+                        src={encodeURI(r.imageUrl)}
+                        alt={r.title}
+                        className="w-14 h-10 rounded-lg object-cover border border-slate-200 inline-block bg-slate-50"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-slate-600">{getTypeLabelVi(r.type)}</td>
+                  <td className="p-4 text-slate-600">{getLevelLabelVi(r.level)}</td>
                   <td className="p-4 text-center">
                     {r.isPublished ? (
                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
@@ -301,6 +480,33 @@ export default function ResourceLibraryPage() {
                     )}
                   </td>
                   <td className="p-4 text-slate-500">{r.updatedAt}</td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <Link
+                        href={`/literatures/${r.id}`}
+                        target="_blank"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition inline-flex items-center gap-1"
+                        title="Xem"
+                      >
+                        <Eye size={13} /> Xem
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(r)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition inline-flex items-center gap-1"
+                        title="Sửa"
+                      >
+                        <Pencil size={13} /> Sửa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLiterature(r.id)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -352,14 +558,6 @@ export default function ResourceLibraryPage() {
                     placeholder="Tiêu đề *"
                     className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                   />
-                  <input
-                    value={litForm.author}
-                    onChange={(e) =>
-                      setLitForm((p) => ({ ...p, author: e.target.value }))
-                    }
-                    placeholder="Tác giả"
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                  />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select
                       value={litForm.type}
@@ -370,19 +568,33 @@ export default function ResourceLibraryPage() {
                     >
                       <option value="poem">Thơ</option>
                       <option value="story">Truyện</option>
-                      <option value="essay">Văn xuôi</option>
+                      <option value="dialogue">Hội thoại</option>
                       <option value="comic">Truyện tranh</option>
                       <option value="song">Bài hát</option>
+                      <option value="article">Bài viết</option>
                     </select>
-                    <input
-                      value={litForm.grade}
+                    <select
+                      value={litForm.level}
                       onChange={(e) =>
-                        setLitForm((p) => ({ ...p, grade: e.target.value }))
+                        setLitForm((p) => ({ ...p, level: e.target.value }))
                       }
-                      placeholder="Khối / cấp độ (VD: A1, B2)"
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                    />
+                    >
+                      <option value="starter">Starter</option>
+                      <option value="beginner">Beginner</option>
+                      <option value="elementary">Elementary</option>
+                      <option value="pre-intermediate">Pre-Intermediate</option>
+                      <option value="intermediate">Intermediate</option>
+                    </select>
                   </div>
+                  <input
+                    value={litForm.topic}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, topic: e.target.value }))
+                    }
+                    placeholder="Chủ đề (VD: animals, friendship, school...)"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
                   <textarea
                     value={litForm.contentEnglish}
                     onChange={(e) =>
@@ -425,6 +637,18 @@ export default function ResourceLibraryPage() {
                       className="mt-1 block w-full text-sm"
                     />
                   </label>
+                  {coverPreviewUrl ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="text-xs font-bold text-slate-600 mb-2">
+                        Xem trước ảnh bìa
+                      </div>
+                      <img
+                        src={coverPreviewUrl}
+                        alt="cover preview"
+                        className="w-full max-h-64 object-contain rounded-lg bg-slate-50 border border-slate-100"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -443,6 +667,155 @@ export default function ResourceLibraryPage() {
                   className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
                 >
                   {creating ? "Đang tạo..." : "Tạo tác phẩm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openEdit && (
+        <div className="fixed inset-0 z-[130] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
+          <div className="min-h-full w-full flex justify-center p-3 md:p-6">
+            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h2 className="text-lg font-black text-slate-800">Chỉnh sửa thơ / văn</h2>
+                <button
+                  type="button"
+                  onClick={resetEdit}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto">
+                {editError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                    {editError}
+                  </div>
+                )}
+                {editSuccess && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 font-semibold">
+                    {editSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3">
+                  <input
+                    value={editForm.title}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, title: e.target.value }))
+                    }
+                    placeholder="Tiêu đề *"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={editForm.type}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, type: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="poem">Thơ</option>
+                      <option value="story">Truyện</option>
+                      <option value="dialogue">Hội thoại</option>
+                      <option value="comic">Truyện tranh</option>
+                      <option value="song">Bài hát</option>
+                      <option value="article">Bài viết</option>
+                    </select>
+                    <select
+                      value={editForm.level}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, level: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="starter">Starter</option>
+                      <option value="beginner">Beginner</option>
+                      <option value="elementary">Elementary</option>
+                      <option value="pre-intermediate">Pre-Intermediate</option>
+                      <option value="intermediate">Intermediate</option>
+                    </select>
+                    <select
+                      value={editForm.isPublished}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, isPublished: e.target.value }))
+                      }
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    >
+                      <option value="false">Lưu nháp</option>
+                      <option value="true">Xuất bản</option>
+                    </select>
+                  </div>
+                  <input
+                    value={editForm.topic}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, topic: e.target.value }))
+                    }
+                    placeholder="Chủ đề (VD: animals, friendship, school...)"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <textarea
+                    value={editForm.contentEnglish}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, contentEnglish: e.target.value }))
+                    }
+                    placeholder="Nội dung tiếng Anh"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
+                  />
+                  <textarea
+                    value={editForm.contentVietnamese}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, contentVietnamese: e.target.value }))
+                    }
+                    placeholder="Nội dung tiếng Việt (bản dịch / ghi chú)"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
+                  />
+                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Ảnh bìa (tuỳ chọn)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setEditCoverFile(e.target.files?.[0] || null)
+                      }
+                      className="mt-1 block w-full text-sm"
+                    />
+                  </label>
+                  {editCoverPreviewUrl ? (
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="text-xs font-bold text-slate-600 mb-2">
+                        Xem trước ảnh bìa
+                      </div>
+                      <img
+                        src={editCoverPreviewUrl}
+                        alt="cover preview"
+                        className="w-full max-h-64 object-contain rounded-lg bg-slate-50 border border-slate-100"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={resetEdit}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-white"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={savingEdit}
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {savingEdit ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>
               </div>
             </div>

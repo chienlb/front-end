@@ -19,12 +19,17 @@ export const competitionService = {
       throw err;
     }
   },
-  createCompetition: async (formData: FormData) => {
-    return api.post("/competitions", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  createCompetition: async (data: any) => {
+    const isFormData =
+      typeof FormData !== "undefined" && data && typeof data === "object" && data instanceof FormData;
+    if (isFormData) {
+      return api.post("/competitions", data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    }
+    return api.post("/competitions", data);
   },
 
   getCompetitionById: async (id: string) => {
@@ -32,6 +37,13 @@ export const competitionService = {
   },
 
   updateCompetition: async (id: string, data: any) => {
+    const isFormData =
+      typeof FormData !== "undefined" && data && typeof data === "object" && data instanceof FormData;
+    if (isFormData) {
+      return api.put(`/competitions/${id}`, data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    }
     return api.put(`/competitions/${id}`, data);
   },
 
