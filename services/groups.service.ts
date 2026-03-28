@@ -57,5 +57,23 @@ export const groupsService = {
       params: { page, limit },
     });
   },
+
+  // Backend endpoint mới (controller bạn cung cấp):
+  // GET /groups/user/get-all-groups
+  getAllGroupsForTeacher: async () => {
+    return api.get("/groups/user/get-all-groups");
+  },
+
+  // Backend endpoint mới (controller bạn cung cấp):
+  // GET /groups/user/get-all-members
+  getAllMembersInTeacherGroups: async () => {
+    return api.get("/groups/user/get-all-members");
+  },
+
+  // Backend endpoint mới (controller bạn cung cấp):
+  // GET /groups/user/get-all-members/:groupId
+  getAllMembersInGroupForTeacher: async (groupId: string) => {
+    return api.get(`/groups/user/get-all-members/${encodeURIComponent(groupId.trim())}`);
+  },
 };
 

@@ -182,8 +182,28 @@ export const assignmentsService = {
     );
   },
 
+  // Backend endpoint bạn vừa cung cấp:
+  // GET /submissions/user/student/assignment/:assignmentId
+  getAllSubmissionsByAssignmentIdForTeacher: async (assignmentId: string) => {
+    return api.get(
+      `/submissions/user/student/assignment/${encodeURIComponent(
+        assignmentId.trim(),
+      )}`,
+    );
+  },
+
   getSubmissionsByStudentId: async (studentId: string) => {
     return api.get(`/submissions/student/${encodeURIComponent(studentId.trim())}`);
+  },
+
+  // Backend endpoint bạn vừa cung cấp:
+  // GET /submissions/user/student/submissions/:studentId
+  getAllSubmissionsByStudentIdForTeacher: async (studentId: string) => {
+    return api.get(
+      `/submissions/user/student/submissions/${encodeURIComponent(
+        studentId.trim(),
+      )}`,
+    );
   },
 
   updateSubmission: async (submissionId: string, data: any) => {

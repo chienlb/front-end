@@ -7,15 +7,11 @@ import {
   Plus,
   Filter,
   FileText,
-  Users,
-  Send,
-  Copy,
-  Edit,
-  CheckSquare,
-  X,
+  Eye,
+  ClipboardCheck,
+  GraduationCap,
 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
-import { groupsService } from "@/services/groups.service";
 
 // --- TYPES ---
 interface AssignmentTemplate {
@@ -36,13 +32,6 @@ export default function AssignmentLibraryPage() {
   const [loadError, setLoadError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [templates, setTemplates] = useState<AssignmentTemplate[]>([]);
-  const [myClasses, setMyClasses] = useState<
-    Array<{ id: string; name: string; studentCount: number }>
-  >([]);
-  const [showAssignModal, setShowAssignModal] =
-    useState<AssignmentTemplate | null>(null);
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [dueDate, setDueDate] = useState("");
 
   const getCurrentUserId = (): string => {
     try {
@@ -80,14 +69,14 @@ export default function AssignmentLibraryPage() {
         const userId = getCurrentUserId();
         if (!userId) {
           setTemplates([]);
-          setMyClasses([]);
           return;
         }
 
-        const [assignmentRes, groupsRes] = await Promise.all([
-          assignmentsService.getAssignmentsByUserId(userId, 1, 200),
-          groupsService.getMyGroups({ page: 1, limit: 200 }),
-        ]);
+        const assignmentRes = await assignmentsService.getAssignmentsByUserId(
+          userId,
+          1,
+          200,
+        );
 
         const assignmentPayload = assignmentRes?.data ?? assignmentRes;
         const assignmentList = extractList(assignmentPayload);
@@ -104,48 +93,16 @@ export default function AssignmentLibraryPage() {
           usageCount: Number(it?.totalSubmissions ?? it?.submissionCount ?? 0) || 0,
         }));
         setTemplates(mappedTemplates.filter((t) => t.id));
-
-        const groupsPayload = groupsRes?.data ?? groupsRes;
-        const groups = extractList(groupsPayload);
-        const mappedGroups = groups.map((g: any, idx: number) => ({
-          id: String(g?._id ?? g?.id ?? `group-${idx}`),
-          name: String(g?.name ?? g?.title ?? "Lớp học"),
-          studentCount: Number(g?.totalMembers ?? g?.memberCount ?? g?.studentCount ?? 0) || 0,
-        }));
-        setMyClasses(mappedGroups.filter((g) => g.id));
       } catch (error: any) {
         const msg = error?.response?.data?.message ?? error?.message;
         setLoadError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tải dữ liệu.");
         setTemplates([]);
-        setMyClasses([]);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, []);
-
-  // --- ACTIONS ---
-  const handleToggleClass = (classId: string) => {
-    if (selectedClasses.includes(classId)) {
-      setSelectedClasses(selectedClasses.filter((id) => id !== classId));
-    } else {
-      setSelectedClasses([...selectedClasses, classId]);
-    }
-  };
-
-  const handleBulkAssign = () => {
-    if (selectedClasses.length === 0)
-      return alert("Vui lòng chọn ít nhất 1 lớp!");
-    if (!dueDate) return alert("Vui lòng chọn hạn nộp!");
-
-    console.log(`Giao bài "${showAssignModal?.title}" cho:`, selectedClasses);
-    alert(`Đã giao bài thành công cho ${selectedClasses.length} lớp!`);
-
-    setShowAssignModal(null);
-    setSelectedClasses([]);
-    setDueDate("");
-  };
 
   const filteredTemplates = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -154,7 +111,7 @@ export default function AssignmentLibraryPage() {
   }, [templates, searchTerm]);
 
   return (
-    <div className="p-8 min-h-screen bg-slate-50 font-sans">
+    <div className="p-8 min-h-screen bg-transparent font-sans rounded-[2rem]">
       {/* 1. HEADER */}
       <div className="flex justify-between items-end mb-8">
         <div>
@@ -162,7 +119,7 @@ export default function AssignmentLibraryPage() {
             Thư viện Đề & Bài tập
           </h1>
           <p className="text-slate-500 mt-1">
-            Soạn thảo đề gốc và phân phối nhanh đến các lớp học.
+            Soạn thảo đề gốc, xem bài nộp và chấm điểm tập trung.
           </p>
         </div>
 
@@ -175,7 +132,7 @@ export default function AssignmentLibraryPage() {
       </div>
 
       {/* 2. LIBRARY LIST */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-slate-200/70 overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 border-b border-slate-100 flex justify-between items-center gap-4">
           <div className="relative w-96">
@@ -252,27 +209,24 @@ export default function AssignmentLibraryPage() {
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => setShowAssignModal(item)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition"
+                      onClick={() => router.push(`/teacher/assignments/${item.id}`)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 transition"
                     >
-                      <Send size={14} /> Giao bài
+                      <Eye size={14} /> Chi tiết
                     </button>
 
                     <button
-                      onClick={() =>
-                        router.push(`/teacher/assignments/${item.id}`)
-                      }
-                      className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition"
-                      title="Chỉnh sửa"
+                      onClick={() => router.push(`/teacher/assignments/${item.id}/submissions`)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition"
                     >
-                      <Edit size={16} />
+                      <ClipboardCheck size={14} /> Học viên đã nộp
                     </button>
 
                     <button
-                      className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg"
-                      title="Nhân bản"
+                      onClick={() => router.push(`/teacher/grading/${item.id}`)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
                     >
-                      <Copy size={16} />
+                      <GraduationCap size={14} /> Chấm điểm
                     </button>
                   </div>
                 </td>
@@ -290,109 +244,6 @@ export default function AssignmentLibraryPage() {
           <div className="p-6 text-sm text-slate-500">Không có bài tập nào.</div>
         ) : null}
       </div>
-
-      {/* 3. MODAL GIAO BÀI */}
-      {showAssignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in zoom-in-95">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="font-black text-lg text-slate-800">
-                  Phân phối bài tập
-                </h3>
-                <p className="text-sm text-slate-500">
-                  Đang giao:{" "}
-                  <span className="font-bold text-blue-600">
-                    {showAssignModal.title}
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => setShowAssignModal(null)}
-                className="p-2 hover:bg-slate-200 rounded-full text-slate-400"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto">
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 mb-3 uppercase flex justify-between">
-                  1. Chọn lớp muốn giao ({selectedClasses.length})
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {myClasses.map((cls) => (
-                    <div
-                      key={cls.id}
-                      onClick={() => handleToggleClass(cls.id)}
-                      className={`p-3 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-                        selectedClasses.includes(cls.id)
-                          ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500"
-                          : "bg-white border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-bold text-sm text-slate-800">
-                          {cls.name}
-                        </p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Users size={12} /> {cls.studentCount} học viên
-                        </p>
-                      </div>
-                      {selectedClasses.includes(cls.id) && (
-                        <CheckSquare size={20} className="text-blue-600" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <label className="block text-sm font-bold text-slate-700 mb-3 uppercase">
-                  2. Thiết lập thời gian
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-slate-500 mb-1 block">
-                      Ngày bắt đầu
-                    </span>
-                    <input
-                      type="datetime-local"
-                      className="w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-500 mb-1 block">
-                      Hạn nộp bài
-                    </span>
-                    <input
-                      type="datetime-local"
-                      className="w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:border-blue-500"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button
-                onClick={() => setShowAssignModal(null)}
-                className="px-5 py-2.5 text-slate-600 font-bold hover:bg-white rounded-xl transition border border-transparent hover:border-slate-200"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleBulkAssign}
-                className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition flex items-center gap-2"
-              >
-                <Send size={18} /> Xác nhận giao bài
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

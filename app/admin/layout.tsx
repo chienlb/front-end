@@ -22,7 +22,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 bg-[#0B1120] text-slate-400
+      className={`fixed inset-y-0 left-0 z-50 bg-[#0B1120] text-slate-300
       border-r border-slate-800/50 shadow-2xl transition-all duration-300 flex flex-col
       ${collapsed ? "w-20" : "w-72"}`}
     >
@@ -48,7 +48,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
         {ADMIN_MENU.map((group, idx) => (
           <div key={idx}>
             {!collapsed && (
-              <p className="text-[10px] font-bold text-slate-500 uppercase mb-3 px-3 tracking-wider">
+              <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 px-3 tracking-wider">
                 {group.group}
               </p>
             )}
@@ -69,7 +69,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
                     ${
                       active
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30"
-                        : "hover:bg-slate-800/50 hover:text-slate-100"
+                        : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
                     }
                     ${collapsed ? "justify-center" : ""}`}
                   >
@@ -105,7 +105,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
               <p className="text-xs font-bold text-slate-200 truncate">
                 System Admin
               </p>
-              <p className="text-[10px] text-slate-500 truncate">v2.0.5</p>
+              <p className="text-[10px] text-slate-400 truncate">v2.0.5</p>
             </div>
           )}
         </div>
@@ -171,27 +171,27 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-neutral-100 font-sans text-gray-800">
+    <div className="min-h-screen bg-white font-sans text-slate-900">
       {/* Sidebar */}
       <AdminSidebar collapsed={collapsed} />
 
       <div
-        className={`min-h-screen transition-all duration-300 flex flex-col bg-neutral-50
-        shadow-[-6px_0_20px_rgba(0,0,0,0.04)]
+        className={`min-h-screen transition-all duration-300 flex flex-col bg-white
+        shadow-[-8px_0_24px_rgba(15,23,42,0.06)]
         ${collapsed ? "ml-20" : "ml-72"}`}
       >
-        <header className="h-16 sticky top-0 z-40 bg-neutral-50 border-b border-neutral-200/90 px-6 flex items-center justify-between transition-all">
+        <header className="h-16 sticky top-0 z-40 bg-white border-b border-slate-200/90 px-6 flex items-center justify-between transition-all">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-2 -ml-2 rounded-xl text-neutral-700 transition active:scale-95
-              shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] bg-neutral-200/80 hover:bg-neutral-200"
+              className="p-2 -ml-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition active:scale-95
+              shadow-sm hover:bg-blue-50 hover:text-blue-700"
               title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
             >
               <Menu size={20} />
             </button>
             <div className="hidden md:block">
-              <h1 className="text-lg font-bold text-gray-800">
+              <h1 className="text-lg font-bold text-slate-900">
                 {activeMenuItem?.name ?? "Tổng quan hệ thống"}
               </h1>
             </div>
@@ -200,47 +200,45 @@ export default function AdminLayout({
           <div className="flex items-center gap-6">
             <div
               className="hidden lg:flex items-center gap-3 px-4 py-2 rounded-xl w-80 transition-all group
-              bg-neutral-200/70 shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]
-              focus-within:shadow-[inset_4px_4px_10px_rgba(0,0,0,0.12)]"
+              border border-slate-200 bg-slate-50 shadow-sm focus-within:border-blue-300 focus-within:bg-white"
             >
               <Search
                 size={18}
-                className="text-gray-500 group-focus-within:text-blue-600/80"
+                className="text-slate-500 group-focus-within:text-blue-600"
               />
               <input
                 placeholder="Tìm kiếm..."
-                className="bg-transparent outline-none text-sm w-full font-medium text-gray-700 placeholder:text-gray-500"
+                className="bg-transparent outline-none text-sm w-full font-medium text-slate-800 placeholder:text-slate-500"
               />
             </div>
 
             <div className="flex items-center gap-3">
               <button
-                className="p-2 rounded-xl text-neutral-700 hover:text-blue-700 transition
-                bg-neutral-200/80 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] hover:shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]"
+                className="p-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition
+                shadow-sm hover:bg-blue-50 hover:text-blue-700"
               >
                 <MessageSquare size={20} />
               </button>
 
               <button
-                className="p-2 rounded-xl relative text-neutral-700 hover:text-blue-700 transition
-                bg-neutral-200/80 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] hover:shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]"
+                className="p-2 rounded-xl relative border border-slate-200 bg-slate-100 text-slate-700 transition
+                shadow-sm hover:bg-blue-50 hover:text-blue-700"
               >
                 <Bell size={20} />
-                <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-neutral-200/90 animate-pulse"></span>
+                <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-100 animate-pulse"></span>
               </button>
             </div>
 
             <div className="relative pl-4 border-l border-slate-500/15" ref={userMenuRef}>
               <button
                 onClick={() => setOpenUserMenu((v) => !v)}
-                className="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 transition
-                bg-transparent hover:bg-[#d4dce8]/80 shadow-none"
+                className="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 transition bg-transparent hover:bg-slate-100"
               >
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold text-gray-700">
+                  <p className="text-sm font-bold text-slate-800">
                     {user?.fullName || user?.name || "Admin"}
                   </p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">
                     {String(user?.role?.name || user?.role || "ADMIN")}
                   </p>
                 </div>
@@ -290,8 +288,8 @@ export default function AdminLayout({
           </div>
         </header>
 
-        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-[#dde5f2]">
-          <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500">
+        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-transparent">
+          <div className="relative z-10 mx-auto w-full rounded-[2rem] border border-transparent bg-transparent shadow-primary-card backdrop-blur animate-in fade-in duration-500">
             {children}
           </div>
         </main>

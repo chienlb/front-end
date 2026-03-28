@@ -107,7 +107,7 @@ export default function QuestionManager() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-4 md:p-6 font-sans">
+    <div className="min-h-screen bg-transparent p-4 md:p-6 font-sans rounded-[2rem]">
       <div className="w-full max-w-[1920px] mx-auto">
         {/* HEADER SECTION */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -128,7 +128,7 @@ export default function QuestionManager() {
         </div>
 
         {/* TOOLBAR (Search & Actions) */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="bg-white p-4 rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="relative w-full md:w-96">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -148,7 +148,7 @@ export default function QuestionManager() {
         </div>
 
         {/* DATA TABLE */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
               <Loader2 className="animate-spin text-blue-500" size={40} />

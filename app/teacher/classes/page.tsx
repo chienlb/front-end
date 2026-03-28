@@ -32,6 +32,9 @@ import { groupsService } from "@/services/groups.service";
 interface TeacherClass {
   _id: string;
   name: string;
+  username: string;
+  joinCode: string;
+  visibility: string;
   thumbnail?: string;
   description?: string;
   type: "COURSE" | "EXAM_PREP";
@@ -283,7 +286,7 @@ export default function TeacherClassesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res: any = await groupsService.getMyGroups({ page: 1, limit: 200 });
+      const res: any = await groupsService.getAllGroupsForTeacher();
       const payload = res?.data ?? res;
 
       const extractList = (source: any): any[] => {
@@ -311,18 +314,43 @@ export default function TeacherClassesPage() {
             ? it.isActive
             : !(statusRaw.includes("inactive") || statusRaw.includes("closed") || statusRaw === "false" || statusRaw === "0");
 
+        const members = Array.isArray(it?.members) ? it.members : [];
+        const ownerId = String(it?.owner ?? "");
+        const ownerInMembers = ownerId
+          ? members.some((m: any) => String(m) === ownerId)
+          : false;
+        const learnerCount = Math.max(0, members.length - (ownerInMembers ? 1 : 0));
+
         const studentCount = Number(
-          it?.totalMembers ?? it?.memberCount ?? it?.studentCount ?? 0,
+          it?.studentCount ??
+            it?.learnerCount ??
+            it?.totalMembers ??
+            it?.memberCount,
         );
 
         return {
           _id: String(it?._id ?? it?.id ?? `group-${idx}`),
-          name: String(it?.name ?? it?.title ?? "Nhóm học"),
-          thumbnail: String(it?.thumbnail ?? it?.image ?? ""),
+          name: String(it?.groupName ?? it?.name ?? it?.title ?? "Nhóm học"),
+          username: String(
+            it?.owner?.username ??
+              it?.owner?.fullName ??
+              it?.ownerUsername ??
+              (it?.slug ? `@${it.slug}` : `@group_${idx + 1}`),
+          ),
+          joinCode: String(it?.joinCode ?? "---"),
+          visibility: String(it?.visibility ?? "public").toLowerCase(),
+          thumbnail: String(it?.thumbnail ?? it?.avatar ?? it?.background ?? it?.image ?? ""),
           description: String(it?.description ?? ""),
           type: String(it?.type ?? "COURSE").toUpperCase() === "EXAM_PREP" ? "EXAM_PREP" : "COURSE",
           isActive,
-          students: Array(Math.max(0, Number.isFinite(studentCount) ? studentCount : 0)).fill(null),
+          students: Array(
+            Math.max(
+              0,
+              Number.isFinite(studentCount) && studentCount > 0
+                ? studentCount
+                : learnerCount,
+            ),
+          ).fill(null),
           scheduleDescription: String(it?.scheduleDescription ?? it?.schedule ?? ""),
           startDate: it?.startDate,
           endDate: it?.endDate,
@@ -576,7 +604,11 @@ export default function TeacherClassesPage() {
               {filteredClasses.map((cls) => (
                 <div
                   key={cls._id}
-                  onClick={() => router.push(`/teacher/classes/${cls._id}`)}
+                  onClick={() =>
+                    router.push(
+                      `/teacher/students?groupId=${encodeURIComponent(cls._id)}&groupName=${encodeURIComponent(cls.name)}`,
+                    )
+                  }
                   className="group bg-white rounded-3xl border border-slate-200 overflow-hidden hover:shadow-2xl hover:shadow-blue-900/10 hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer relative"
                 >
                   {/* Image Section */}
@@ -645,41 +677,41 @@ export default function TeacherClassesPage() {
                   {/* Body Section */}
                   <div className="p-5 flex-1 flex flex-col gap-4">
                     <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                        {cls.tutorId?.avatar ? (
-                          <img
-                            src={cls.tutorId.avatar}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-xs">
-                            {cls.tutorId?.fullName?.charAt(0) || "T"}
-                          </div>
-                        )}
+                      <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 overflow-hidden flex-shrink-0 flex items-center justify-center text-blue-600 font-bold text-xs">
+                        @
                       </div>
                       <div>
                         <p className="text-xs text-slate-400 font-bold uppercase">
-                          Giảng viên
+                          Username nhóm
                         </p>
                         <p className="text-sm font-bold text-slate-700">
-                          {cls.tutorId?.fullName || "Chưa phân công"}
+                          {cls.username}
                         </p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-start gap-3 text-sm text-slate-600">
-                        <Calendar
+                        <Clock
                           size={16}
                           className="text-blue-500 mt-0.5 flex-shrink-0"
                         />
                         <div>
                           <span className="block font-medium text-slate-700">
-                            Lịch học:
+                            Mã tham gia:
                           </span>{" "}
                           <span className="text-slate-500 text-xs">
-                            {cls.scheduleDescription || "Chưa cập nhật lịch"}
+                            {cls.joinCode}
                           </span>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-600">
+                        <Filter
+                          size={16}
+                          className="text-violet-500 flex-shrink-0"
+                        />
+                        <span className="font-medium">
+                          Quyền riêng tư: {cls.visibility === "public" ? "Công khai" : "Riêng tư"}
+                        </span>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-600">
                         <Users
@@ -698,7 +730,7 @@ export default function TeacherClassesPage() {
                       Cập nhật: hôm nay
                     </span>
                     <span className="text-xs font-bold text-blue-600 flex items-center gap-1 group-hover:translate-x-1 transition">
-                      Vào lớp <ArrowRight size={12} />
+                      Xem học viên <ArrowRight size={12} />
                     </span>
                   </div>
                 </div>
@@ -714,8 +746,8 @@ export default function TeacherClassesPage() {
                   <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-200">
                     <tr>
                       <th className="p-5 pl-8">Lớp học</th>
-                      <th className="p-5">Giảng viên</th>
-                      <th className="p-5">Lịch học</th>
+                      <th className="p-5">Username nhóm</th>
+                      <th className="p-5">Mã tham gia</th>
                       <th className="p-5 text-center">Học viên</th>
                       <th className="p-5">Trạng thái</th>
                       <th className="p-5 pr-8 text-right">Thao tác</th>
@@ -726,7 +758,9 @@ export default function TeacherClassesPage() {
                       <tr
                         key={cls._id}
                         onClick={() =>
-                          router.push(`/teacher/classes/${cls._id}`)
+                          router.push(
+                            `/teacher/students?groupId=${encodeURIComponent(cls._id)}&groupName=${encodeURIComponent(cls.name)}`,
+                          )
                         }
                         className="hover:bg-slate-50 transition cursor-pointer group"
                       >
@@ -758,10 +792,10 @@ export default function TeacherClassesPage() {
                           </div>
                         </td>
                         <td className="p-5 font-medium text-slate-600">
-                          {cls.tutorId?.fullName || "---"}
+                          {cls.username}
                         </td>
                         <td className="p-5 text-slate-500">
-                          {cls.scheduleDescription || "Chưa có lịch"}
+                          {cls.joinCode}
                         </td>
                         <td className="p-5 text-center font-bold text-slate-700">
                           {cls.students?.length || 0}

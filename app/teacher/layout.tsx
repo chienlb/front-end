@@ -27,7 +27,6 @@ import {
   Dumbbell,
   Database,
   ClipboardList,
-  PenTool,
   Users,
 } from "lucide-react";
 
@@ -70,11 +69,6 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           icon: Dumbbell,
         },
         {
-          name: "Bảng điểm học viên",
-          href: "/teacher/grading",
-          icon: PenTool,
-        },
-        {
           name: "Quản lý tài khoản",
           href: "/teacher/profile",
           icon: UserCog,
@@ -85,15 +79,15 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen bg-[#0F172A] text-slate-300 flex flex-col border-r border-slate-800 transition-all duration-300 ease-in-out z-50
+      className={`fixed left-0 top-0 h-screen bg-[#0D1B2A] text-slate-200 flex flex-col border-r border-slate-800 transition-all duration-300 ease-in-out z-50
       ${isCollapsed ? "w-20" : "w-72"}`}
     >
       {/* --- LOGO AREA --- */}
-      <div className="h-16 flex items-center justify-center border-b border-slate-800 shrink-0 sticky top-0 bg-[#0F172A] z-10">
+      <div className="h-16 flex items-center justify-center border-b border-slate-800 shrink-0 sticky top-0 bg-[#0D1B2A] z-10">
         <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap px-4">
           {/* Logo Icon */}
           <div
-            className={`w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 transition-all duration-300 shrink-0 ${isCollapsed ? "scale-110" : "scale-100"}`}
+            className={`w-10 h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transition-all duration-300 shrink-0 ${isCollapsed ? "scale-110" : "scale-100"}`}
           >
             <GraduationCap className="text-white" size={22} />
           </div>
@@ -103,7 +97,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             className={`transition-all duration-300 overflow-hidden ${isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"}`}
           >
             <span className="text-xl font-bold text-white tracking-tight block">
-              Smart<span className="text-blue-500">Teach</span>
+              Smart<span className="text-emerald-400">Teach</span>
             </span>
           </div>
         </div>
@@ -115,7 +109,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           <div key={idx} className="px-3">
             {/* Group Label */}
             <div
-              className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? "text-center" : "px-3"}`}
+              className={`text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? "text-center" : "px-3"}`}
             >
               {isCollapsed ? (
                 <span className="block w-6 h-[2px] bg-slate-800 mx-auto rounded-full"></span>
@@ -142,8 +136,8 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 font-medium text-sm w-full relative overflow-hidden
                         ${
                           isActive
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-                            : "hover:bg-slate-800/50 hover:text-white text-slate-400"
+                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
+                            : "hover:bg-slate-800/50 hover:text-white text-slate-300"
                         }
                         ${isCollapsed ? "justify-center" : ""}
                       `}
@@ -164,7 +158,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
                       {/* Active Indicator (Small dot for collapsed mode) */}
                       {isActive && isCollapsed && (
-                        <span className="absolute right-2 top-2 w-1.5 h-1.5 bg-blue-300 rounded-full shadow-sm"></span>
+                        <span className="absolute right-2 top-2 w-1.5 h-1.5 bg-emerald-300 rounded-full shadow-sm"></span>
                       )}
                     </div>
 
@@ -185,7 +179,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       </div>
 
       {/* --- FOOTER USER --- */}
-      <div className="p-4 border-t border-slate-800 shrink-0 bg-[#0F172A]">
+      <div className="p-4 border-t border-slate-800 shrink-0 bg-[#0D1B2A]">
         <div
           className={`bg-slate-800/40 rounded-xl transition-all duration-300 border border-slate-800/50 flex items-center ${isCollapsed ? "justify-center p-2" : "p-3 gap-3"}`}
         >
@@ -199,7 +193,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             <p className="text-xs font-bold text-white truncate">
               Smart Education
             </p>
-            <p className="text-[10px] text-slate-400 truncate">
+            <p className="text-[10px] text-slate-300 truncate">
               Phiên bản v1.0
             </p>
           </div>
@@ -219,7 +213,7 @@ export default function TeacherLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-neutral-100 font-sans text-slate-800 selection:bg-neutral-200/60">
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-neutral-200/60">
       {/* Sidebar Component */}
       <Sidebar
         isCollapsed={isCollapsed}
@@ -228,30 +222,30 @@ export default function TeacherLayout({
 
       {/* Main Content Wrapper — một nền neo thống nhất, không highlight sáng */}
       <div
-        className={`transition-all duration-300 ease-in-out min-h-screen flex flex-col bg-[#d8ebe4]
+        className={`transition-all duration-300 ease-in-out min-h-screen flex flex-col bg-white
         shadow-[-8px_0_28px_rgba(15,23,42,0.06)]
         ${isCollapsed ? "ml-20" : "ml-72"}`}
       >
         {/* Header */}
-        <header className="h-16 sticky top-0 z-40 bg-[#d8ebe4] border-b border-emerald-900/10 px-4 md:px-8 flex items-center justify-between transition-all duration-300">
+        <header className="h-16 sticky top-0 z-40 bg-white border-b border-emerald-100 px-4 md:px-8 flex items-center justify-between transition-all duration-300">
           {/* Left: Toggle Button & Breadcrumbs */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 -ml-2 text-slate-600 rounded-xl transition-colors active:scale-95
-              bg-[#cfe5da] shadow-[inset_2px_2px_6px_rgba(15,23,42,0.1)] hover:bg-[#c9dfd5]"
+              className="p-2 -ml-2 text-slate-600 rounded-xl transition-colors active:scale-95 border border-emerald-100
+              bg-emerald-50 shadow-sm hover:bg-emerald-100 hover:text-emerald-700"
               title={isCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
             >
               <Menu size={20} />
             </button>
 
-            <div className="hidden md:block h-5 w-px bg-emerald-900/12 mx-1"></div>
+            <div className="hidden md:block h-5 w-px bg-emerald-200 mx-1"></div>
 
             <div className="hidden md:block">
-              <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Hệ thống quản lý
               </h2>
-              <p className="text-sm font-bold text-slate-800 leading-none">
+              <p className="text-sm font-bold text-slate-900 leading-none">
                 Teacher Portal
               </p>
             </div>
@@ -261,39 +255,35 @@ export default function TeacherLayout({
           <div className="flex items-center gap-3 md:gap-5">
             {/* Search Box */}
             <div
-              className="hidden md:flex items-center px-3 py-2 rounded-xl transition-all w-64 group cursor-text
-              bg-[#cfe5da] shadow-[inset_3px_3px_8px_rgba(15,23,42,0.11)]
-              focus-within:shadow-[inset_4px_4px_10px_rgba(15,23,42,0.13)]"
+              className="hidden md:flex items-center px-3 py-2 rounded-xl transition-all w-64 group cursor-text border border-emerald-100
+              bg-emerald-50 shadow-sm focus-within:border-emerald-300 focus-within:bg-white"
             >
               <Search
                 size={16}
-                className="text-slate-500 group-focus-within:text-emerald-800/70 transition-colors"
+                className="text-slate-500 group-focus-within:text-emerald-700 transition-colors"
               />
               <input
                 placeholder="Tìm kiếm nhanh (Ctrl + K)"
-                className="bg-transparent border-none outline-none text-xs font-medium text-slate-700 ml-2 w-full placeholder:text-slate-500"
+                className="bg-transparent border-none outline-none text-xs font-medium text-slate-800 ml-2 w-full placeholder:text-slate-500"
               />
             </div>
 
             {/* Notification */}
             <button
-              className="relative p-2.5 rounded-xl text-slate-600 transition-colors
-              bg-[#cfe5da] shadow-[inset_2px_2px_6px_rgba(15,23,42,0.1)] hover:shadow-[inset_3px_3px_8px_rgba(15,23,42,0.12)]"
+                className="relative p-2.5 rounded-xl text-slate-600 transition-colors border border-emerald-100
+              bg-emerald-50 shadow-sm hover:bg-emerald-100 hover:text-emerald-700"
             >
               <Bell size={20} />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#cfe5da] animate-pulse"></span>
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-emerald-50 animate-pulse"></span>
             </button>
 
             {/* User Profile */}
-            <div className="flex items-center gap-3 pl-5 border-l border-emerald-900/12 cursor-pointer group">
+            <div className="flex items-center gap-3 pl-5 border-l border-emerald-200 cursor-pointer group">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-700 group-hover:text-emerald-900 transition">
+                <p className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 transition">
                   Cô Minh Anh
                 </p>
-                <span
-                  className="text-[10px] font-bold text-emerald-900/90 px-2 py-0.5 rounded-full
-                  bg-[#cfe5da] shadow-[inset_1px_1px_3px_rgba(15,23,42,0.08)]"
-                >
+                <span className="text-[10px] font-bold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100">
                   Giáo viên
                 </span>
               </div>
@@ -303,19 +293,19 @@ export default function TeacherLayout({
                   className="w-9 h-9 rounded-full ring-2 ring-emerald-900/10 shadow-[2px_2px_6px_rgba(15,23,42,0.12)] group-hover:scale-105 transition-transform"
                   alt="Avatar"
                 />
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-600 border-2 border-[#d8ebe4] rounded-full"></div>
+                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-600 border-2 border-white rounded-full"></div>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-neutral-50">
-          <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500">
+        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-transparent">
+          <div className="relative z-10 mx-auto w-full rounded-[2rem] border border-transparent bg-transparent backdrop-blur animate-in fade-in duration-500">
             {children}
           </div>
         </main>
 
-        <footer className="py-6 text-center border-t border-emerald-900/10 bg-[#d8ebe4]">
+        <footer className="py-6 text-center border-t border-emerald-900/10 bg-white">
           <p className="text-xs font-medium text-slate-400">
             © 2026 SmartKids Education System.{" "}
             <span className="hidden sm:inline opacity-70">

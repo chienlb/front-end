@@ -459,7 +459,6 @@ export default function ResourceLibraryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tiêu đề, tác giả, thể loại..."
-              placeholder="Tìm theo tiêu đề, thể loại..."
               className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-indigo-400"
             />
           </div>
