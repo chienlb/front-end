@@ -26,7 +26,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { liveClassService } from "@/services/live-class.service";
+import { groupsService } from "@/services/groups.service";
 
 // --- TYPES ---
 interface TeacherClass {
@@ -283,35 +283,63 @@ export default function TeacherClassesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Mock data nếu không có API thật
-      const mockData: TeacherClass[] = [
-        {
-          _id: "class_1",
-          name: "Tiếng Anh Giao Tiếp K12",
-          type: "COURSE",
-          isActive: true,
-          students: Array(25).fill(null),
-          tutorId: { _id: "t1", fullName: "Cô Minh Anh", avatar: "" },
-          scheduleDescription: "T2 - T4 - T6 (19:30)",
-          thumbnail:
-            "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=800&q=80",
-        },
-        {
-          _id: "class_2",
-          name: "Luyện Thi IELTS Cấp Tốc",
-          type: "EXAM_PREP",
-          isActive: false,
-          students: Array(10).fill(null),
-          tutorId: { _id: "t2", fullName: "Thầy John", avatar: "" },
-          scheduleDescription: "T7 - CN (08:00)",
-          thumbnail: "",
-        },
-      ];
-      // const classRes = await liveClassService.getAllClasses();
-      // setClasses(classRes.data || classRes);
-      setTimeout(() => setClasses(mockData), 800);
+      const res: any = await groupsService.getMyGroups({ page: 1, limit: 200 });
+      const payload = res?.data ?? res;
+
+      const extractList = (source: any): any[] => {
+        if (Array.isArray(source)) return source;
+        if (!source || typeof source !== "object") return [];
+        const keys = ["data", "items", "results", "docs", "groups", "rows"];
+        for (const key of keys) {
+          if (Array.isArray(source[key])) return source[key];
+        }
+        for (const key of ["data", "result", "payload"]) {
+          const nested = source[key];
+          if (!nested || typeof nested !== "object") continue;
+          for (const k of keys) {
+            if (Array.isArray(nested[k])) return nested[k];
+          }
+        }
+        return [];
+      };
+
+      const list = extractList(payload);
+      const mapped: TeacherClass[] = list.map((it: any, idx: number) => {
+        const statusRaw = String(it?.status ?? it?.isActive ?? "").toLowerCase();
+        const isActive =
+          typeof it?.isActive === "boolean"
+            ? it.isActive
+            : !(statusRaw.includes("inactive") || statusRaw.includes("closed") || statusRaw === "false" || statusRaw === "0");
+
+        const studentCount = Number(
+          it?.totalMembers ?? it?.memberCount ?? it?.studentCount ?? 0,
+        );
+
+        return {
+          _id: String(it?._id ?? it?.id ?? `group-${idx}`),
+          name: String(it?.name ?? it?.title ?? "Nhóm học"),
+          thumbnail: String(it?.thumbnail ?? it?.image ?? ""),
+          description: String(it?.description ?? ""),
+          type: String(it?.type ?? "COURSE").toUpperCase() === "EXAM_PREP" ? "EXAM_PREP" : "COURSE",
+          isActive,
+          students: Array(Math.max(0, Number.isFinite(studentCount) ? studentCount : 0)).fill(null),
+          scheduleDescription: String(it?.scheduleDescription ?? it?.schedule ?? ""),
+          startDate: it?.startDate,
+          endDate: it?.endDate,
+          tutorId: it?.tutorId
+            ? {
+                _id: String(it.tutorId?._id ?? ""),
+                fullName: String(it.tutorId?.fullName ?? "Giảng viên"),
+                avatar: it.tutorId?.avatar,
+              }
+            : undefined,
+        };
+      });
+
+      setClasses(mapped);
     } catch (err) {
       console.error(err);
+      setClasses([]);
     } finally {
       setLoading(false);
     }

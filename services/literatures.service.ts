@@ -43,7 +43,23 @@ export const literatureService = {
 
   // Xoá literature
   deleteLiterature: async (id: string) => {
-    return api.delete(`/literatures/${id}`);
+    try {
+      return await api.delete(`/literatures/${id}`);
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      if (status && status !== 404 && status !== 405) throw error;
+    }
+
+    const fallbackUrls = [`/literatures/delete/${id}`, `/literatures/${id}/delete`];
+    let lastError: any = null;
+    for (const url of fallbackUrls) {
+      try {
+        return await api.delete(url);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? new Error("Delete literature failed");
   },
 
   // Restore literature

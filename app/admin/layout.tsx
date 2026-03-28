@@ -171,21 +171,21 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
+    <div className="min-h-screen bg-neutral-100 font-sans text-gray-800">
       {/* Sidebar */}
       <AdminSidebar collapsed={collapsed} />
 
-      {/* Main Wrapper */}
       <div
-        className={`min-h-screen transition-all duration-300 flex flex-col
+        className={`min-h-screen transition-all duration-300 flex flex-col bg-neutral-50
+        shadow-[-6px_0_20px_rgba(0,0,0,0.04)]
         ${collapsed ? "ml-20" : "ml-72"}`}
       >
-        {/* Header */}
-        <header className="h-16 sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200 px-6 flex items-center justify-between transition-all">
+        <header className="h-16 sticky top-0 z-40 bg-neutral-50 border-b border-neutral-200/90 px-6 flex items-center justify-between transition-all">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-2 -ml-2 hover:bg-gray-100 rounded-lg text-gray-500 transition active:scale-95"
+              className="p-2 -ml-2 rounded-xl text-neutral-700 transition active:scale-95
+              shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] bg-neutral-200/80 hover:bg-neutral-200"
               title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
             >
               <Menu size={20} />
@@ -198,32 +198,43 @@ export default function AdminLayout({
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="hidden lg:flex items-center gap-3 bg-gray-100/80 hover:bg-gray-100 px-4 py-2 rounded-xl w-80 border border-transparent focus-within:border-blue-300 focus-within:bg-white transition-all group">
+            <div
+              className="hidden lg:flex items-center gap-3 px-4 py-2 rounded-xl w-80 transition-all group
+              bg-neutral-200/70 shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]
+              focus-within:shadow-[inset_4px_4px_10px_rgba(0,0,0,0.12)]"
+            >
               <Search
                 size={18}
-                className="text-gray-400 group-focus-within:text-blue-500"
+                className="text-gray-500 group-focus-within:text-blue-600/80"
               />
               <input
                 placeholder="Tìm kiếm..."
-                className="bg-transparent outline-none text-sm w-full font-medium text-gray-700"
+                className="bg-transparent outline-none text-sm w-full font-medium text-gray-700 placeholder:text-gray-500"
               />
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-blue-600 transition">
+              <button
+                className="p-2 rounded-xl text-neutral-700 hover:text-blue-700 transition
+                bg-neutral-200/80 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] hover:shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]"
+              >
                 <MessageSquare size={20} />
               </button>
 
-              <button className="p-2 hover:bg-gray-100 rounded-full relative text-gray-500 hover:text-blue-600 transition">
+              <button
+                className="p-2 rounded-xl relative text-neutral-700 hover:text-blue-700 transition
+                bg-neutral-200/80 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.08)] hover:shadow-[inset_3px_3px_8px_rgba(0,0,0,0.1)]"
+              >
                 <Bell size={20} />
-                <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-neutral-200/90 animate-pulse"></span>
               </button>
             </div>
 
-            <div className="relative pl-4 border-l border-gray-200" ref={userMenuRef}>
+            <div className="relative pl-4 border-l border-slate-500/15" ref={userMenuRef}>
               <button
                 onClick={() => setOpenUserMenu((v) => !v)}
-                className="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 hover:bg-slate-100 transition"
+                className="flex items-center gap-3 cursor-pointer rounded-xl px-2 py-1 transition
+                bg-transparent hover:bg-[#d4dce8]/80 shadow-none"
               >
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-bold text-gray-700">
@@ -240,7 +251,7 @@ export default function AdminLayout({
                       String(user?.fullName || user?.name || "Admin User"),
                     )}&background=0F172A&color=fff`
                   }
-                  className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                  className="w-10 h-10 rounded-full ring-2 ring-slate-500/15 shadow-[2px_2px_6px_rgba(15,23,42,0.12)]"
                   alt="Avatar"
                 />
                 <ChevronDown size={14} className="text-slate-500 hidden sm:block" />
@@ -279,17 +290,7 @@ export default function AdminLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 p-8 relative overflow-x-hidden">
-          {/* Background Pattern */}
-          <div
-            className="absolute inset-0 pointer-events-none z-0 opacity-40"
-            style={{
-              backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
-          ></div>
-
+        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-[#dde5f2]">
           <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500">
             {children}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -14,67 +14,116 @@ import {
   CheckSquare,
   X,
 } from "lucide-react";
+import { assignmentsService } from "@/services/assignments.service";
+import { groupsService } from "@/services/groups.service";
 
 // --- TYPES ---
 interface AssignmentTemplate {
   id: string;
   title: string;
-  type: "QUIZ" | "ESSAY" | "HOMEWORK";
-  questionCount: number;
-  duration: number;
+  type: string;
+  questionCount: number | null;
+  maxScore: number;
   createdAt: string;
   tags: string[];
   usageCount: number;
 }
 
-// --- MOCK DATA ---
-const ASSIGNMENT_TEMPLATES: AssignmentTemplate[] = [
-  {
-    id: "AS-001",
-    title: "Kiểm tra 15 phút - Unit 1 (New)",
-    type: "QUIZ",
-    questionCount: 15,
-    duration: 15,
-    createdAt: "10/11/2023",
-    tags: ["Unit 1", "Grammar"],
-    usageCount: 3,
-  },
-  {
-    id: "AS-002",
-    title: "Bài luận: My Hobby",
-    type: "ESSAY",
-    questionCount: 1,
-    duration: 45,
-    createdAt: "05/11/2023",
-    tags: ["Writing", "Unit 2"],
-    usageCount: 0,
-  },
-  {
-    id: "AS-003",
-    title: "Mid-term Test Semester 1",
-    type: "QUIZ",
-    questionCount: 50,
-    duration: 60,
-    createdAt: "01/11/2023",
-    tags: ["Midterm", "General"],
-    usageCount: 5,
-  },
-];
-
-const MY_CLASSES = [
-  { id: "C01", name: "Tiếng Anh 10A1", studentCount: 40 },
-  { id: "C02", name: "Tiếng Anh 10A2", studentCount: 38 },
-  { id: "C03", name: "Luyện thi IELTS K12", studentCount: 15 },
-];
-
 export default function AssignmentLibraryPage() {
   const router = useRouter();
 
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [templates, setTemplates] = useState<AssignmentTemplate[]>([]);
+  const [myClasses, setMyClasses] = useState<
+    Array<{ id: string; name: string; studentCount: number }>
+  >([]);
   const [showAssignModal, setShowAssignModal] =
     useState<AssignmentTemplate | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
+
+  const getCurrentUserId = (): string => {
+    try {
+      const raw = window.localStorage.getItem("currentUser");
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      return String(parsed?._id || parsed?.id || parsed?.data?._id || "");
+    } catch {
+      return "";
+    }
+  };
+
+  const extractList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    const keys = ["data", "items", "results", "docs", "assignments", "groups", "rows"];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of keys) {
+        if (Array.isArray(nested[k])) return nested[k];
+      }
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setLoadError("");
+        const userId = getCurrentUserId();
+        if (!userId) {
+          setTemplates([]);
+          setMyClasses([]);
+          return;
+        }
+
+        const [assignmentRes, groupsRes] = await Promise.all([
+          assignmentsService.getAssignmentsByUserId(userId, 1, 200),
+          groupsService.getMyGroups({ page: 1, limit: 200 }),
+        ]);
+
+        const assignmentPayload = assignmentRes?.data ?? assignmentRes;
+        const assignmentList = extractList(assignmentPayload);
+        const mappedTemplates: AssignmentTemplate[] = assignmentList.map((it: any) => ({
+          id: String(it?._id ?? it?.id ?? ""),
+          title: String(it?.title ?? it?.name ?? "Bài tập chưa đặt tên"),
+          type: String(it?.type || "quiz"),
+          questionCount: Array.isArray(it?.questions) ? it.questions.length : null,
+          maxScore: Number(it?.maxScore ?? 10) || 10,
+          createdAt: it?.createdAt
+            ? new Date(it.createdAt).toLocaleDateString("vi-VN")
+            : "—",
+          tags: Array.isArray(it?.tags) ? it.tags : [],
+          usageCount: Number(it?.totalSubmissions ?? it?.submissionCount ?? 0) || 0,
+        }));
+        setTemplates(mappedTemplates.filter((t) => t.id));
+
+        const groupsPayload = groupsRes?.data ?? groupsRes;
+        const groups = extractList(groupsPayload);
+        const mappedGroups = groups.map((g: any, idx: number) => ({
+          id: String(g?._id ?? g?.id ?? `group-${idx}`),
+          name: String(g?.name ?? g?.title ?? "Lớp học"),
+          studentCount: Number(g?.totalMembers ?? g?.memberCount ?? g?.studentCount ?? 0) || 0,
+        }));
+        setMyClasses(mappedGroups.filter((g) => g.id));
+      } catch (error: any) {
+        const msg = error?.response?.data?.message ?? error?.message;
+        setLoadError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tải dữ liệu.");
+        setTemplates([]);
+        setMyClasses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   // --- ACTIONS ---
   const handleToggleClass = (classId: string) => {
@@ -97,6 +146,12 @@ export default function AssignmentLibraryPage() {
     setSelectedClasses([]);
     setDueDate("");
   };
+
+  const filteredTemplates = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter((t) => t.title.toLowerCase().includes(q));
+  }, [templates, searchTerm]);
 
   return (
     <div className="p-8 min-h-screen bg-slate-50 font-sans">
@@ -152,7 +207,7 @@ export default function AssignmentLibraryPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {ASSIGNMENT_TEMPLATES.map((item) => (
+            {filteredTemplates.map((item) => (
               <tr
                 key={item.id}
                 className="hover:bg-slate-50/50 transition group"
@@ -183,8 +238,8 @@ export default function AssignmentLibraryPage() {
                   </div>
                 </td>
                 <td className="p-4 text-sm text-slate-600">
-                  <p>{item.questionCount} câu hỏi</p>
-                  <p className="text-xs text-slate-400">{item.duration} phút</p>
+                  <p className="capitalize font-semibold">{item.type}</p>
+                  <p className="text-xs text-slate-400">Điểm tối đa: {item.maxScore}</p>
                 </td>
                 <td className="p-4 text-sm text-slate-500">{item.createdAt}</td>
                 <td className="p-4">
@@ -225,6 +280,15 @@ export default function AssignmentLibraryPage() {
             ))}
           </tbody>
         </table>
+        {loading ? (
+          <div className="p-6 text-sm text-slate-500">Đang tải danh sách bài tập...</div>
+        ) : null}
+        {!loading && loadError ? (
+          <div className="p-6 text-sm text-red-600">{loadError}</div>
+        ) : null}
+        {!loading && !loadError && filteredTemplates.length === 0 ? (
+          <div className="p-6 text-sm text-slate-500">Không có bài tập nào.</div>
+        ) : null}
       </div>
 
       {/* 3. MODAL GIAO BÀI */}
@@ -257,7 +321,7 @@ export default function AssignmentLibraryPage() {
                   1. Chọn lớp muốn giao ({selectedClasses.length})
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {MY_CLASSES.map((cls) => (
+                  {myClasses.map((cls) => (
                     <div
                       key={cls.id}
                       onClick={() => handleToggleClass(cls.id)}

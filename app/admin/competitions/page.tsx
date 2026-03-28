@@ -618,12 +618,15 @@ export default function AdminCompetitionsPage() {
                           placeholder="Điểm"
                           className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
                         />
-                        <input
+                        <select
                           value={q.type}
                           onChange={(e) => updateQuestion(qIndex, { type: e.target.value })}
-                          placeholder="Loại câu hỏi"
-                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
-                        />
+                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400 bg-white"
+                        >
+                          <option value="multiple_choice">Trắc nghiệm (multiple_choice)</option>
+                          <option value="true_false">Đúng / Sai (true_false)</option>
+                          <option value="short_answer">Trả lời ngắn (short_answer)</option>
+                        </select>
                       </div>
                       <textarea
                         value={q.explanation || ""}

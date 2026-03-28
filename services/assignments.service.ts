@@ -13,6 +13,32 @@ const firstSuccessful = async <T,>(fns: Array<() => Promise<T>>): Promise<T> => 
 };
 
 export const assignmentsService = {
+  createAssignment: async (payload: {
+    title: string;
+    description?: string;
+    type: string;
+    lessonId: string;
+    classId: string;
+    dueDate: string;
+    maxScore: number;
+    isPublished: boolean;
+    file?: File | null;
+  }) => {
+    const formData = new FormData();
+    formData.append("title", payload.title.trim());
+    formData.append("description", (payload.description || "").trim());
+    formData.append("type", payload.type.trim());
+    formData.append("lessonId", payload.lessonId.trim());
+    formData.append("classId", payload.classId.trim());
+    formData.append("dueDate", payload.dueDate);
+    formData.append("maxScore", String(payload.maxScore));
+    formData.append("isPublished", String(Boolean(payload.isPublished)));
+    if (payload.file) formData.append("file", payload.file);
+    return api.post("/assignments", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
   uploadFile: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -113,6 +139,81 @@ export const assignmentsService = {
   getAssignmentById: async (assignmentId: string) => {
     const id = assignmentId.trim();
     return api.get(`/assignments/${id}`);
+  },
+
+  // ---- SUBMISSIONS APIs ----
+  createSubmission: async (payload: {
+    assignmentId: string;
+    studentId: string;
+    status?: string;
+    score?: number;
+    feedback?: string;
+    submittedAt?: string;
+    files?: File[];
+    studentAnswers?: Record<string, any>;
+    attachments?: string[];
+  }) => {
+    const formData = new FormData();
+    formData.append("assignmentId", payload.assignmentId.trim());
+    formData.append("studentId", payload.studentId.trim());
+    if (payload.status) formData.append("status", payload.status);
+    if (payload.score != null) formData.append("score", String(payload.score));
+    if (payload.feedback) formData.append("feedback", payload.feedback);
+    if (payload.submittedAt) formData.append("submittedAt", payload.submittedAt);
+    if (payload.studentAnswers) {
+      formData.append("studentAnswers", JSON.stringify(payload.studentAnswers));
+    }
+    if (payload.attachments?.length) {
+      formData.append("attachments", JSON.stringify(payload.attachments));
+    }
+    (payload.files || []).forEach((f) => formData.append("files", f));
+    return api.post("/submissions", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  getSubmissionById: async (submissionId: string) => {
+    return api.get(`/submissions/${encodeURIComponent(submissionId.trim())}`);
+  },
+
+  getSubmissionsByAssignmentId: async (assignmentId: string) => {
+    return api.get(
+      `/submissions/assignment/${encodeURIComponent(assignmentId.trim())}`,
+    );
+  },
+
+  getSubmissionsByStudentId: async (studentId: string) => {
+    return api.get(`/submissions/student/${encodeURIComponent(studentId.trim())}`);
+  },
+
+  updateSubmission: async (submissionId: string, data: any) => {
+    return api.put(`/submissions/${encodeURIComponent(submissionId.trim())}`, data);
+  },
+
+  deleteSubmission: async (submissionId: string) => {
+    return api.delete(`/submissions/${encodeURIComponent(submissionId.trim())}`);
+  },
+
+  gradeSubmission: async (
+    submissionId: string,
+    payload: { gradedBy: string; score: number; feedback?: string },
+  ) => {
+    return api.put(
+      `/submissions/${encodeURIComponent(submissionId.trim())}/grade`,
+      payload,
+    );
+  },
+
+  // API cuối lấy điểm theo assignment (graded submissions).
+  // Vì snippet backend chưa có decorator route cho method này,
+  // thử nhiều biến thể endpoint để tương thích.
+  getGradedSubmissionsByAssignmentId: async (assignmentId: string) => {
+    const id = encodeURIComponent(assignmentId.trim());
+    return firstSuccessful([
+      () => api.get(`/submissions/assignment/${id}/graded`),
+      () => api.get(`/submissions/graded/assignment/${id}`),
+      () => api.get(`/submissions/assignment/${id}?status=graded`),
+    ]);
   },
 };
 

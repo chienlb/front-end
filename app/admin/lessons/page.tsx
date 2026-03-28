@@ -32,6 +32,14 @@ type LessonRow = {
 
 type UnitOption = { id: string; name: string };
 
+type VocabWord = { word: string; definition: string; ipa?: string };
+type VocabularyContent = {
+  type: "vocabulary";
+  description: string;
+  words: VocabWord[];
+  tags?: string[];
+};
+
 export default function AdminLessonsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | LessonStatus>("ALL");
@@ -59,7 +67,6 @@ export default function AdminLessonsPage() {
     orderIndex: "1",
     duration: "30",
     isActive: "active",
-    contentJson: "",
   });
   const [lessonForm, setLessonForm] = useState({
     unitId: "",
@@ -71,147 +78,17 @@ export default function AdminLessonsPage() {
     orderIndex: "1",
     duration: "30",
     isActive: "active",
-    contentJson: "",
   });
 
-  const buildDefaultContentJson = (type: string) => {
-    const t = String(type || "").toLowerCase();
-    if (t === "vocabulary") {
-      return JSON.stringify(
-        {
-          type: "vocabulary",
-          description: "",
-          words: [{ word: "", definition: "", ipa: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "grammar") {
-      return JSON.stringify(
-        {
-          type: "grammar",
-          description: "",
-          rule: "",
-          explanation_vi: "",
-          explanation_en: "",
-          examples: [{ example: "", translation: "" }],
-          tags: [],
-          commonMistakes: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "dialogue") {
-      return JSON.stringify(
-        {
-          type: "dialogue",
-          description: "",
-          script: "",
-          audio: "",
-          translation: "",
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "reading") {
-      return JSON.stringify(
-        {
-          type: "reading",
-          description: "",
-          passage: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "exercises") {
-      return JSON.stringify(
-        {
-          type: "exercises",
-          description: "",
-          exerciseType: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "quizzes") {
-      return JSON.stringify(
-        {
-          type: "quizzes",
-          description: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "reviews") {
-      return JSON.stringify(
-        {
-          type: "reviews",
-          description: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "summaries") {
-      return JSON.stringify(
-        {
-          type: "summaries",
-          description: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "games") {
-      return JSON.stringify(
-        {
-          type: "games",
-          description: "",
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    if (t === "songs") {
-      return JSON.stringify(
-        {
-          type: "songs",
-          description: "",
-          lyrics: "",
-          translation: "",
-          audio: "",
-          video: "",
-          vocabulary: [{ word: "", definition: "", ipa: "", image: "", audio: "" }],
-          questionsAndAnswers: [{ question: "", answer: "" }],
-          tags: [],
-        },
-        null,
-        2,
-      );
-    }
-    // fallback (backend expects union object)
-    return JSON.stringify({ type: t || "vocabulary", description: "" }, null, 2);
-  };
+  const defaultVocabularyContent = (): VocabularyContent => ({
+    type: "vocabulary",
+    description: "",
+    words: [{ word: "", definition: "", ipa: "" }],
+    tags: [],
+  });
+
+  const [createContent, setCreateContent] = useState<VocabularyContent>(defaultVocabularyContent());
+  const [editContent, setEditContent] = useState<VocabularyContent>(defaultVocabularyContent());
 
   const fetchLessons = async () => {
     try {
@@ -225,14 +102,17 @@ export default function AdminLessonsPage() {
           : [];
 
       const mapped: LessonRow[] = list.map((l) => {
-        const statusRaw = String(l?.isActive ?? "").toLowerCase();
+        // Backend có thể trả `isActive` kiểu enum string ("active"/"inactive")
+        // hoặc trả ở field `status`. Ưu tiên lấy đúng dữ liệu thay vì default "" -> active.
+        const statusRaw = String(l?.isActive ?? l?.status ?? "").toLowerCase();
         const lessonStatus: LessonStatus =
-          statusRaw === "active" ||
-          statusRaw === "true" ||
-          statusRaw === "1" ||
-          statusRaw === ""
-            ? "ACTIVE"
-            : "INACTIVE";
+          statusRaw === "inactive" ||
+          statusRaw === "blocked" ||
+          statusRaw === "deleted" ||
+          statusRaw === "false" ||
+          statusRaw === "0"
+            ? "INACTIVE"
+            : "ACTIVE";
         const updatedIso = l?.updatedAt || l?.createdAt || "";
         const unitId = String(
           l?.unitId?._id || l?.unitId?.id || l?.unit?._id || l?.unit?.id || l?.unitId || "",
@@ -289,12 +169,8 @@ export default function AdminLessonsPage() {
   }, []);
 
   useEffect(() => {
-    setLessonForm((p) =>
-      p.contentJson?.trim()
-        ? p
-        : { ...p, contentJson: buildDefaultContentJson(p.type) },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // ensure defaults for create form content
+    setCreateContent(defaultVocabularyContent());
   }, []);
 
   const resetLessonForm = () => {
@@ -308,8 +184,8 @@ export default function AdminLessonsPage() {
       orderIndex: "1",
       duration: "30",
       isActive: "active",
-      contentJson: buildDefaultContentJson("vocabulary"),
     });
+    setCreateContent(defaultVocabularyContent());
     setThumbnailFile(null);
     setCreateError("");
     setCreateSuccess("");
@@ -327,8 +203,8 @@ export default function AdminLessonsPage() {
       orderIndex: "1",
       duration: "30",
       isActive: "active",
-      contentJson: buildDefaultContentJson("vocabulary"),
     });
+    setEditContent(defaultVocabularyContent());
     setEditThumbnailFile(null);
     setEditError("");
   };
@@ -342,30 +218,55 @@ export default function AdminLessonsPage() {
       setCreateError("Vui lòng nhập tiêu đề bài học.");
       return;
     }
+    if (lessonForm.type !== "vocabulary") {
+      setCreateError("Hiện tại form chỉ hỗ trợ content dạng Từ vựng (vocabulary).");
+      return;
+    }
     try {
       setCreating(true);
       setCreateError("");
       setCreateSuccess("");
 
-      const fd = new FormData();
-      fd.append("unit", lessonForm.unitId.trim());
-      fd.append("title", lessonForm.title.trim());
-      fd.append("description", lessonForm.description.trim());
-      fd.append("type", String(lessonForm.type || "").toLowerCase());
-      fd.append("level", lessonForm.level);
-      fd.append("orderIndex", lessonForm.orderIndex || "0");
-      fd.append("estimatedDuration", lessonForm.duration || "0");
-      fd.append("skillFocus", String(lessonForm.skillFocus || "").toLowerCase());
-      fd.append("isActive", lessonForm.isActive);
-      if (thumbnailFile) fd.append("thumbnail", thumbnailFile);
-      fd.append(
-        "content",
-        lessonForm.contentJson?.trim()
-          ? lessonForm.contentJson
-          : buildDefaultContentJson(lessonForm.type),
-      );
+      const contentObj: VocabularyContent = {
+        ...createContent,
+        type: "vocabulary",
+        words: (createContent.words || []).filter(
+          (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
+        ),
+      };
+      if (!contentObj.words.length) {
+        setCreateError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
+        return;
+      }
 
-      await lessonService.createLesson(fd);
+      if (thumbnailFile) {
+        const fd = new FormData();
+        fd.append("unit", lessonForm.unitId.trim());
+        fd.append("title", lessonForm.title.trim());
+        fd.append("description", lessonForm.description.trim());
+        fd.append("type", "vocabulary");
+        fd.append("level", lessonForm.level);
+        fd.append("orderIndex", lessonForm.orderIndex || "0");
+        fd.append("estimatedDuration", lessonForm.duration || "0");
+        fd.append("skillFocus", "vocabulary");
+        fd.append("isActive", lessonForm.isActive);
+        fd.append("thumbnail", thumbnailFile);
+        fd.append("content", JSON.stringify(contentObj));
+        await lessonService.createLesson(fd);
+      } else {
+        await lessonService.createLesson({
+          unit: lessonForm.unitId.trim(),
+          title: lessonForm.title.trim(),
+          description: lessonForm.description.trim(),
+          type: "vocabulary",
+          level: lessonForm.level,
+          orderIndex: Number(lessonForm.orderIndex || 0),
+          estimatedDuration: Number(lessonForm.duration || 0),
+          skillFocus: "vocabulary",
+          isActive: lessonForm.isActive,
+          content: contentObj,
+        } as any);
+      }
       setCreateSuccess("Tạo bài học thành công.");
       await fetchLessons();
       setTimeout(() => {
@@ -385,33 +286,66 @@ export default function AdminLessonsPage() {
   const handleDeleteLesson = async (id: string) => {
     const ok = window.confirm("Bạn có chắc muốn xóa bài học này?");
     if (!ok) return;
+    const prevLessons = lessons;
+    setLessons((prev) => prev.filter((l) => l.id !== id));
     try {
       await lessonService.deleteLesson(id);
-      await fetchLessons();
     } catch (error: any) {
+      setLessons(prevLessons);
       alert(error?.response?.data?.message || "Không thể xóa bài học.");
     }
   };
 
-  const handleOpenEdit = (row: LessonRow) => {
+  const handleOpenEdit = async (row: LessonRow) => {
     setEditError("");
     setEditThumbnailFile(null);
-    setEditForm({
-      id: row.id,
-      unitId: row.unitId || "",
-      title: row.name || "",
-      description: row.description || "",
-      type: row.type && row.type !== "N/A" ? row.type : "vocabulary",
-      level: "A1",
-      skillFocus: "vocabulary",
-      orderIndex: String(row.orderIndex ?? 0),
-      duration: String(row.duration ?? 0),
-      isActive: row.status === "ACTIVE" ? "active" : "inactive",
-      contentJson: buildDefaultContentJson(
-        row.type && row.type !== "N/A" ? row.type : "vocabulary",
-      ),
-    });
-    setOpenEdit(true);
+    try {
+      const res: any = await lessonService.getLessonById(row.id);
+      const detail = res?.data ?? res;
+
+      const rawContent = detail?.content && typeof detail.content === "object" ? detail.content : null;
+      const rawWords = Array.isArray(rawContent?.words) ? rawContent.words : [];
+      const mappedWords: VocabWord[] = rawWords
+        .map((w: any) => ({
+          word: String(w?.word || ""),
+          definition: String(w?.definition || ""),
+          ipa: String(w?.ipa || ""),
+        }))
+        .filter((w: VocabWord) => w.word || w.definition || w.ipa);
+
+      setEditForm({
+        id: row.id,
+        unitId: String(
+          detail?.unit?._id ||
+            detail?.unit?.id ||
+            detail?.unitId?._id ||
+            detail?.unitId?.id ||
+            detail?.unit ||
+            detail?.unitId ||
+            row.unitId ||
+            "",
+        ),
+        title: String(detail?.title || detail?.name || row.name || ""),
+        description: String(detail?.description || row.description || ""),
+        type: String(detail?.type || row.type || "vocabulary"),
+        level: String(detail?.level || "A1"),
+        skillFocus: String(detail?.skillFocus || "vocabulary"),
+        orderIndex: String(detail?.orderIndex ?? row.orderIndex ?? 0),
+        duration: String(detail?.estimatedDuration ?? detail?.duration ?? row.duration ?? 0),
+        isActive: String(detail?.isActive || (row.status === "ACTIVE" ? "active" : "inactive")).toLowerCase(),
+      });
+
+      setEditContent({
+        type: "vocabulary",
+        description: String(rawContent?.description || detail?.description || ""),
+        words: mappedWords.length ? mappedWords : [{ word: "", definition: "", ipa: "" }],
+        tags: Array.isArray(rawContent?.tags) ? rawContent.tags : [],
+      });
+      setOpenEdit(true);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      alert(Array.isArray(msg) ? msg.join(", ") : msg || "Không tải được chi tiết bài học.");
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -424,29 +358,54 @@ export default function AdminLessonsPage() {
       setEditError("Vui lòng nhập tiêu đề bài học.");
       return;
     }
+    if (editForm.type !== "vocabulary") {
+      setEditError("Hiện tại form chỉ hỗ trợ content dạng Từ vựng (vocabulary).");
+      return;
+    }
     try {
       setSavingEdit(true);
       setEditError("");
 
-      const fd = new FormData();
-      fd.append("unit", editForm.unitId.trim());
-      fd.append("title", editForm.title.trim());
-      fd.append("description", editForm.description.trim());
-      fd.append("type", String(editForm.type || "").toLowerCase());
-      fd.append("level", editForm.level);
-      fd.append("orderIndex", editForm.orderIndex || "0");
-      fd.append("estimatedDuration", editForm.duration || "0");
-      fd.append("skillFocus", String(editForm.skillFocus || "").toLowerCase());
-      fd.append("isActive", editForm.isActive);
-      if (editThumbnailFile) fd.append("thumbnail", editThumbnailFile);
-      fd.append(
-        "content",
-        editForm.contentJson?.trim()
-          ? editForm.contentJson
-          : buildDefaultContentJson(editForm.type),
-      );
+      const contentObj: VocabularyContent = {
+        ...editContent,
+        type: "vocabulary",
+        words: (editContent.words || []).filter(
+          (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
+        ),
+      };
+      if (!contentObj.words.length) {
+        setEditError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
+        return;
+      }
 
-      await lessonService.updateLesson(editForm.id, fd);
+      if (editThumbnailFile) {
+        const fd = new FormData();
+        fd.append("unit", editForm.unitId.trim());
+        fd.append("title", editForm.title.trim());
+        fd.append("description", editForm.description.trim());
+        fd.append("type", "vocabulary");
+        fd.append("level", editForm.level);
+        fd.append("orderIndex", editForm.orderIndex || "0");
+        fd.append("estimatedDuration", editForm.duration || "0");
+        fd.append("skillFocus", "vocabulary");
+        fd.append("isActive", editForm.isActive);
+        fd.append("thumbnail", editThumbnailFile);
+        fd.append("content", JSON.stringify(contentObj));
+        await lessonService.updateLesson(editForm.id, fd);
+      } else {
+        await lessonService.updateLesson(editForm.id, {
+          unit: editForm.unitId.trim(),
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          type: "vocabulary",
+          level: editForm.level,
+          orderIndex: Number(editForm.orderIndex || 0),
+          estimatedDuration: Number(editForm.duration || 0),
+          skillFocus: "vocabulary",
+          isActive: editForm.isActive,
+          content: contentObj,
+        });
+      }
       setOpenEdit(false);
       resetEditForm();
       await fetchLessons();
@@ -696,7 +655,6 @@ export default function AdminLessonsPage() {
                           ...p,
                           type: e.target.value,
                           skillFocus: e.target.value,
-                          contentJson: buildDefaultContentJson(e.target.value),
                         }))
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
@@ -753,17 +711,93 @@ export default function AdminLessonsPage() {
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     />
                   </div>
-                  <label className="text-xs font-bold text-slate-600">
-                    Content (JSON) *
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="text-xs font-bold text-slate-600 mb-2">
+                      Content (Từ vựng)
+                    </div>
                     <textarea
-                      value={lessonForm.contentJson}
+                      value={createContent.description}
                       onChange={(e) =>
-                        setLessonForm((p) => ({ ...p, contentJson: e.target.value }))
+                        setCreateContent((c) => ({ ...c, description: e.target.value }))
                       }
-                      placeholder="Nội dung lesson theo schema backend (JSON)"
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-40 font-mono"
+                      placeholder="Mô tả (tuỳ chọn)"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
                     />
-                  </label>
+                    <div className="mt-3 space-y-2">
+                      {createContent.words.map((w, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                          <input
+                            value={w.word}
+                            onChange={(e) =>
+                              setCreateContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, word: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="word"
+                            className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <input
+                            value={w.definition}
+                            onChange={(e) =>
+                              setCreateContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, definition: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="definition"
+                            className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <input
+                            value={w.ipa || ""}
+                            onChange={(e) =>
+                              setCreateContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, ipa: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="ipa"
+                            className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <div className="sm:col-span-6 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCreateContent((c) => ({
+                                  ...c,
+                                  words:
+                                    c.words.length <= 1
+                                      ? c.words
+                                      : c.words.filter((_, i) => i !== idx),
+                                }))
+                              }
+                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                            >
+                              Xóa dòng
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCreateContent((c) => ({
+                            ...c,
+                            words: [...c.words, { word: "", definition: "", ipa: "" }],
+                          }))
+                        }
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                      >
+                        + Thêm từ
+                      </button>
+                    </div>
+                  </div>
                   <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
                     <span className="text-xs font-semibold text-slate-600">
                       Ảnh đại diện (tuỳ chọn)
@@ -869,7 +903,6 @@ export default function AdminLessonsPage() {
                           ...p,
                           type: e.target.value,
                           skillFocus: e.target.value,
-                          contentJson: buildDefaultContentJson(e.target.value),
                         }))
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
@@ -926,17 +959,93 @@ export default function AdminLessonsPage() {
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     />
                   </div>
-                  <label className="text-xs font-bold text-slate-600">
-                    Content (JSON) *
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="text-xs font-bold text-slate-600 mb-2">
+                      Content (Từ vựng)
+                    </div>
                     <textarea
-                      value={editForm.contentJson}
+                      value={editContent.description}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, contentJson: e.target.value }))
+                        setEditContent((c) => ({ ...c, description: e.target.value }))
                       }
-                      placeholder="Nội dung lesson theo schema backend (JSON)"
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-40 font-mono"
+                      placeholder="Mô tả (tuỳ chọn)"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
                     />
-                  </label>
+                    <div className="mt-3 space-y-2">
+                      {editContent.words.map((w, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                          <input
+                            value={w.word}
+                            onChange={(e) =>
+                              setEditContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, word: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="word"
+                            className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <input
+                            value={w.definition}
+                            onChange={(e) =>
+                              setEditContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, definition: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="definition"
+                            className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <input
+                            value={w.ipa || ""}
+                            onChange={(e) =>
+                              setEditContent((c) => ({
+                                ...c,
+                                words: c.words.map((x, i) =>
+                                  i === idx ? { ...x, ipa: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            placeholder="ipa"
+                            className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                          />
+                          <div className="sm:col-span-6 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditContent((c) => ({
+                                  ...c,
+                                  words:
+                                    c.words.length <= 1
+                                      ? c.words
+                                      : c.words.filter((_, i) => i !== idx),
+                                }))
+                              }
+                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                            >
+                              Xóa dòng
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditContent((c) => ({
+                            ...c,
+                            words: [...c.words, { word: "", definition: "", ipa: "" }],
+                          }))
+                        }
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                      >
+                        + Thêm từ
+                      </button>
+                    </div>
+                  </div>
                   <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
                     <span className="text-xs font-semibold text-slate-600">
                       Cập nhật ảnh đại diện (tuỳ chọn)

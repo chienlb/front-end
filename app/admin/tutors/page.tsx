@@ -14,14 +14,29 @@ import {
   Filter,
   Loader2,
   MoreVertical,
+  Eye,
+  EyeOff,
+  Sparkles,
+  KeyRound,
 } from "lucide-react";
-import { liveService } from "@/services/live.service";
 import { userService } from "@/services/user.service";
+import { authService } from "@/services/auth.service";
 
 export default function TutorManager() {
   const [tutors, setTutors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordStrength = (pw: string) => {
+    const s = String(pw || "");
+    let score = 0;
+    if (s.length >= 6) score++;
+    if (/[A-Z]/.test(s)) score++;
+    if (/[0-9]/.test(s)) score++;
+    if (/[^a-zA-Z0-9]/.test(s)) score++;
+    return score; // 0..4
+  };
   const [searchTerm, setSearchTerm] = useState("");
 
   // Modal State
@@ -67,6 +82,8 @@ export default function TutorManager() {
   // --- 2. HANDLERS ---
   const handleOpenCreate = () => {
     setIsEditing(false);
+    setFormError("");
+    setShowPassword(false);
     setFormData({
       fullName: "",
       email: "",
@@ -79,6 +96,8 @@ export default function TutorManager() {
 
   const handleOpenEdit = (tutor: any) => {
     setIsEditing(true);
+    setFormError("");
+    setShowPassword(false);
     setCurrentId(String(tutor._id || tutor.id || ""));
     setFormData({
       fullName: tutor.fullName || "",
@@ -93,23 +112,38 @@ export default function TutorManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.email)
-      return alert("Vui lòng nhập đủ thông tin!");
+      return setFormError("Vui lòng nhập đủ Họ tên và Email.");
 
     setSubmitting(true);
     try {
+      setFormError("");
       if (isEditing && currentId) {
         const { password, ...updateData } = formData;
-        await liveService.updateTutor(currentId, updateData);
-        alert("Cập nhật thành công!");
+        await userService.updateUser(currentId, updateData);
       } else {
-        if (!formData.password) return alert("Vui lòng nhập mật khẩu!");
-        await liveService.createTutor(formData);
-        alert("Tạo gia sư thành công!");
+        if (!formData.password) {
+          setFormError("Vui lòng nhập mật khẩu.");
+          return;
+        }
+        const username = String(formData.email || "")
+          .split("@")[0]
+          ?.replace(/[^a-zA-Z0-9_.-]/g, "")
+          .slice(0, 24);
+        await authService.register({
+          fullname: formData.fullName,
+          username: username || `teacher_${Date.now()}`,
+          email: formData.email,
+          password: formData.password,
+          role: "teacher",
+          typeAccount: "email",
+          phone: formData.phone || undefined,
+        });
       }
       setIsModalOpen(false);
       fetchTutors();
-    } catch (error) {
-      alert("Có lỗi xảy ra!");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setFormError(Array.isArray(msg) ? msg.join(", ") : msg || "Có lỗi xảy ra!");
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +152,7 @@ export default function TutorManager() {
   const handleDelete = async (id: string) => {
     if (confirm("Bạn có chắc chắn muốn xóa Gia sư này?")) {
       try {
-        await liveService.deleteTutor(id);
+        await userService.deleteUser(id);
         fetchTutors();
       } catch (error) {
         alert("Lỗi khi xóa gia sư");
@@ -286,11 +320,17 @@ export default function TutorManager() {
       {/* --- MODAL FORM --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="font-black text-lg text-slate-800">
-                {isEditing ? "Cập nhật thông tin" : "Thêm Gia sư Mới"}
-              </h2>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-[linear-gradient(135deg,#EFF6FF_0%,#FFFFFF_55%,#F5F3FF_100%)]">
+              <div>
+                <h2 className="font-black text-lg text-slate-900 flex items-center gap-2">
+                  <Sparkles size={16} className="text-violet-500" />
+                  {isEditing ? "Cập nhật giáo viên" : "Thêm giáo viên mới"}
+                </h2>
+                <p className="text-xs text-slate-500 font-semibold">
+                  {isEditing ? "Cập nhật thông tin cơ bản" : "Tạo tài khoản giáo viên bằng email"}
+                </p>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-red-500 transition p-1 hover:bg-white rounded-full"
@@ -303,13 +343,18 @@ export default function TutorManager() {
               onSubmit={handleSubmit}
               className="p-6 space-y-5 overflow-y-auto"
             >
+              {formError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                  {formError}
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">
                     Họ và tên <span className="text-red-500">*</span>
                   </label>
                   <input
-                    className="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
+                    className="w-full border border-slate-200 p-3 rounded-2xl text-sm focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
                     placeholder="VD: Nguyễn Văn A"
                     value={formData.fullName}
                     onChange={(e) =>
@@ -323,7 +368,7 @@ export default function TutorManager() {
                     Số điện thoại
                   </label>
                   <input
-                    className="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
+                    className="w-full border border-slate-200 p-3 rounded-2xl text-sm focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
                     placeholder="09xxx..."
                     value={formData.phone}
                     onChange={(e) =>
@@ -339,7 +384,7 @@ export default function TutorManager() {
                 </label>
                 <input
                   type="email"
-                  className="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium text-slate-700 transition disabled:bg-slate-100 disabled:text-slate-500"
+                  className="w-full border border-slate-200 p-3 rounded-2xl text-sm focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none font-medium text-slate-700 transition disabled:bg-slate-100 disabled:text-slate-500"
                   placeholder="email@example.com"
                   value={formData.email}
                   onChange={(e) =>
@@ -355,16 +400,54 @@ export default function TutorManager() {
                   <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">
                     Mật khẩu <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    className="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
-                    placeholder="Nhập mật khẩu..."
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    required
-                  />
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <KeyRound size={16} />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
+                      placeholder="Nhập mật khẩu..."
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                      title={showPassword ? "Ẩn" : "Hiện"}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          passwordStrength(formData.password) <= 1
+                            ? "bg-red-400"
+                            : passwordStrength(formData.password) === 2
+                              ? "bg-amber-400"
+                              : passwordStrength(formData.password) === 3
+                                ? "bg-blue-400"
+                                : "bg-green-500"
+                        }`}
+                        style={{ width: `${(passwordStrength(formData.password) / 4) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500">
+                      {passwordStrength(formData.password) <= 1
+                        ? "Yếu"
+                        : passwordStrength(formData.password) === 2
+                          ? "Vừa"
+                          : passwordStrength(formData.password) === 3
+                            ? "Khá"
+                            : "Mạnh"}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -373,7 +456,7 @@ export default function TutorManager() {
                   Link Avatar (URL)
                 </label>
                 <input
-                  className="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
+                  className="w-full border border-slate-200 p-3 rounded-2xl text-sm focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none font-medium text-slate-700 transition"
                   placeholder="https://..."
                   value={formData.avatar}
                   onChange={(e) =>
@@ -381,19 +464,37 @@ export default function TutorManager() {
                   }
                 />
               </div>
+              {(formData.avatar || "").trim() ? (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <img
+                    src={formData.avatar}
+                    className="w-12 h-12 rounded-full border border-slate-200 object-cover bg-white"
+                    alt="avatar preview"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  <div className="text-sm">
+                    <div className="font-bold text-slate-800">Preview avatar</div>
+                    <div className="text-xs text-slate-500 truncate max-w-[420px]">
+                      {formData.avatar}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition text-sm"
+                  className="px-5 py-2.5 text-slate-700 font-bold hover:bg-slate-100 rounded-2xl transition text-sm border border-slate-200"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition disabled:opacity-70 flex items-center gap-2"
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition disabled:opacity-70 flex items-center gap-2"
                 >
                   {submitting && <Loader2 size={16} className="animate-spin" />}
                   {isEditing ? "Lưu thay đổi" : "Tạo tài khoản"}

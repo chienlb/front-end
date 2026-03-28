@@ -45,12 +45,49 @@ export const lessonService = {
 
   // Cập nhật lesson
   updateLesson: async (id: string, data: any) => {
-    return api.patch(`/lessons/${id}`, data);
+    const isFormData =
+      typeof FormData !== "undefined" &&
+      data &&
+      typeof data === "object" &&
+      data instanceof FormData;
+    const config = isFormData
+      ? {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      : undefined;
+
+    try {
+      return await api.patch(`/lessons/${id}`, data, config as any);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        try {
+          return await api.put(`/lessons/update/${id}`, data, config as any);
+        } catch {
+          return api.put(`/lessons/${id}/update`, data, config as any);
+        }
+      }
+      throw err;
+    }
   },
 
   // Xóa lesson
   deleteLesson: async (id: string) => {
-    return api.delete(`/lessons/${id}`);
+    try {
+      return await api.delete(`/lessons/${id}`);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        try {
+          return await api.delete(`/lessons/delete/${id}`);
+        } catch {
+          return api.delete(`/lessons/${id}/delete`);
+        }
+      }
+      throw err;
+    }
   },
 
   // Restore lesson

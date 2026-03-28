@@ -16,6 +16,8 @@ import {
 import { Question, AssignmentInfo } from "./types";
 import QuestionItem from "./QuestionItem";
 import PreviewModal from "./PreviewModal";
+import { groupsService } from "@/services/groups.service";
+import { assignmentsService } from "@/services/assignments.service";
 
 interface AssignmentEditorProps {
   initialData?: {
@@ -32,6 +34,18 @@ export default function AssignmentEditor({
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState("");
+  const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [createForm, setCreateForm] = useState({
+    type: "reading",
+    lessonId: "",
+    classId: "",
+    dueDate: "",
+    maxScore: 100,
+    isPublished: true,
+    file: null as File | null,
+  });
 
   // --- STATE ---
   const [assignmentInfo, setAssignmentInfo] = useState<AssignmentInfo>({
@@ -59,6 +73,41 @@ export default function AssignmentEditor({
       setQuestions(initialData.questions);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    const fetchGroups = async () => {
+      try {
+        const res: any = await groupsService.getMyGroups({ page: 1, limit: 200 });
+        const payload = res?.data ?? res;
+        const extractList = (source: any): any[] => {
+          if (Array.isArray(source)) return source;
+          if (!source || typeof source !== "object") return [];
+          const keys = ["data", "items", "results", "docs", "groups", "rows"];
+          for (const key of keys) {
+            if (Array.isArray(source[key])) return source[key];
+          }
+          for (const key of ["data", "result", "payload"]) {
+            const nested = source[key];
+            if (!nested || typeof nested !== "object") continue;
+            for (const k of keys) {
+              if (Array.isArray(nested[k])) return nested[k];
+            }
+          }
+          return [];
+        };
+        const list = extractList(payload);
+        const mapped = list.map((it: any, idx: number) => ({
+          id: String(it?._id ?? it?.id ?? `group-${idx}`),
+          name: String(it?.name ?? it?.title ?? "Nhóm học"),
+        }));
+        setClasses(mapped);
+      } catch {
+        setClasses([]);
+      }
+    };
+    fetchGroups();
+  }, [mode]);
 
   // --- COMPUTED VALUES ---
   const totalPoints = useMemo(() => {
@@ -109,22 +158,52 @@ export default function AssignmentEditor({
   };
 
   const handleSave = async () => {
-    if (!assignmentInfo.title.trim())
-      return alert("Vui lòng nhập tiêu đề bài tập!");
+    if (!assignmentInfo.title.trim()) return alert("Vui lòng nhập tiêu đề bài tập!");
 
     setIsSaving(true);
+    setSaveError("");
+    setSaveSuccess("");
 
-    // Giả lập API call
-    console.log("Saving assignment:", { info: assignmentInfo, questions });
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Fake delay
+    try {
+      if (mode === "create") {
+        if (!createForm.lessonId.trim()) {
+          setSaveError("Vui lòng nhập Lesson ID.");
+          return;
+        }
+        if (!createForm.classId.trim()) {
+          setSaveError("Vui lòng chọn lớp học.");
+          return;
+        }
+        if (!createForm.dueDate) {
+          setSaveError("Vui lòng chọn hạn nộp.");
+          return;
+        }
 
-    setIsSaving(false);
-    alert(
-      mode === "create"
-        ? "Đã tạo bài tập mới thành công!"
-        : "Đã cập nhật bài tập!",
-    );
-    router.push("/teacher/assignments");
+        await assignmentsService.createAssignment({
+          title: assignmentInfo.title,
+          description: assignmentInfo.description,
+          type: createForm.type,
+          lessonId: createForm.lessonId,
+          classId: createForm.classId,
+          dueDate: createForm.dueDate,
+          maxScore: Number(createForm.maxScore) || 0,
+          isPublished: createForm.isPublished,
+          file: createForm.file,
+        });
+        setSaveSuccess("Tạo bài tập thành công.");
+        setTimeout(() => router.push("/teacher/assignments"), 400);
+        return;
+      }
+
+      // TODO: update API cho mode edit nếu backend cung cấp endpoint.
+      alert("Đã cập nhật bài tập!");
+      router.push("/teacher/assignments");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setSaveError(Array.isArray(msg) ? msg.join(", ") : msg || "Lưu bài tập thất bại.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -190,6 +269,136 @@ export default function AssignmentEditor({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {saveError ? (
+              <div className="md:col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                {saveError}
+              </div>
+            ) : null}
+            {saveSuccess ? (
+              <div className="md:col-span-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 font-semibold">
+                {saveSuccess}
+              </div>
+            ) : null}
+
+            {mode === "create" ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Loại bài tập
+                  </label>
+                  <select
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition bg-white"
+                    value={createForm.type}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, type: e.target.value }))
+                    }
+                  >
+                    <option value="reading">Reading</option>
+                    <option value="listening">Listening</option>
+                    <option value="writing">Writing</option>
+                    <option value="speaking">Speaking</option>
+                    <option value="quiz">Quiz</option>
+                    <option value="project">Project</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Lesson ID
+                  </label>
+                  <input
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition"
+                    placeholder="Nhập lessonId"
+                    value={createForm.lessonId}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, lessonId: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Lớp học
+                  </label>
+                  <select
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
+                    value={createForm.classId}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, classId: e.target.value }))
+                    }
+                  >
+                    <option value="">Chọn lớp học</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Hạn nộp
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition"
+                    value={createForm.dueDate}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, dueDate: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Điểm tối đa
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition"
+                    value={createForm.maxScore}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({
+                        ...p,
+                        maxScore: Number(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Trạng thái
+                  </label>
+                  <select
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
+                    value={createForm.isPublished ? "true" : "false"}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({
+                        ...p,
+                        isPublished: e.target.value === "true",
+                      }))
+                    }
+                  >
+                    <option value="true">Xuất bản</option>
+                    <option value="false">Nháp</option>
+                  </select>
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    File bài tập
+                  </label>
+                  <input
+                    type="file"
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
+                    onChange={(e) =>
+                      setCreateForm((p) => ({
+                        ...p,
+                        file: e.target.files?.[0] || null,
+                      }))
+                    }
+                  />
+                </div>
+              </>
+            ) : null}
+
             {/* Description */}
             <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">

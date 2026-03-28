@@ -36,13 +36,37 @@ export default function ManagePostsPage() {
     isFeatured: false,
   });
 
+  const extractPostList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+
+    const keys = ["data", "items", "results", "docs", "posts", "rows"];
+    for (const key of keys) {
+      const v = payload[key];
+      if (Array.isArray(v)) return v;
+    }
+
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of keys) {
+        const v = nested[k];
+        if (Array.isArray(v)) return v;
+      }
+    }
+
+    return [];
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const res: any = await postService.getAllAdmin();
-      setPosts(res.data || res);
+      const payload = res?.data ?? res;
+      setPosts(extractPostList(payload));
     } catch (error) {
       console.error(error);
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -107,7 +131,7 @@ export default function ManagePostsPage() {
   };
 
   const filteredPosts = posts.filter((p) =>
-    p.title.toLowerCase().includes(searchTerm.toLowerCase()),
+    String(p?.title || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (

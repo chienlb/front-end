@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Trophy,
   Plus,
@@ -15,6 +15,7 @@ import {
 import CompetitionBuilder, {
   CompetitionData,
 } from "@/components/teacher/competitions/CompetitionBuilder";
+import { competitionService } from "@/services/competition.service";
 
 // --- TYPES ---
 type CompStatus = "UPCOMING" | "HAPPENING" | "ENDED";
@@ -39,89 +40,37 @@ interface Competition {
   topStudents?: StudentRank[];
 }
 
-// --- MOCK DATA ---
-const INITIAL_COMPETITIONS: Competition[] = [
-  {
-    id: "CP01",
-    title: "Rung Chuông Vàng - Unit 1-3",
-    type: "QUIZ",
-    startTime: "20:00, 20/11/2023",
-    endTime: "21:00, 20/11/2023",
-    participants: 45,
-    status: "UPCOMING",
-  },
-  {
-    id: "CP02",
-    title: "Thử thách Speaking: My Dream Job",
-    type: "SPEAKING",
-    startTime: "01/11/2023",
-    endTime: "07/11/2023",
-    participants: 32,
-    status: "HAPPENING",
-    topStudents: [
-      {
-        rank: 1,
-        name: "Nguyễn Văn A",
-        avatar: "https://i.pravatar.cc/150?img=11",
-        score: 95,
-        time: "45s",
-        rewarded: false,
-      },
-      {
-        rank: 2,
-        name: "Trần Thị B",
-        avatar: "https://i.pravatar.cc/150?img=5",
-        score: 92,
-        time: "50s",
-        rewarded: false,
-      },
-      {
-        rank: 3,
-        name: "Lê Văn C",
-        avatar: "https://i.pravatar.cc/150?img=3",
-        score: 88,
-        time: "55s",
-        rewarded: false,
-      },
-    ],
-  },
-  {
-    id: "CP03",
-    title: "Đua top Từ vựng Tháng 10",
-    type: "QUIZ",
-    startTime: "01/10/2023",
-    endTime: "31/10/2023",
-    participants: 120,
-    status: "ENDED",
-    topStudents: [
-      {
-        rank: 1,
-        name: "Phạm Minh D",
-        avatar: "https://i.pravatar.cc/150?img=8",
-        score: 1000,
-        rewarded: true,
-      },
-      {
-        rank: 2,
-        name: "Hoàng Yến",
-        avatar: "https://i.pravatar.cc/150?img=9",
-        score: 980,
-        rewarded: true,
-      },
-      {
-        rank: 3,
-        name: "Cao Thắng",
-        avatar: "https://i.pravatar.cc/150?img=12",
-        score: 950,
-        rewarded: true,
-      },
-    ],
-  },
-];
+function getCurrentUserId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = localStorage.getItem("currentUser");
+    if (!raw) return "";
+    const user = JSON.parse(raw);
+    return String(user?._id || user?.id || "");
+  } catch {
+    return "";
+  }
+}
+
+function isoToViText(value: unknown): string {
+  if (!value) return "—";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("vi-VN");
+}
+
+function normalizeStatus(status: string): CompStatus {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("ongoing") || s.includes("happening") || s.includes("active") || s.includes("open"))
+    return "HAPPENING";
+  if (s.includes("ended") || s.includes("closed")) return "ENDED";
+  return "UPCOMING";
+}
 
 export default function CompetitionsPage() {
-  const [competitions, setCompetitions] =
-    useState<Competition[]>(INITIAL_COMPETITIONS);
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<CompStatus | "ALL">("ALL");
   const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
 
@@ -129,29 +78,112 @@ export default function CompetitionsPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   // Filter Logic
-  const filteredList =
-    activeTab === "ALL"
-      ? competitions
-      : competitions.filter((c) => c.status === activeTab);
+  const filteredList = useMemo(() => {
+    const base =
+      activeTab === "ALL"
+        ? competitions
+        : competitions.filter((c) => c.status === activeTab);
+    const q = search.toLowerCase().trim();
+    if (!q) return base;
+    return base.filter((c) => c.title.toLowerCase().includes(q));
+  }, [competitions, activeTab, search]);
 
   // --- HANDLERS ---
   const handleAward = (studentName: string) => {
     alert(`Đã gửi phần thưởng (Huy hiệu + Điểm) cho em ${studentName}!`);
   };
 
-  const handleCreateCompetition = (data: CompetitionData) => {
-    const newComp: Competition = {
-      id: `CP${Date.now()}`,
-      title: data.title,
-      type: data.type,
-      startTime: new Date(data.startTime).toLocaleString("vi-VN"),
-      endTime: new Date(data.endTime).toLocaleString("vi-VN"),
-      participants: 0,
-      status: "UPCOMING",
-    };
+  const fetchCompetitions = async () => {
+    try {
+      setLoading(true);
+      const res: any = await competitionService.getAllCompetitions();
+      const payload = res?.data ?? res;
+      const list: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.competitions)
+            ? payload.competitions
+            : [];
 
-    setCompetitions([newComp, ...competitions]);
-    setIsCreating(false); // Đóng modal
+      const mapped: Competition[] = list.map((c) => ({
+        id: String(c?._id || c?.id || ""),
+        title: String(c?.name || c?.title || "Cuộc thi"),
+        // Map to builder types; default QUIZ
+        type: "QUIZ",
+        startTime: isoToViText(c?.startTime || c?.startAt || c?.startDate),
+        endTime: isoToViText(c?.endTime || c?.endAt || c?.endDate),
+        participants: Number(c?.totalParticipants || c?.participantsCount || c?.participants || 0),
+        status: normalizeStatus(String(c?.status || "")),
+      }));
+      setCompetitions(mapped);
+      if (selectedComp) {
+        const still = mapped.find((x) => x.id === selectedComp.id);
+        if (still) setSelectedComp(still);
+      }
+    } catch (error) {
+      console.error("Lỗi tải cuộc thi (teacher):", error);
+      setCompetitions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
+
+  const handleCreateCompetition = async (data: CompetitionData) => {
+    try {
+      const createdBy = getCurrentUserId();
+      if (!createdBy) {
+        alert("Không lấy được userId. Vui lòng đăng nhập lại.");
+        return;
+      }
+
+      const payload = {
+        name: data.title,
+        description: data.description || "",
+        type: "rank",
+        startTime: new Date(data.startTime).toISOString(),
+        endTime: new Date(data.endTime).toISOString(),
+        createdBy,
+        totalParticipants: 0,
+        status: "upcoming",
+        isPublished: true,
+        visibility: "public",
+        listQuestion:
+          data.type === "QUIZ"
+            ? data.questions.map((q) => ({
+                question: q.text,
+                options: q.options,
+                correctAnswer: q.options[q.correctIndex] ?? "",
+                score: 10,
+                type: "multiple_choice",
+              }))
+            : [],
+      };
+
+      await competitionService.createCompetition(payload);
+      setIsCreating(false);
+      await fetchCompetitions();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      alert(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tạo cuộc thi.");
+    }
+  };
+
+  const handleDeleteCompetition = async (id: string) => {
+    const ok = window.confirm("Bạn có chắc muốn xóa cuộc thi này?");
+    if (!ok) return;
+    try {
+      await competitionService.deleteCompetition(id);
+      if (selectedComp?.id === id) setSelectedComp(null);
+      await fetchCompetitions();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      alert(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể xóa cuộc thi.");
+    }
   };
 
   return (
@@ -243,12 +275,19 @@ export default function CompetitionsPage() {
               <input
                 className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400"
                 placeholder="Tìm cuộc thi..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
 
           {/* List Cards */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-20">
+            {loading ? (
+              <div className="p-10 text-center text-slate-500 col-span-full">
+                Đang tải danh sách cuộc thi...
+              </div>
+            ) : null}
             {filteredList.map((comp) => (
               <div
                 key={comp.id}
@@ -286,6 +325,21 @@ export default function CompetitionsPage() {
                     <h3 className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition mb-1">
                       {comp.title}
                     </h3>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-400">
+                        ID: {comp.id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCompetition(comp.id);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                      >
+                        Xóa
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-2">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} /> {comp.startTime}

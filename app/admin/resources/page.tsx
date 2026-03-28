@@ -107,12 +107,16 @@ export default function ResourceLibraryPage() {
   const [createSuccess, setCreateSuccess] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
+  const [comicFiles, setComicFiles] = useState<(File | null)[]>([]);
+  const [comicPreviewUrls, setComicPreviewUrls] = useState<string[]>([]);
   const [openEdit, setOpenEdit] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
   const [editCoverPreviewUrl, setEditCoverPreviewUrl] = useState<string>("");
+  const [editComicFiles, setEditComicFiles] = useState<(File | null)[]>([]);
+  const [editComicPreviewUrls, setEditComicPreviewUrls] = useState<string[]>([]);
   const [editForm, setEditForm] = useState({
     id: "",
     title: "",
@@ -121,6 +125,8 @@ export default function ResourceLibraryPage() {
     topic: "",
     contentEnglish: "",
     contentVietnamese: "",
+    audioUrl: "",
+    videoUrl: "",
     isPublished: "false",
   });
   const [litForm, setLitForm] = useState({
@@ -130,6 +136,8 @@ export default function ResourceLibraryPage() {
     topic: "",
     contentEnglish: "",
     contentVietnamese: "",
+    audioUrl: "",
+    videoUrl: "",
     isPublished: "false",
   });
 
@@ -183,6 +191,19 @@ export default function ResourceLibraryPage() {
   }, [coverFile]);
 
   useEffect(() => {
+    // revoke old urls
+    comicPreviewUrls.forEach((u) => URL.revokeObjectURL(u));
+    if (!comicFiles.length) {
+      setComicPreviewUrls([]);
+      return;
+    }
+    const urls = comicFiles.map((f) => (f ? URL.createObjectURL(f) : ""));
+    setComicPreviewUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comicFiles]);
+
+  useEffect(() => {
     if (!editCoverFile) {
       setEditCoverPreviewUrl("");
       return;
@@ -192,6 +213,18 @@ export default function ResourceLibraryPage() {
     return () => URL.revokeObjectURL(url);
   }, [editCoverFile]);
 
+  useEffect(() => {
+    editComicPreviewUrls.forEach((u) => URL.revokeObjectURL(u));
+    if (!editComicFiles.length) {
+      setEditComicPreviewUrls([]);
+      return;
+    }
+    const urls = editComicFiles.map((f) => (f ? URL.createObjectURL(f) : ""));
+    setEditComicPreviewUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editComicFiles]);
+
   const resetLitForm = () => {
     setLitForm({
       title: "",
@@ -200,10 +233,14 @@ export default function ResourceLibraryPage() {
       topic: "",
       contentEnglish: "",
       contentVietnamese: "",
+      audioUrl: "",
+      videoUrl: "",
       isPublished: "false",
     });
     setCoverFile(null);
     setCoverPreviewUrl("");
+    setComicFiles([]);
+    setComicPreviewUrls([]);
     setCreateError("");
     setCreateSuccess("");
   };
@@ -225,8 +262,14 @@ export default function ResourceLibraryPage() {
       fd.append("topic", litForm.topic.trim());
       fd.append("contentEnglish", litForm.contentEnglish);
       fd.append("contentVietnamese", litForm.contentVietnamese);
+      if (litForm.audioUrl.trim()) fd.append("audioUrl", litForm.audioUrl.trim());
+      if (litForm.videoUrl.trim()) fd.append("videoUrl", litForm.videoUrl.trim());
       fd.append("isPublished", litForm.isPublished);
       if (coverFile) fd.append("image", coverFile);
+      if (litForm.type === "comic" && comicFiles.length > 0) {
+        // Upload multiple comic pages. Backend should map them to `images[]`.
+        comicFiles.filter(Boolean).forEach((file) => fd.append("images", file as File));
+      }
 
       await literatureService.createLiterature(fd);
       setCreateSuccess("Tạo tác phẩm thành công.");
@@ -273,6 +316,8 @@ export default function ResourceLibraryPage() {
       setSavingEdit(false);
       setEditCoverFile(null);
       setEditCoverPreviewUrl("");
+      setEditComicFiles([]);
+      setEditComicPreviewUrls([]);
 
       const res: any = await literatureService.getLiteratureById(row.id);
       const detail = res?.data ?? res;
@@ -284,6 +329,8 @@ export default function ResourceLibraryPage() {
         topic: String(detail?.topic || ""),
         contentEnglish: String(detail?.contentEnglish || ""),
         contentVietnamese: String(detail?.contentVietnamese || ""),
+        audioUrl: String(detail?.audioUrl || ""),
+        videoUrl: String((detail as any)?.videoUrl || ""),
         isPublished: String(Boolean(detail?.isPublished) ? "true" : "false"),
       });
       setOpenEdit(true);
@@ -299,6 +346,8 @@ export default function ResourceLibraryPage() {
     setEditSuccess("");
     setEditCoverFile(null);
     setEditCoverPreviewUrl("");
+    setEditComicFiles([]);
+    setEditComicPreviewUrls([]);
     setEditForm({
       id: "",
       title: "",
@@ -307,6 +356,8 @@ export default function ResourceLibraryPage() {
       topic: "",
       contentEnglish: "",
       contentVietnamese: "",
+      audioUrl: "",
+      videoUrl: "",
       isPublished: "false",
     });
   };
@@ -329,8 +380,13 @@ export default function ResourceLibraryPage() {
       fd.append("topic", editForm.topic.trim());
       fd.append("contentEnglish", editForm.contentEnglish);
       fd.append("contentVietnamese", editForm.contentVietnamese);
+      if (editForm.audioUrl.trim()) fd.append("audioUrl", editForm.audioUrl.trim());
+      if (editForm.videoUrl.trim()) fd.append("videoUrl", editForm.videoUrl.trim());
       fd.append("isPublished", editForm.isPublished);
       if (editCoverFile) fd.append("image", editCoverFile);
+      if (editForm.type === "comic" && editComicFiles.length > 0) {
+        editComicFiles.filter(Boolean).forEach((file) => fd.append("images", file as File));
+      }
 
       await literatureService.updateLiterature(editForm.id, fd);
       setEditSuccess("Cập nhật tác phẩm thành công.");
@@ -614,6 +670,24 @@ export default function ResourceLibraryPage() {
                     placeholder="Nội dung tiếng Việt (bản dịch / ghi chú)"
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
                   />
+                  <input
+                    value={litForm.audioUrl}
+                    onChange={(e) =>
+                      setLitForm((p) => ({ ...p, audioUrl: e.target.value }))
+                    }
+                    placeholder="Audio URL (tuỳ chọn)"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  {litForm.type === "song" ? (
+                    <input
+                      value={litForm.videoUrl}
+                      onChange={(e) =>
+                        setLitForm((p) => ({ ...p, videoUrl: e.target.value }))
+                      }
+                      placeholder="Video URL (YouTube) (tuỳ chọn)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                  ) : null}
                   <select
                     value={litForm.isPublished}
                     onChange={(e) =>
@@ -637,6 +711,65 @@ export default function ResourceLibraryPage() {
                       className="mt-1 block w-full text-sm"
                     />
                   </label>
+                  {litForm.type === "comic" ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-600">
+                          Ảnh truyện tranh (từng trang)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setComicFiles((p) => [...(p.length ? p : [null]), null])}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                        >
+                          + Thêm tranh
+                        </button>
+                      </div>
+
+                      {(comicFiles.length ? comicFiles : [null]).map((file, idx) => (
+                        <div key={idx} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-xs font-bold text-slate-600">
+                              Trang {idx + 1}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setComicFiles((p) =>
+                                  p.length <= 1
+                                    ? [null]
+                                    : p.filter((_, i) => i !== idx),
+                                )
+                              }
+                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                            >
+                              Xóa trang
+                            </button>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              setComicFiles((p) => {
+                                const base = p.length ? [...p] : [null];
+                                base[idx] = f;
+                                return base;
+                              });
+                            }}
+                            className="block w-full text-sm"
+                          />
+                          {comicPreviewUrls[idx] ? (
+                            <img
+                              src={comicPreviewUrls[idx]}
+                              alt={`comic-${idx + 1}`}
+                              className="mt-3 h-32 w-full object-cover rounded-lg border border-slate-200 bg-white"
+                            />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {coverPreviewUrl ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="text-xs font-bold text-slate-600 mb-2">
@@ -773,6 +906,24 @@ export default function ResourceLibraryPage() {
                     placeholder="Nội dung tiếng Việt (bản dịch / ghi chú)"
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-28"
                   />
+                  <input
+                    value={editForm.audioUrl}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, audioUrl: e.target.value }))
+                    }
+                    placeholder="Audio URL (tuỳ chọn)"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                  />
+                  {editForm.type === "song" ? (
+                    <input
+                      value={editForm.videoUrl}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, videoUrl: e.target.value }))
+                      }
+                      placeholder="Video URL (YouTube) (tuỳ chọn)"
+                      className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                    />
+                  ) : null}
                   <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
                     <span className="text-xs font-semibold text-slate-600">
                       Ảnh bìa (tuỳ chọn)
@@ -786,6 +937,67 @@ export default function ResourceLibraryPage() {
                       className="mt-1 block w-full text-sm"
                     />
                   </label>
+                  {editForm.type === "comic" ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-600">
+                          Ảnh truyện tranh (từng trang)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditComicFiles((p) => [...(p.length ? p : [null]), null])
+                          }
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                        >
+                          + Thêm tranh
+                        </button>
+                      </div>
+
+                      {(editComicFiles.length ? editComicFiles : [null]).map((file, idx) => (
+                        <div key={idx} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-xs font-bold text-slate-600">
+                              Trang {idx + 1}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditComicFiles((p) =>
+                                  p.length <= 1
+                                    ? [null]
+                                    : p.filter((_, i) => i !== idx),
+                                )
+                              }
+                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                            >
+                              Xóa trang
+                            </button>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              setEditComicFiles((p) => {
+                                const base = p.length ? [...p] : [null];
+                                base[idx] = f;
+                                return base;
+                              });
+                            }}
+                            className="block w-full text-sm"
+                          />
+                          {editComicPreviewUrls[idx] ? (
+                            <img
+                              src={editComicPreviewUrls[idx]}
+                              alt={`comic-${idx + 1}`}
+                              className="mt-3 h-32 w-full object-cover rounded-lg border border-slate-200 bg-white"
+                            />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {editCoverPreviewUrl ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="text-xs font-bold text-slate-600 mb-2">

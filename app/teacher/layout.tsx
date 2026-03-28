@@ -219,30 +219,33 @@ export default function TeacherLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-blue-100">
+    <div className="min-h-screen bg-neutral-100 font-sans text-slate-800 selection:bg-neutral-200/60">
       {/* Sidebar Component */}
       <Sidebar
         isCollapsed={isCollapsed}
         toggleSidebar={() => setIsCollapsed(!isCollapsed)}
       />
 
-      {/* Main Content Wrapper */}
+      {/* Main Content Wrapper — một nền neo thống nhất, không highlight sáng */}
       <div
-        className={`transition-all duration-300 ease-in-out min-h-screen flex flex-col ${isCollapsed ? "ml-20" : "ml-72"}`}
+        className={`transition-all duration-300 ease-in-out min-h-screen flex flex-col bg-[#d8ebe4]
+        shadow-[-8px_0_28px_rgba(15,23,42,0.06)]
+        ${isCollapsed ? "ml-20" : "ml-72"}`}
       >
         {/* Header */}
-        <header className="h-16 sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 flex items-center justify-between transition-all duration-300 shadow-sm">
+        <header className="h-16 sticky top-0 z-40 bg-[#d8ebe4] border-b border-emerald-900/10 px-4 md:px-8 flex items-center justify-between transition-all duration-300">
           {/* Left: Toggle Button & Breadcrumbs */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 -ml-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors active:scale-95 border border-transparent hover:border-slate-200"
+              className="p-2 -ml-2 text-slate-600 rounded-xl transition-colors active:scale-95
+              bg-[#cfe5da] shadow-[inset_2px_2px_6px_rgba(15,23,42,0.1)] hover:bg-[#c9dfd5]"
               title={isCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
             >
               <Menu size={20} />
             </button>
 
-            <div className="hidden md:block h-5 w-px bg-slate-200 mx-1"></div>
+            <div className="hidden md:block h-5 w-px bg-emerald-900/12 mx-1"></div>
 
             <div className="hidden md:block">
               <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -257,53 +260,62 @@ export default function TeacherLayout({
           {/* Right: Actions */}
           <div className="flex items-center gap-3 md:gap-5">
             {/* Search Box */}
-            <div className="hidden md:flex items-center bg-slate-100/50 hover:bg-white px-3 py-2 rounded-xl border border-slate-200/50 hover:border-blue-300 focus-within:border-blue-500 focus-within:bg-white focus-within:shadow-md focus-within:shadow-blue-100 transition-all w-64 group cursor-text">
+            <div
+              className="hidden md:flex items-center px-3 py-2 rounded-xl transition-all w-64 group cursor-text
+              bg-[#cfe5da] shadow-[inset_3px_3px_8px_rgba(15,23,42,0.11)]
+              focus-within:shadow-[inset_4px_4px_10px_rgba(15,23,42,0.13)]"
+            >
               <Search
                 size={16}
-                className="text-slate-400 group-focus-within:text-blue-500 transition-colors"
+                className="text-slate-500 group-focus-within:text-emerald-800/70 transition-colors"
               />
               <input
                 placeholder="Tìm kiếm nhanh (Ctrl + K)"
-                className="bg-transparent border-none outline-none text-xs font-medium text-slate-700 ml-2 w-full placeholder:text-slate-400"
+                className="bg-transparent border-none outline-none text-xs font-medium text-slate-700 ml-2 w-full placeholder:text-slate-500"
               />
             </div>
 
             {/* Notification */}
-            <button className="relative p-2.5 hover:bg-slate-100 rounded-full text-slate-500 transition-colors border border-transparent hover:border-slate-200">
+            <button
+              className="relative p-2.5 rounded-xl text-slate-600 transition-colors
+              bg-[#cfe5da] shadow-[inset_2px_2px_6px_rgba(15,23,42,0.1)] hover:shadow-[inset_3px_3px_8px_rgba(15,23,42,0.12)]"
+            >
               <Bell size={20} />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#cfe5da] animate-pulse"></span>
             </button>
 
             {/* User Profile */}
-            <div className="flex items-center gap-3 pl-5 border-l border-slate-200 cursor-pointer group">
+            <div className="flex items-center gap-3 pl-5 border-l border-emerald-900/12 cursor-pointer group">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-700 group-hover:text-blue-600 transition">
+                <p className="text-xs font-bold text-slate-700 group-hover:text-emerald-900 transition">
                   Cô Minh Anh
                 </p>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 group-hover:bg-blue-100 transition">
+                <span
+                  className="text-[10px] font-bold text-emerald-900/90 px-2 py-0.5 rounded-full
+                  bg-[#cfe5da] shadow-[inset_1px_1px_3px_rgba(15,23,42,0.08)]"
+                >
                   Giáo viên
                 </span>
               </div>
               <div className="relative">
                 <img
                   src="https://i.pravatar.cc/150?img=5"
-                  className="w-9 h-9 rounded-full border-2 border-white shadow-md group-hover:scale-105 transition-transform group-hover:shadow-lg group-hover:ring-2 ring-blue-100"
+                  className="w-9 h-9 rounded-full ring-2 ring-emerald-900/10 shadow-[2px_2px_6px_rgba(15,23,42,0.12)] group-hover:scale-105 transition-transform"
                   alt="Avatar"
                 />
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
+                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-600 border-2 border-[#d8ebe4] rounded-full"></div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Content Body */}
-        <main className="flex-1 p-6 md:p-8 relative overflow-hidden bg-[#F8FAFC]">
-          <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500 slide-in-from-bottom-2">
+        <main className="flex-1 p-5 sm:p-6 md:p-8 relative overflow-x-hidden min-h-0 bg-neutral-50">
+          <div className="relative z-10 mx-auto w-full animate-in fade-in duration-500">
             {children}
           </div>
         </main>
 
-        <footer className="py-6 text-center border-t border-slate-200/50 bg-white/50 backdrop-blur-sm">
+        <footer className="py-6 text-center border-t border-emerald-900/10 bg-[#d8ebe4]">
           <p className="text-xs font-medium text-slate-400">
             © 2026 SmartKids Education System.{" "}
             <span className="hidden sm:inline opacity-70">

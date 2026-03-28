@@ -5,57 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import AssignmentEditor from "@/components/teacher/assignments/AssignmentEditor";
 import { Question } from "@/components/teacher/assignments/types";
-
-// Giả lập độ trễ mạng (Network Latency)
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const getAssignmentById = async (id: string) => {
-  await delay(1000); // Giả vờ đợi 1 giây
-
-  // Giả lập: Nếu ID = "error" thì trả về null để test case lỗi
-  if (id === "error") return null;
-
-  // Dữ liệu mẫu trả về (Khớp với interface AssignmentEditorProps)
-  return {
-    info: {
-      title: `Bài kiểm tra Unit 1 - Mã đề ${id}`,
-      description:
-        "Kiểm tra kiến thức từ vựng và ngữ pháp Unit 1. Thời gian làm bài 45 phút.",
-      duration: 45,
-    },
-    questions: [
-      {
-        id: 101,
-        type: "MULTIPLE_CHOICE",
-        text: "Từ nào sau đây có nghĩa là 'Quả táo'?",
-        points: 2,
-        options: [
-          { id: 1, text: "Banana", isCorrect: false },
-          { id: 2, text: "Apple", isCorrect: true },
-          { id: 3, text: "Orange", isCorrect: false },
-          { id: 4, text: "Grape", isCorrect: false },
-        ],
-      },
-      {
-        id: 102,
-        type: "MATCHING",
-        text: "Ghép từ vựng với nghĩa tiếng Việt tương ứng:",
-        points: 3,
-        pairs: [
-          { id: 1, left: "Cat", right: "Con mèo" },
-          { id: 2, left: "Dog", right: "Con chó" },
-          { id: 3, left: "Bird", right: "Con chim" },
-        ],
-      },
-      {
-        id: 103,
-        type: "ESSAY",
-        text: "Viết một đoạn văn ngắn (50 từ) giới thiệu về bản thân em.",
-        points: 5,
-      },
-    ] as Question[],
-  };
-};
+import { assignmentsService } from "@/services/assignments.service";
 export default function EditAssignmentPage({
   params,
 }: {
@@ -66,18 +16,73 @@ export default function EditAssignmentPage({
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
+
+  const extractList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    const keys = ["data", "items", "results", "docs", "submissions", "rows"];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of keys) {
+        if (Array.isArray(nested[k])) return nested[k];
+      }
+    }
+    return [];
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // Gọi API lấy dữ liệu
-        const assignmentData = await getAssignmentById(id);
-
-        if (!assignmentData) {
+        const res: any = await assignmentsService.getAssignmentById(id);
+        const raw = res?.data ?? res;
+        if (!raw) {
           setError("Không tìm thấy bài tập này.");
         } else {
-          setData(assignmentData);
+          const questionsRaw = Array.isArray(raw?.questions) ? raw.questions : [];
+          const questions: Question[] = questionsRaw.map((q: any, idx: number) => ({
+            id: Number(q?.id ?? idx + 1),
+            type:
+              String(q?.type || "MULTIPLE_CHOICE").toUpperCase() === "ESSAY"
+                ? "ESSAY"
+                : String(q?.type || "").toUpperCase() === "MATCHING"
+                  ? "MATCHING"
+                  : String(q?.type || "").toUpperCase() === "SPEAKING"
+                    ? "SPEAKING"
+                    : "MULTIPLE_CHOICE",
+            text: String(q?.text ?? q?.question ?? ""),
+            points: Number(q?.points ?? q?.score ?? 1) || 1,
+            options: Array.isArray(q?.options)
+              ? q.options.map((o: any, oIdx: number) => ({
+                  id: Number(o?.id ?? oIdx + 1),
+                  text: String(o?.text ?? o?.label ?? ""),
+                  isCorrect: Boolean(o?.isCorrect ?? false),
+                }))
+              : undefined,
+            pairs: Array.isArray(q?.pairs)
+              ? q.pairs.map((p: any, pIdx: number) => ({
+                  id: Number(p?.id ?? pIdx + 1),
+                  left: String(p?.left ?? ""),
+                  right: String(p?.right ?? ""),
+                }))
+              : undefined,
+          }));
+
+          setData({
+            info: {
+              title: String(raw?.title ?? raw?.name ?? "Bài tập"),
+              description: String(raw?.description ?? ""),
+              duration: Number(raw?.duration ?? raw?.estimatedDuration ?? 45) || 45,
+            },
+            questions,
+          });
         }
       } catch (err) {
         setError("Có lỗi xảy ra khi tải dữ liệu.");
@@ -87,6 +92,27 @@ export default function EditAssignmentPage({
     };
 
     fetchData();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+      try {
+        setLoadingSubmissions(true);
+        setSubmissionError("");
+        const res: any = await assignmentsService.getSubmissionsByAssignmentId(id);
+        const payload = res?.data ?? res;
+        setSubmissions(extractList(payload));
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message;
+        setSubmissionError(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tải danh sách bài nộp.",
+        );
+        setSubmissions([]);
+      } finally {
+        setLoadingSubmissions(false);
+      }
+    };
+    fetchSubmissions();
   }, [id]);
 
   // --- TRƯỜNG HỢP 1: ĐANG TẢI ---
@@ -122,9 +148,68 @@ export default function EditAssignmentPage({
 
   // --- TRƯỜNG HỢP 3: TẢI XONG -> HIỂN THỊ EDITOR ---
   return (
-    <AssignmentEditor
-      mode="edit"
-      initialData={data} // Truyền dữ liệu cũ vào để Editor hiển thị
-    />
+    <div className="bg-slate-50 min-h-screen">
+      <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <div className="mb-4 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="text-base font-black text-slate-800">
+              Danh sách học sinh đã nộp bài
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Assignment ID: {id}
+            </p>
+          </div>
+
+          {loadingSubmissions ? (
+            <div className="p-5 text-sm text-slate-500">Đang tải danh sách nộp bài...</div>
+          ) : submissionError ? (
+            <div className="p-5 text-sm text-red-600">{submissionError}</div>
+          ) : submissions.length === 0 ? (
+            <div className="p-5 text-sm text-slate-500">Chưa có học sinh nộp bài.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                  <tr>
+                    <th className="px-5 py-3">Học sinh</th>
+                    <th className="px-5 py-3">Trạng thái</th>
+                    <th className="px-5 py-3">Điểm</th>
+                    <th className="px-5 py-3">Thời gian nộp</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {submissions.map((s, idx) => {
+                    const student = s?.studentId ?? s?.student ?? {};
+                    const studentName = String(
+                      student?.fullName ?? student?.name ?? s?.studentName ?? "Học sinh",
+                    );
+                    const status = String(s?.status ?? "submitted");
+                    const score = s?.score;
+                    const submittedAt = s?.submittedAt
+                      ? new Date(s.submittedAt).toLocaleString("vi-VN")
+                      : "—";
+                    return (
+                      <tr key={String(s?._id ?? s?.id ?? idx)}>
+                        <td className="px-5 py-3">{studentName}</td>
+                        <td className="px-5 py-3">{status}</td>
+                        <td className="px-5 py-3">
+                          {typeof score === "number" ? score : "Chưa chấm"}
+                        </td>
+                        <td className="px-5 py-3">{submittedAt}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AssignmentEditor
+        mode="edit"
+        initialData={data}
+      />
+    </div>
   );
 }

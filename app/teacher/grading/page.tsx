@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle,
   Clock,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import GradingDashboard from "@/components/teacher/grading/GradingDashboard";
+import { assignmentsService } from "@/services/assignments.service";
 
 // --- TYPES ---
 export type Status = "PENDING" | "GRADED" | "LATE";
@@ -38,95 +39,145 @@ export interface Submission {
   feedback?: string;
 }
 
-// --- MOCK DATA ---
-const SUBMISSIONS: Submission[] = [
-  {
-    id: "S01",
-    studentName: "Nguyễn Văn A",
-    studentAvatar: "https://i.pravatar.cc/150?img=11",
-    className: "IELTS Intensive K12",
-    assignmentTitle: "Writing Task 2: Environment",
-    submittedAt: "10:30 AM, Hôm nay",
-    status: "PENDING",
-    maxScore: 100,
-    content: {
-      type: "ESSAY",
-      fileUrl: "writing_task2.pdf",
-      text: "Em gửi thầy bài viết về môi trường ạ.",
-      preview: "https://via.placeholder.com/600x800?text=PDF+Preview",
-    },
-  },
-  {
-    id: "S02",
-    studentName: "Trần Thị B",
-    studentAvatar: "https://i.pravatar.cc/150?img=5",
-    className: "Giao tiếp cơ bản A1",
-    assignmentTitle: "Record Video: Introduce yourself",
-    submittedAt: "09:15 AM, Hôm qua",
-    status: "PENDING",
-    maxScore: 10,
-    content: {
-      type: "VIDEO",
-      fileUrl: "intro.mp4",
-      text: "Video giới thiệu bản thân.",
-      preview: "https://via.placeholder.com/600x400?text=Video+Thumbnail",
-    },
-  },
-  {
-    id: "S03",
-    studentName: "Lê Văn C",
-    studentAvatar: "https://i.pravatar.cc/150?img=3",
-    className: "IELTS Intensive K12",
-    assignmentTitle: "Reading Practice Test 1",
-    submittedAt: "2 ngày trước",
-    status: "GRADED",
-    score: 8.5,
-    maxScore: 9.0,
-    feedback: "Good job! Keep it up.",
-    content: {
-      type: "ESSAY",
-      fileUrl: "reading_test.pdf",
-      text: "Reading test submission.",
-      preview: "https://via.placeholder.com/600x800?text=PDF+Preview",
-    },
-  },
-  {
-    id: "S04",
-    studentName: "Phạm Minh D",
-    studentAvatar: "https://i.pravatar.cc/150?img=8",
-    className: "Giao tiếp cơ bản A1",
-    assignmentTitle: "Homework Unit 3",
-    submittedAt: "5 phút trước",
-    status: "LATE",
-    maxScore: 100,
-    content: {
-      type: "ESSAY",
-      fileUrl: "hw_unit3.docx",
-      text: "Submitted late due to internet issues.",
-      preview: "https://via.placeholder.com/600x800?text=DOCX+Preview",
-    },
-  },
-];
-
 export default function GradingCenterPage() {
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [filterStatus, setFilterStatus] = useState<Status | "ALL">("PENDING");
   const [selectedClass, setSelectedClass] = useState("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
 
   // State for Modal
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(
     null,
   );
 
+  const getCurrentUserId = (): string => {
+    try {
+      const raw = window.localStorage.getItem("currentUser");
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      return String(parsed?._id || parsed?.id || parsed?.data?._id || "");
+    } catch {
+      return "";
+    }
+  };
+
+  const extractList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    const keys = ["data", "items", "results", "docs", "assignments", "submissions", "rows"];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of keys) {
+        if (Array.isArray(nested[k])) return nested[k];
+      }
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setLoadError("");
+        const userId = getCurrentUserId();
+        if (!userId) {
+          setSubmissions([]);
+          return;
+        }
+
+        const assignmentsRes: any = await assignmentsService.getAssignmentsByUserId(
+          userId,
+          1,
+          50,
+        );
+        const assignmentPayload = assignmentsRes?.data ?? assignmentsRes;
+        const assignments = extractList(assignmentPayload);
+
+        const submissionResponses = await Promise.all(
+          assignments.map((a: any) =>
+            assignmentsService
+              .getSubmissionsByAssignmentId(String(a?._id || a?.id || ""))
+              .catch(() => null),
+          ),
+        );
+
+        const merged: Submission[] = [];
+        submissionResponses.forEach((res, idx) => {
+          if (!res) return;
+          const assignment = assignments[idx];
+          const payload = (res as any)?.data ?? res;
+          const list = extractList(payload);
+          list.forEach((s: any, sIdx: number) => {
+            const student = s?.studentId ?? s?.student ?? {};
+            const statusRaw = String(s?.status || "").toUpperCase();
+            const status: Status =
+              statusRaw.includes("GRADED")
+                ? "GRADED"
+                : statusRaw.includes("LATE")
+                  ? "LATE"
+                  : "PENDING";
+            merged.push({
+              id: String(s?._id ?? s?.id ?? `${idx}-${sIdx}`),
+              studentName: String(student?.fullName ?? student?.name ?? "Học sinh"),
+              studentAvatar: String(student?.avatar ?? "https://i.pravatar.cc/150?img=11"),
+              className: String(
+                assignment?.classId?.name ?? assignment?.classId?.title ?? "Lớp học",
+              ),
+              assignmentTitle: String(assignment?.title ?? "Bài tập"),
+              submittedAt: s?.submittedAt
+                ? new Date(s.submittedAt).toLocaleString("vi-VN")
+                : "—",
+              status,
+              score: typeof s?.score === "number" ? s.score : undefined,
+              maxScore: Number(assignment?.maxScore ?? 10) || 10,
+              feedback: s?.feedback,
+            });
+          });
+        });
+
+        setSubmissions(merged);
+      } catch (error: any) {
+        const msg = error?.response?.data?.message ?? error?.message;
+        setLoadError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tải dữ liệu chấm điểm.");
+        setSubmissions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   // Filter Logic
-  const filteredList = SUBMISSIONS.filter((item) => {
+  const filteredList = submissions.filter((item) => {
     const matchStatus =
       filterStatus === "ALL" ? true : item.status === filterStatus;
     const matchClass =
       selectedClass === "ALL" ? true : item.className === selectedClass;
-    return matchStatus && matchClass;
+    const matchSearch =
+      !searchTerm.trim() ||
+      item.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.assignmentTitle.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchStatus && matchClass && matchSearch;
   });
 
-  const pendingCount = SUBMISSIONS.filter((s) => s.status === "PENDING").length;
+  const pendingCount = submissions.filter((s) => s.status === "PENDING").length;
+  const gradedCount = submissions.filter((s) => s.status === "GRADED").length;
+  const averageScore = useMemo(() => {
+    const graded = submissions.filter((s) => typeof s.score === "number");
+    if (!graded.length) return "0.0";
+    const avg = graded.reduce((sum, s) => sum + Number(s.score || 0), 0) / graded.length;
+    return avg.toFixed(1);
+  }, [submissions]);
+  const classOptions = useMemo(
+    () => Array.from(new Set(submissions.map((s) => s.className).filter(Boolean))),
+    [submissions],
+  );
 
   return (
     <div className="p-8 min-h-screen bg-slate-50 font-sans">
@@ -158,7 +209,7 @@ export default function GradingCenterPage() {
               <p className="text-xs font-bold text-green-600 uppercase mb-1">
                 Đã chấm xong (Tuần này)
               </p>
-              <p className="text-3xl font-black text-slate-800">24</p>
+              <p className="text-3xl font-black text-slate-800">{gradedCount}</p>
             </div>
             <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
               <CheckCircle size={24} />
@@ -169,7 +220,7 @@ export default function GradingCenterPage() {
               <p className="text-xs font-bold text-blue-600 uppercase mb-1">
                 Điểm trung bình
               </p>
-              <p className="text-3xl font-black text-slate-800">8.2</p>
+              <p className="text-3xl font-black text-slate-800">{averageScore}</p>
             </div>
             <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
               <FileText size={24} />
@@ -214,8 +265,11 @@ export default function GradingCenterPage() {
               onChange={(e) => setSelectedClass(e.target.value)}
             >
               <option value="ALL">Tất cả lớp học</option>
-              <option value="IELTS Intensive K12">IELTS Intensive K12</option>
-              <option value="Giao tiếp cơ bản A1">Giao tiếp cơ bản A1</option>
+              {classOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
             </select>
             <ChevronDown
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
@@ -231,6 +285,8 @@ export default function GradingCenterPage() {
             <input
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400"
               placeholder="Tìm tên HS, bài tập..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
@@ -239,6 +295,12 @@ export default function GradingCenterPage() {
       {/* 3. SUBMISSION LIST */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="divide-y divide-slate-100">
+          {loading ? (
+            <div className="p-6 text-sm text-slate-500">Đang tải dữ liệu chấm điểm...</div>
+          ) : null}
+          {!loading && loadError ? (
+            <div className="p-6 text-sm text-red-600">{loadError}</div>
+          ) : null}
           {filteredList.map((item) => (
             <div
               key={item.id}

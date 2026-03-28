@@ -48,5 +48,14 @@ export const groupsService = {
       params: { page, limit },
     });
   },
+
+  // Backend endpoint bạn vừa cung cấp:
+  // GET /groups/user/members -> danh sách học viên trong nhóm của giáo viên hiện tại
+  getMyGroupMembers: async (params?: { page?: number; limit?: number }) => {
+    const { page = 1, limit = 100 } = params ?? {};
+    return api.get("/groups/user/members", {
+      params: { page, limit },
+    });
+  },
 };
 
