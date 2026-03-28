@@ -1,17 +1,17 @@
 import api from "@/utils/api";
 
 export const groupMessagesService = {
-  // Preferred (suggested) route: GET /group-messages/group/:groupId
-  // Fallback: GET /group-messages/:groupId (nếu backend chưa tách route)
+  // Preferred route from backend controller: GET /group-messages/group/:groupId
+  // Fallback: GET /group-messages/:groupId (for legacy backend variants)
   getMessagesByGroupId: async (groupId: string, params?: { page?: number; limit?: number }) => {
     const { page = 1, limit = 50 } = params ?? {};
 
     try {
-      return await api.get(`/group-messages/${groupId}`, {
+      return await api.get(`/group-messages/group/${groupId}`, {
         params: { page, limit },
       });
     } catch {
-      return api.get(`/group-messages/group/${groupId}`, {
+      return api.get(`/group-messages/${groupId}`, {
         params: { page, limit },
       });
     }

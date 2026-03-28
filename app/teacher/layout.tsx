@@ -69,6 +69,11 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           icon: Dumbbell,
         },
         {
+          name: "Tin nhắn nhóm",
+          href: "/teacher/group-messages",
+          icon: MessageSquareText,
+        },
+        {
           name: "Quản lý tài khoản",
           href: "/teacher/profile",
           icon: UserCog,
