@@ -103,7 +103,7 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
           {!collapsed && (
             <div className="overflow-hidden">
               <p className="text-xs font-bold text-slate-200 truncate">
-                System Admin
+                Quản trị hệ thống
               </p>
               <p className="text-[10px] text-slate-400 truncate">v2.0.5</p>
             </div>
@@ -239,14 +239,14 @@ export default function AdminLayout({
                     {user?.fullName || user?.name || "Admin"}
                   </p>
                   <p className="text-[10px] font-bold text-slate-500 uppercase">
-                    {String(user?.role?.name || user?.role || "ADMIN")}
+                    {String(user?.role?.name || user?.role || "Quản trị")}
                   </p>
                 </div>
                 <img
                   src={
                     user?.avatar ||
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      String(user?.fullName || user?.name || "Admin User"),
+                      String(user?.fullName || user?.name || "Quản trị viên"),
                     )}&background=0F172A&color=fff`
                   }
                   className="w-10 h-10 rounded-full ring-2 ring-slate-500/15 shadow-[2px_2px_6px_rgba(15,23,42,0.12)]"

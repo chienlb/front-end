@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { courseService } from "@/services/course.service";
 import ItemEditModal from "@/components/teacher/course/unit/ItemEditModal";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 export default function CourseStructurePage() {
   const params = useParams();
@@ -41,7 +42,7 @@ export default function CourseStructurePage() {
       setCourse(data);
     } catch (error) {
       console.error(error);
-      alert("Không tìm thấy khóa học");
+      await showAlert("Không tìm thấy khóa học");
     } finally {
       setLoading(false);
     }
@@ -84,12 +85,32 @@ export default function CourseStructurePage() {
   };
 
   const handleDeleteUnit = async (unitId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa Unit này?")) return;
+    const ok = await showConfirm("Bạn có chắc chắn muốn xóa Unit này?");
+    if (!ok) return;
+
+    const normalizedId = String(unitId || "").trim();
+    const previousCourse = course;
+
+    // Optimistic update để tránh cảm giác "xóa rồi nhưng vẫn còn".
+    setCourse((prev: any) => {
+      if (!prev || !Array.isArray(prev.units)) return prev;
+      return {
+        ...prev,
+        units: prev.units.filter(
+          (u: any) =>
+            String(u?._id ?? u?.id ?? "").trim() !== normalizedId,
+        ),
+      };
+    });
+
     try {
-      await courseService.deleteUnit(unitId);
-      fetchCourse();
+      await courseService.deleteUnit(normalizedId);
+      // Refetch lại từ server để đồng bộ tuyệt đối dữ liệu cây khóa học.
+      await fetchCourse();
     } catch (error) {
-      alert("Lỗi khi xóa Unit");
+      // Rollback nếu backend xóa thất bại.
+      setCourse(previousCourse);
+      await showAlert("Lỗi khi xóa Unit");
     }
   };
 

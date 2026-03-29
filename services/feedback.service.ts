@@ -17,6 +17,14 @@ export interface FeedbackItem {
   updatedAt?: string;
 }
 
+export interface FeedbackListResponse {
+  data: FeedbackItem[];
+  total: number;
+  totalPages: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
 export interface CreateFeedbackPayload {
   type: FeedbackType;
   title: string;
@@ -40,7 +48,11 @@ export const feedbackService = {
     return api.post("/feedbacks", payload);
   },
 
-  findAll: async (page = 1, limit = 10) => {
+  getAll: async (page = 1, limit = 10): Promise<FeedbackListResponse> => {
+    return api.get("/feedbacks", { params: { page, limit } });
+  },
+
+  findAll: async (page = 1, limit = 10): Promise<FeedbackListResponse> => {
     return api.get("/feedbacks", { params: { page, limit } });
   },
 

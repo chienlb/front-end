@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   Check,
@@ -12,6 +12,7 @@ import {
   Clock,
   MoreHorizontal,
 } from "lucide-react";
+import { notificationService } from "@/services/notifications.service";
 
 // --- TYPES ---
 type NotiType = "INFO" | "SUCCESS" | "WARNING" | "ANNOUNCEMENT";
@@ -26,60 +27,66 @@ interface Notification {
   link?: string; // Link điều hướng (đến bài tập, thanh toán)
 }
 
-// --- MOCK DATA ---
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "N1",
-    type: "WARNING",
-    title: "Sắp hết hạn gói học",
-    message:
-      "Gói Premium của bé Nguyễn Văn An sẽ hết hạn trong 3 ngày tới. Vui lòng gia hạn để không gián đoạn việc học.",
-    time: "2 giờ trước",
-    isRead: false,
-    link: "/parent/subscription",
-  },
-  {
-    id: "N2",
-    type: "SUCCESS",
-    title: "Bé Ngọc hoàn thành xuất sắc bài tập",
-    message:
-      "Chúc mừng! Bé Trần Bảo Ngọc vừa đạt điểm 10/10 bài kiểm tra Unit 3: Animals.",
-    time: "5 giờ trước",
-    isRead: false,
-    link: "/parent/reports",
-  },
-  {
-    id: "N3",
-    type: "INFO",
-    title: "Bài tập về nhà mới",
-    message: "Cô Lan Anh đã giao bài tập mới cho lớp 3A. Hạn nộp: 20/11/2023.",
-    time: "1 ngày trước",
-    isRead: true,
-    link: "/parent/dashboard", // Giả định link
-  },
-  {
-    id: "N4",
-    type: "ANNOUNCEMENT",
-    title: "Bảo trì hệ thống",
-    message:
-      "Hệ thống sẽ bảo trì nâng cấp từ 00:00 đến 02:00 ngày mai. Xin lỗi vì sự bất tiện này.",
-    time: "2 ngày trước",
-    isRead: true,
-  },
-  {
-    id: "N5",
-    type: "SUCCESS",
-    title: "Thanh toán thành công",
-    message: "Đã nhận được thanh toán 199.000đ cho gói Basic (Bé Ngọc).",
-    time: "3 ngày trước",
-    isRead: true,
-    link: "/parent/subscription",
-  },
-];
-
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"ALL" | "UNREAD">("ALL");
+  const [loading, setLoading] = useState(true);
+
+  const formatTimeAgo = (dateString?: string) => {
+    if (!dateString) return "";
+    const diff = Date.now() - new Date(dateString).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (minutes < 60) return `${Math.max(minutes, 1)} phút trước`;
+    if (hours < 24) return `${hours} giờ trước`;
+    return `${days} ngày trước`;
+  };
+
+  const mapType = (typeRaw?: string): NotiType => {
+    const value = String(typeRaw || "").toUpperCase();
+    if (value.includes("WARNING") || value.includes("REMINDER")) return "WARNING";
+    if (value.includes("SUCCESS") || value.includes("ACHIEVEMENT")) return "SUCCESS";
+    if (value.includes("ANNOUNCE")) return "ANNOUNCEMENT";
+    return "INFO";
+  };
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const rawUser = localStorage.getItem("currentUser");
+        if (!rawUser) return;
+        const user = JSON.parse(rawUser);
+        const userId = user?._id || user?.id || user?.userId;
+        if (!userId) return;
+
+        const res = await notificationService.getNotificationsByUserId(String(userId), {
+          page: 1,
+          limit: 50,
+        });
+
+        const mapped = (res.data || []).map((n: any) => ({
+          id: String(n?._id ?? n?.id ?? ""),
+          type: mapType(n?.type),
+          title: String(n?.title ?? "Thông báo"),
+          message: String(n?.message ?? ""),
+          time: formatTimeAgo(n?.createdAt),
+          isRead: Boolean(n?.isRead),
+          link: (n?.data?.link as string | undefined) || undefined,
+        }));
+
+        setNotifications(mapped.filter((n: Notification) => n.id));
+      } catch (err) {
+        console.error("Lỗi tải thông báo phụ huynh:", err);
+        setNotifications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchNotifications();
+  }, []);
 
   // Filter Logic
   const filteredList =
@@ -88,16 +95,23 @@ export default function NotificationsPage() {
   // Actions
   const markAllAsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    const rawUser = localStorage.getItem("currentUser");
+    if (!rawUser) return;
+    const user = JSON.parse(rawUser);
+    const userId = user?._id || user?.id || user?.userId;
+    if (userId) void notificationService.markAllAsReadByUser(String(userId));
   };
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
     );
+    void notificationService.markAsRead(id);
   };
 
   const deleteNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    void notificationService.deleteNotification(id);
   };
 
   // Helper: Icon & Style based on Type
@@ -170,7 +184,12 @@ export default function NotificationsPage() {
 
       {/* NOTIFICATION LIST */}
       <div className="space-y-3">
-        {filteredList.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Bell size={64} className="opacity-20 mb-4" />
+            <p>Đang tải thông báo...</p>
+          </div>
+        ) : filteredList.length > 0 ? (
           filteredList.map((item) => {
             const style = getTypeStyle(item.type);
             const Icon = style.icon;

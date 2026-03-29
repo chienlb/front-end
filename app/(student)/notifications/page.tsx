@@ -22,12 +22,28 @@ export default function NotificationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   // --- ACTIONS ---
-  const markAllRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+  const markAllRead = async () => {
+    const rawUser = localStorage.getItem("currentUser");
+    if (!rawUser) return;
+    const user = JSON.parse(rawUser);
+    const userId = user?._id || user?.id || user?.userId;
+    if (!userId) return;
+
+    try {
+      await notificationService.markAllAsReadByUser(String(userId));
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error("Lỗi đánh dấu đã đọc:", err);
+    }
   };
 
-  const deleteNotification = (id: number) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
+  const deleteNotification = async (id: string) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error("Lỗi xóa thông báo:", err);
+    }
   };
 
   const normalizeList = (res: any) => {
@@ -73,12 +89,12 @@ export default function NotificationsPage() {
           limit: 20,
         });
 
-        const mapped = normalizeList(res);
+        const mapped = normalizeList(res.data);
         setNotifications(mapped);
 
         // If backend returns pagination, use it; else infer from page size.
         const totalPages =
-          (typeof res?.totalPages === "number" ? res.totalPages : null) ??
+          (typeof res.totalPages === "number" ? res.totalPages : null) ??
           (typeof res?.meta?.totalPages === "number" ? res.meta.totalPages : null);
 
         if (typeof totalPages === "number") setHasMore(1 < totalPages);
@@ -112,7 +128,7 @@ export default function NotificationsPage() {
         limit: 20,
       });
 
-      const mapped = normalizeList(res);
+      const mapped = normalizeList(res.data);
 
       setNotifications((prev) => {
         const seen = new Set(prev.map((n) => n.id));
@@ -124,7 +140,7 @@ export default function NotificationsPage() {
       setPage(nextPage);
 
       const totalPages =
-        (typeof res?.totalPages === "number" ? res.totalPages : null) ??
+        (typeof res.totalPages === "number" ? res.totalPages : null) ??
         (typeof res?.meta?.totalPages === "number" ? res.meta.totalPages : null);
       if (typeof totalPages === "number") setHasMore(nextPage < totalPages);
       else setHasMore(mapped.length >= 20);

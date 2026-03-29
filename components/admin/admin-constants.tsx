@@ -18,7 +18,7 @@ export const ADMIN_MENU = [
     group: "QUẢN TRỊ",
     items: [
       {
-        name: "Dashboard",
+        name: "Tổng quan",
         icon: <LayoutDashboard size={20} />,
         href: "/admin",
       },
@@ -48,7 +48,7 @@ export const ADMIN_MENU = [
         href: "/admin/tutors",
       },
       {
-        name: "Feedback",
+        name: "Nhận xét",
         icon: <MessageSquareText size={20} />,
         href: "/admin/reports",
       },

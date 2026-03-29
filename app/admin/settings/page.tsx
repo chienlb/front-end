@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Palette,
   UserCircle2,
   Lock,
   CheckCircle2,
@@ -11,32 +10,15 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { userService } from "@/services/user.service";
 import { authService } from "@/services/auth.service";
 
-type SettingsTab = "APPEARANCE" | "ACCOUNT" | "SECURITY";
-
-type ThemeOption = {
-  id: string;
-  label: string;
-  value: string;
-};
-
-const THEME_OPTIONS: ThemeOption[] = [
-  { id: "slate", label: "Slate", value: "#f8fafc" },
-  { id: "blue", label: "Blue", value: "#eff6ff" },
-  { id: "violet", label: "Violet", value: "#f5f3ff" },
-  { id: "rose", label: "Rose", value: "#fff1f2" },
-  { id: "amber", label: "Amber", value: "#fffbeb" },
-];
+type SettingsTab = "ACCOUNT" | "SECURITY";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("APPEARANCE");
-
-  const [bgTheme, setBgTheme] = useState<string>(THEME_OPTIONS[0].value);
-  const [savingTheme, setSavingTheme] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("ACCOUNT");
 
   const [userId, setUserId] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [profileForm, setProfileForm] = useState({
     fullName: "",
     email: "",
@@ -60,13 +42,13 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const rawTheme = localStorage.getItem("admin_settings_bg_theme");
-      if (rawTheme) setBgTheme(rawTheme);
       const rawUser = localStorage.getItem("currentUser");
       if (rawUser) {
         const u = JSON.parse(rawUser);
         const uid = String(u?._id || u?.id || "");
+        const fullName = String(u?.fullName || u?.fullname || u?.name || "");
         setUserId(uid);
+        if (fullName) setDisplayName(fullName);
       }
     } catch {
       // ignore parse errors
@@ -76,53 +58,37 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res: any = await userService.getProfile();
+        const res: any = await authService.getProfile();
         const data = res?.data ?? res;
+        const fullName = String(data?.fullName || data?.fullname || data?.name || "");
         setProfileForm({
-          fullName: String(data?.fullName || data?.name || ""),
+          fullName,
           email: String(data?.email || ""),
           phone: String(data?.phone || ""),
           avatar: String(data?.avatar || ""),
         });
-        const uid = String(data?._id || data?.id || userId || "");
+        if (fullName) setDisplayName(fullName);
+        const uid = String(data?._id || data?.id || "");
         if (uid) setUserId(uid);
       } catch {
         // keep current values
       }
     };
-    fetchProfile();
+
+    void fetchProfile();
   }, []);
 
-  const activeTheme = useMemo(
-    () => THEME_OPTIONS.find((x) => x.value === bgTheme) || THEME_OPTIONS[0],
-    [bgTheme],
-  );
-
-  const handleSaveTheme = () => {
-    setSavingTheme(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin_settings_bg_theme", bgTheme);
-    }
-    setTimeout(() => {
-      setSavingTheme(false);
-      alert("Đã lưu giao diện nền.");
-    }, 400);
-  };
-
   const handleSaveProfile = async () => {
-    if (!userId) {
-      setProfileMessage("Không xác định được user hiện tại. Vui lòng đăng nhập lại.");
-      return;
-    }
     try {
       setSavingProfile(true);
       setProfileMessage("");
-      await userService.updateMyProfile(userId, {
+      await authService.updateProfile({
         fullName: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         phone: profileForm.phone.trim(),
         avatar: profileForm.avatar.trim(),
       });
+      setDisplayName(profileForm.fullName.trim());
       setProfileMessage("Đã cập nhật thông tin tài khoản.");
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
@@ -145,6 +111,7 @@ export default function SettingsPage() {
       setPasswordMessage("Mật khẩu xác nhận không khớp.");
       return;
     }
+
     try {
       setChangingPassword(true);
       setPasswordMessage("");
@@ -164,16 +131,10 @@ export default function SettingsPage() {
 
   const tabs = [
     {
-      id: "APPEARANCE",
-      label: "Giao diện",
-      icon: <Palette size={18} />,
-      desc: "Đổi nền trang admin",
-    },
-    {
       id: "ACCOUNT",
       label: "Tài khoản",
       icon: <UserCircle2 size={18} />,
-      desc: "Thông tin cá nhân",
+      desc: "Thông tin tài khoản",
     },
     {
       id: "SECURITY",
@@ -184,277 +145,233 @@ export default function SettingsPage() {
   ] as const;
 
   return (
-    <div
-      className="h-[calc(100vh-100px)] flex flex-col space-y-6"
-      style={{ backgroundColor: bgTheme }}
-    >
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <UserCircle2 className="text-gray-600" /> Cài đặt tài khoản
-          </h1>
-          <p className="text-gray-500 text-sm">
-            Tùy chỉnh nền giao diện, thông tin cá nhân và bảo mật.
-          </p>
-        </div>
-        <div className="text-xs text-slate-500 bg-white px-3 py-2 rounded-lg border border-slate-200">
-          Nền hiện tại: <span className="font-bold text-slate-700">{activeTheme.label}</span>
-        </div>
-      </div>
+    <div className="relative h-[calc(100vh-100px)] overflow-hidden rounded-3xl bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-1">
+      <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-cyan-100/70 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-blue-100/70 blur-3xl" />
 
-      <div className="flex-1 flex gap-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* --- LEFT MENU --- */}
-        <div className="w-64 flex flex-col gap-2 border-r pr-6 border-gray-100">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as SettingsTab)}
-              className={`text-left p-3 rounded-xl flex items-start gap-3 transition-all
-                ${
-                  activeTab === tab.id
-                    ? "bg-blue-50 text-blue-700 border border-blue-100 shadow-sm"
-                    : "text-slate-600 hover:bg-gray-50"
-                }`}
-            >
-              <div
-                className={`mt-0.5 ${
-                  activeTab === tab.id ? "text-blue-600" : "text-gray-400"
-                }`}
-              >
-                {tab.icon}
-              </div>
-              <div>
-                <div className="font-bold text-sm">{tab.label}</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">
-                  {tab.desc}
-                </div>
-              </div>
-            </button>
-          ))}
+      <div className="relative h-full flex flex-col space-y-6 p-5 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-2xl border border-white/70 bg-white/80 backdrop-blur-sm px-5 py-4 shadow-sm">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-2">
+              <UserCircle2 className="text-sky-700" /> Cài đặt tài khoản
+            </h1>
+            <p className="text-slate-500 text-sm font-medium mt-1">
+              Quản lý thông tin tài khoản và bảo mật đăng nhập.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 font-semibold">
+            Tên: <span className="text-slate-800 font-black">{displayName || "Đang cập nhật"}</span>
+            <span className="mx-2 text-slate-300">|</span>
+            ID tài khoản: <span className="text-slate-800 font-black">{userId || "Đang cập nhật"}</span>
+          </div>
         </div>
 
-        {/* --- RIGHT CONTENT FORM --- */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-          {activeTab === "APPEARANCE" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Đổi nền giao diện admin
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {THEME_OPTIONS.map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => setBgTheme(theme.value)}
-                    className={`rounded-xl border p-3 text-left transition ${
-                      bgTheme === theme.value
-                        ? "border-blue-500 ring-2 ring-blue-100"
-                        : "border-slate-200 hover:border-slate-300"
+        <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 bg-white/90 p-4 md:p-6 rounded-3xl shadow-xl border border-white/80 overflow-hidden">
+          <div className="md:w-72 shrink-0 md:border-r md:pr-6 border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as SettingsTab)}
+                  className={`text-left p-3 rounded-2xl flex items-start gap-3 transition-all border ${
+                    activeTab === tab.id
+                      ? "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-800 border-blue-200 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center ${
+                      activeTab === tab.id
+                        ? "text-blue-700 bg-blue-100"
+                        : "text-slate-400 bg-slate-100"
                     }`}
                   >
-                    <div
-                      className="h-14 rounded-lg border border-slate-200"
-                      style={{ backgroundColor: theme.value }}
-                    />
-                    <div className="mt-2 text-sm font-bold text-slate-700">{theme.label}</div>
-                  </button>
-                ))}
-              </div>
-              <div
-                className="rounded-2xl border border-slate-200 p-4"
-                style={{ backgroundColor: bgTheme }}
-              >
-                <div className="text-sm font-semibold text-slate-700">Xem trước nền</div>
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
-                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
-                  <div className="h-16 rounded-lg bg-white border border-slate-200" />
-                </div>
-              </div>
-              <button
-                onClick={handleSaveTheme}
-                disabled={savingTheme}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
-              >
-                <Save size={18} /> {savingTheme ? "Đang lưu..." : "Lưu nền"}
-              </button>
-            </div>
-          )}
-
-          {activeTab === "ACCOUNT" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Cài đặt tài khoản
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">Họ và tên</label>
-                  <input
-                    type="text"
-                    className="w-full border p-2 rounded-lg text-sm"
-                    value={profileForm.fullName}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({ ...p, fullName: e.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">Email</label>
-                  <input
-                    type="email"
-                    className="w-full border p-2 rounded-lg text-sm"
-                    value={profileForm.email}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">Số điện thoại</label>
-                  <input
-                    type="text"
-                    className="w-full border p-2 rounded-lg text-sm"
-                    value={profileForm.phone}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({ ...p, phone: e.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">Avatar URL</label>
-                  <input
-                    type="text"
-                    className="w-full border p-2 rounded-lg text-sm"
-                    value={profileForm.avatar}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({ ...p, avatar: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-              {!!profileForm.avatar && (
-                <div className="w-20 h-20 rounded-full overflow-hidden border border-slate-200">
-                  <img src={profileForm.avatar} alt="avatar" className="w-full h-full object-cover" />
-                </div>
-              )}
-              {profileMessage && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-green-600" />
-                  {profileMessage}
-                </div>
-              )}
-              <button
-                onClick={handleSaveProfile}
-                disabled={savingProfile}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
-              >
-                <Save size={18} /> {savingProfile ? "Đang lưu..." : "Lưu tài khoản"}
-              </button>
-            </div>
-          )}
-
-          {activeTab === "SECURITY" && (
-            <div className="space-y-6 max-w-2xl animate-fade-in">
-              <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4">
-                Đổi mật khẩu
-              </h3>
-              <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-sm text-yellow-800 flex gap-2">
-                <AlertTriangle size={20} className="flex-shrink-0" />
-                <div>
-                  Mật khẩu mới nên có ít nhất 6 ký tự, gồm chữ hoa, chữ thường và số để an toàn hơn.
-                </div>
-              </div>
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="block text-xs font-bold text-gray-500 mb-1">Mật khẩu cũ</span>
-                  <div className="relative">
-                    <input
-                      type={showOld ? "text" : "password"}
-                      className="w-full border p-2 rounded-lg text-sm pr-10"
-                      value={passwordForm.oldPassword}
-                      onChange={(e) =>
-                        setPasswordForm((p) => ({ ...p, oldPassword: e.target.value }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowOld((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
-                    >
-                      {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                    {tab.icon}
                   </div>
-                </label>
-                <label className="block">
-                  <span className="block text-xs font-bold text-gray-500 mb-1">Mật khẩu mới</span>
-                  <div className="relative">
-                    <input
-                      type={showNew ? "text" : "password"}
-                      className="w-full border p-2 rounded-lg text-sm pr-10"
-                      value={passwordForm.newPassword}
-                      onChange={(e) =>
-                        setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNew((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
-                    >
-                      {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                  <div>
+                    <div className="font-extrabold text-sm">{tab.label}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{tab.desc}</div>
                   </div>
-                </label>
-                <label className="block">
-                  <span className="block text-xs font-bold text-gray-500 mb-1">Xác nhận mật khẩu mới</span>
-                  <div className="relative">
-                    <input
-                      type={showConfirm ? "text" : "password"}
-                      className="w-full border p-2 rounded-lg text-sm pr-10"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) =>
-                        setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
-                    >
-                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </label>
-                {passwordMessage && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-green-600" />
-                    {passwordMessage}
-                  </div>
-                )}
-                <button
-                  onClick={handleChangePassword}
-                  disabled={changingPassword}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
-                >
-                  <Lock size={16} /> {changingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
                 </button>
-              </div>
+              ))}
             </div>
-          )}
+          </div>
 
-          {/* fallback hidden old tabs */}
-          {false && (
-            <div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer"></div>
-              </label>
-            </div>
-          )}
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 md:pr-3">
+            {activeTab === "ACCOUNT" && (
+              <div className="space-y-6 max-w-3xl animate-fade-in">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+                  <h3 className="text-lg font-black text-slate-800 border-b border-slate-200 pb-2 mb-4">
+                    Cài đặt tài khoản
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Họ và tên</label>
+                      <input
+                        type="text"
+                        className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        placeholder="Nhập họ và tên"
+                        value={profileForm.fullName}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Email</label>
+                      <input
+                        type="email"
+                        className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        placeholder="Nhập email"
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Số điện thoại</label>
+                      <input
+                        type="text"
+                        className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        placeholder="Nhập số điện thoại"
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Avatar URL</label>
+                      <input
+                        type="text"
+                        className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        placeholder="https://..."
+                        value={profileForm.avatar}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, avatar: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {!!profileForm.avatar && (
+                    <div className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-sky-200 ring-2 ring-sky-50">
+                        <img src={profileForm.avatar} alt="avatar" className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-400 font-bold">Ảnh đại diện xem trước</div>
+                        <div className="text-sm font-semibold text-slate-700">Tài khoản hiện tại</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {profileMessage && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-green-600" />
+                      {profileMessage}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={savingProfile}
+                    className="mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-2.5 rounded-xl font-extrabold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
+                  >
+                    <Save size={18} /> {savingProfile ? "Đang lưu..." : "Lưu tài khoản"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "SECURITY" && (
+              <div className="space-y-6 max-w-3xl animate-fade-in">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+                  <h3 className="text-lg font-black text-slate-800 border-b border-slate-200 pb-2 mb-4">
+                    Đổi mật khẩu
+                  </h3>
+
+                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-sm text-amber-800 flex gap-2">
+                    <AlertTriangle size={20} className="flex-shrink-0" />
+                    <div>
+                      Mật khẩu mới nên có ít nhất 6 ký tự, gồm chữ hoa, chữ thường và số để an toàn hơn.
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 mt-4">
+                    <label className="block">
+                      <span className="block text-xs font-bold text-slate-500 mb-1.5">Mật khẩu cũ</span>
+                      <div className="relative">
+                        <input
+                          type={showOld ? "text" : "password"}
+                          className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                          value={passwordForm.oldPassword}
+                          onChange={(e) => setPasswordForm((p) => ({ ...p, oldPassword: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowOld((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                        >
+                          {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </label>
+
+                    <label className="block">
+                      <span className="block text-xs font-bold text-slate-500 mb-1.5">Mật khẩu mới</span>
+                      <div className="relative">
+                        <input
+                          type={showNew ? "text" : "password"}
+                          className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNew((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                        >
+                          {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </label>
+
+                    <label className="block">
+                      <span className="block text-xs font-bold text-slate-500 mb-1.5">Xác nhận mật khẩu mới</span>
+                      <div className="relative">
+                        <input
+                          type={showConfirm ? "text" : "password"}
+                          className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirm((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                        >
+                          {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </label>
+
+                    {passwordMessage && (
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-green-600" />
+                        {passwordMessage}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleChangePassword}
+                      disabled={changingPassword}
+                      className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-2.5 rounded-xl font-extrabold flex items-center gap-2 shadow-lg shadow-blue-200 transition disabled:opacity-70"
+                    >
+                      <Lock size={16} /> {changingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

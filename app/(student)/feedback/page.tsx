@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Send, MessageSquareText, Star } from "lucide-react";
-import { feedbackService, type FeedbackType } from "@/services/feedback.service";
+import {
+  feedbackService,
+  type FeedbackItem,
+  type FeedbackType,
+} from "@/services/feedback.service";
 
 const CATEGORIES: Array<{ value: FeedbackType; label: string; hint: string }> = [
   { value: "bug", label: "Báo lỗi", hint: "Có lỗi hiển thị, không bấm được, sai dữ liệu..." },
@@ -19,11 +23,59 @@ export default function StudentFeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const LIMIT = 5;
 
   const categoryHint = useMemo(
     () => CATEGORIES.find((c) => c.value === category)?.hint ?? "",
     [category],
   );
+
+  const typeLabel = (type: FeedbackType) => {
+    return CATEGORIES.find((c) => c.value === type)?.label ?? type;
+  };
+
+  const loadFeedbacks = async (page = 1) => {
+    try {
+      setLoadingFeedbacks(true);
+      setFeedbackError(null);
+
+      const res = await feedbackService.getAll(page, LIMIT);
+
+      let rows = Array.isArray(res?.data) ? res.data : [];
+
+      if (typeof window !== "undefined") {
+        const rawUser = localStorage.getItem("currentUser");
+        if (rawUser) {
+          const parsed = JSON.parse(rawUser);
+          const currentUserId =
+            parsed?._id || parsed?.id || parsed?.userId || parsed?.user?._id;
+          if (currentUserId) {
+            rows = rows.filter((item) => item.userId === currentUserId);
+          }
+        }
+      }
+
+      setFeedbacks(rows);
+      setCurrentPage(page);
+      setTotalPages(Math.max(1, Number(res?.totalPages || 1)));
+    } catch (e: any) {
+      setFeedbackError(
+        e?.response?.data?.message || e?.message || "Không tải được danh sách nhận xét.",
+      );
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadFeedbacks(1);
+  }, []);
 
   const submit = async () => {
     if (!title.trim()) {
@@ -57,6 +109,7 @@ export default function StudentFeedbackPage() {
       setMessage("");
       setRating(5);
       setCategory("general");
+      await loadFeedbacks(1);
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || "Gửi nhận xét thất bại.");
     } finally {
@@ -185,6 +238,97 @@ export default function StudentFeedbackPage() {
               {submitting ? "Đang gửi..." : "Gửi nhận xét"}
             </button>
           </div>
+        </div>
+
+        <div className="mt-6 bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl md:text-2xl font-black text-slate-900">
+              Lịch sử nhận xét
+            </h2>
+            <button
+              type="button"
+              onClick={() => void loadFeedbacks(currentPage)}
+              disabled={loadingFeedbacks}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 disabled:opacity-60"
+            >
+              {loadingFeedbacks ? "Đang tải..." : "Làm mới"}
+            </button>
+          </div>
+
+          {feedbackError && (
+            <div className="mt-4 p-4 rounded-2xl border border-red-200 bg-red-50 text-red-700 font-semibold text-sm">
+              {feedbackError}
+            </div>
+          )}
+
+          {!feedbackError && loadingFeedbacks && (
+            <div className="mt-4 text-sm font-semibold text-slate-500">
+              Đang tải danh sách nhận xét...
+            </div>
+          )}
+
+          {!feedbackError && !loadingFeedbacks && feedbacks.length === 0 && (
+            <div className="mt-4 p-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-sm">
+              Chưa có nhận xét nào.
+            </div>
+          )}
+
+          {!feedbackError && !loadingFeedbacks && feedbacks.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {feedbacks.map((item) => (
+                <div key={item._id} className="p-4 rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold">
+                      {typeLabel(item.type)}
+                    </span>
+                    {item.isResolved ? (
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                        Đã xử lý
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">
+                        Chưa xử lý
+                      </span>
+                    )}
+                    <span className="ml-auto text-xs text-slate-400 font-semibold">
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleString("vi-VN")
+                        : "-"}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 text-base font-black text-slate-900">{item.title}</h3>
+                  <p className="mt-1 text-sm text-slate-600 font-medium whitespace-pre-wrap">
+                    {item.content}
+                  </p>
+                  <div className="mt-2 text-xs text-slate-500 font-semibold">
+                    Đánh giá: {item.rating ?? "-"}/5
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadFeedbacks(currentPage - 1)}
+                  disabled={currentPage <= 1 || loadingFeedbacks}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Trước
+                </button>
+                <span className="text-sm font-bold text-slate-600 min-w-[110px] text-center">
+                  Trang {currentPage}/{Math.max(1, totalPages)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void loadFeedbacks(currentPage + 1)}
+                  disabled={currentPage >= totalPages || loadingFeedbacks}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

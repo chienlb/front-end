@@ -12,9 +12,11 @@ import {
   X,
   Pencil,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { lessonService } from "@/services/lessons.service";
 import { unitService } from "@/services/units.service";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 type LessonStatus = "ACTIVE" | "INACTIVE";
 type LessonRow = {
@@ -43,6 +45,7 @@ type VocabularyContent = {
 export default function AdminLessonsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | LessonStatus>("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lessons, setLessons] = useState<LessonRow[]>([]);
 
@@ -90,10 +93,19 @@ export default function AdminLessonsPage() {
   const [createContent, setCreateContent] = useState<VocabularyContent>(defaultVocabularyContent());
   const [editContent, setEditContent] = useState<VocabularyContent>(defaultVocabularyContent());
 
-  const fetchLessons = async () => {
+  const fetchLessons = async (filterStatus?: "ALL" | LessonStatus) => {
     try {
       setLoading(true);
-      const res: any = await lessonService.getAllLessons({ page: 1, limit: 500 });
+      const statusToFetch = filterStatus ?? status;
+      let res: any;
+
+      if (statusToFetch === "ALL") {
+        res = await lessonService.getAllLessons({ page: 1, limit: 500 });
+      } else {
+        const statusParam = statusToFetch === "ACTIVE" ? "active" : "inactive";
+        res = await lessonService.getLessonsByStatus(statusParam);
+      }
+
       const payload = res?.data ?? res;
       const list: any[] = Array.isArray(payload)
         ? payload
@@ -123,7 +135,7 @@ export default function AdminLessonsPage() {
           name: String(l?.title || l?.name || "Bài học chưa đặt tên"),
           description: l?.description || "",
           unitName: String(
-            l?.unitId?.name || l?.unit?.name || l?.unitName || "Không rõ unit",
+            l?.unitId?.name || l?.unit?.name || l?.unitName || "Không rõ chủ đề",
           ),
           type: String(l?.type || "N/A"),
           status: lessonStatus,
@@ -155,7 +167,7 @@ export default function AdminLessonsPage() {
       setUnitOptions(
         list.map((u) => ({
           id: String(u?._id || u?.id || ""),
-          name: String(u?.name || u?.title || "Unit"),
+          name: String(u?.name || u?.title || "Chủ đề"),
         })),
       );
     } catch {
@@ -164,9 +176,12 @@ export default function AdminLessonsPage() {
   };
 
   useEffect(() => {
-    fetchLessons();
     fetchUnitsForSelect();
   }, []);
+
+  useEffect(() => {
+    fetchLessons(status);
+  }, [status]);
 
   useEffect(() => {
     // ensure defaults for create form content
@@ -268,7 +283,7 @@ export default function AdminLessonsPage() {
         } as any);
       }
       setCreateSuccess("Tạo bài học thành công.");
-      await fetchLessons();
+      await fetchLessons(status);
       setTimeout(() => {
         setOpenCreate(false);
         resetLessonForm();
@@ -284,15 +299,39 @@ export default function AdminLessonsPage() {
   };
 
   const handleDeleteLesson = async (id: string) => {
-    const ok = window.confirm("Bạn có chắc muốn xóa bài học này?");
+    const ok = await showConfirm("Bạn có chắc muốn xóa bài học này?", "Xóa bài học");
     if (!ok) return;
     const prevLessons = lessons;
     setLessons((prev) => prev.filter((l) => l.id !== id));
     try {
       await lessonService.deleteLesson(id);
+      await showAlert("Đã xóa bài học thành công.", "Thành công");
     } catch (error: any) {
       setLessons(prevLessons);
-      alert(error?.response?.data?.message || "Không thể xóa bài học.");
+      await showAlert(
+        error?.response?.data?.message || "Không thể xóa bài học.",
+        "Xóa thất bại",
+      );
+    }
+  };
+
+  const handleRestoreLesson = async (id: string) => {
+    const ok = await showConfirm("Bạn có chắc muốn khôi phục bài học này?", "Khôi phục bài học");
+    if (!ok) return;
+
+    const prevLessons = lessons;
+    setLessons((prev) => prev.filter((l) => l.id !== id));
+
+    try {
+      await lessonService.restoreLesson(id);
+      await fetchLessons(status);
+      await showAlert("Đã khôi phục bài học thành công.", "Thành công");
+    } catch (error: any) {
+      setLessons(prevLessons);
+      await showAlert(
+        error?.response?.data?.message || "Không thể khôi phục bài học.",
+        "Khôi phục thất bại",
+      );
     }
   };
 
@@ -344,7 +383,10 @@ export default function AdminLessonsPage() {
       setOpenEdit(true);
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
-      alert(Array.isArray(msg) ? msg.join(", ") : msg || "Không tải được chi tiết bài học.");
+      await showAlert(
+        Array.isArray(msg) ? msg.join(", ") : msg || "Không tải được chi tiết bài học.",
+        "Không thể mở chỉnh sửa",
+      );
     }
   };
 
@@ -408,7 +450,7 @@ export default function AdminLessonsPage() {
       }
       setOpenEdit(false);
       resetEditForm();
-      await fetchLessons();
+      await fetchLessons(status);
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
       setEditError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể cập nhật bài học.");
@@ -423,10 +465,26 @@ export default function AdminLessonsPage() {
         l.name.toLowerCase().includes(search.toLowerCase()) ||
         l.unitName.toLowerCase().includes(search.toLowerCase()) ||
         l.description?.toLowerCase().includes(search.toLowerCase());
-      const okStatus = status === "ALL" || l.status === status;
-      return okText && okStatus;
+      return okText;
     });
-  }, [search, status, lessons]);
+  }, [search, lessons]);
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedLessons = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const activeCount = lessons.filter((x) => x.status === "ACTIVE").length;
   const inactiveCount = lessons.filter((x) => x.status === "INACTIVE").length;
@@ -435,13 +493,13 @@ export default function AdminLessonsPage() {
     if (s === "ACTIVE") {
       return (
         <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-          Active
+          Hoạt động
         </span>
       );
     }
     return (
       <span className="px-2 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
-        Inactive
+        Ngừng hoạt động
       </span>
     );
   };
@@ -456,12 +514,12 @@ export default function AdminLessonsPage() {
               Quản lý bài học
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Dữ liệu đồng bộ từ API `GET /lessons`.
+              Dữ liệu đồng bộ từ API lấy danh sách bài học.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={fetchLessons}
+              onClick={() => fetchLessons(status)}
               className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition inline-flex items-center gap-2"
             >
               <RefreshCw size={16} /> Làm mới
@@ -474,7 +532,7 @@ export default function AdminLessonsPage() {
               }}
               className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2"
             >
-              <Plus size={18} /> Tạo lesson
+              <Plus size={18} /> Tạo bài học
             </button>
           </div>
         </div>
@@ -485,11 +543,11 @@ export default function AdminLessonsPage() {
             <p className="text-2xl font-black text-slate-800 mt-1">{lessons.length}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-xs uppercase text-slate-500 font-bold">Đang active</p>
+            <p className="text-xs uppercase text-slate-500 font-bold">Đang hoạt động</p>
             <p className="text-2xl font-black text-green-600 mt-1">{activeCount}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-xs uppercase text-slate-500 font-bold">Inactive</p>
+            <p className="text-xs uppercase text-slate-500 font-bold">Ngừng hoạt động</p>
             <p className="text-2xl font-black text-amber-600 mt-1">{inactiveCount}</p>
           </div>
         </div>
@@ -500,23 +558,27 @@ export default function AdminLessonsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên bài học / unit..."
+              placeholder="Tìm theo tên bài học / chủ đề..."
               className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-indigo-400"
             />
           </div>
           <div className="flex items-center gap-2">
             <Layers3 size={16} className="text-slate-500" />
-            {(["ALL", "ACTIVE", "INACTIVE"] as const).map((s) => (
+            {([
+              { value: "ALL", label: "Tất cả" },
+              { value: "ACTIVE", label: "Đang hoạt động" },
+              { value: "INACTIVE", label: "Ngừng hoạt động" },
+            ] as const).map((s) => (
               <button
-                key={s}
-                onClick={() => setStatus(s)}
+                key={s.value}
+                onClick={() => setStatus(s.value)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                  status === s
+                  status === s.value
                     ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                 }`}
               >
-                {s}
+                {s.label}
               </button>
             ))}
           </div>
@@ -528,8 +590,8 @@ export default function AdminLessonsPage() {
               <tr>
                 <th className="p-4 pl-6">Bài học</th>
                 <th className="p-4">Mô tả</th>
-                <th className="p-4">Unit</th>
-                <th className="p-4 text-center">Order</th>
+                <th className="p-4">Chủ đề</th>
+                <th className="p-4 text-center">Thứ tự</th>
                 <th className="p-4 text-center">Thời lượng</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Cập nhật</th>
@@ -537,7 +599,7 @@ export default function AdminLessonsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filtered.map((l) => (
+              {paginatedLessons.map((l) => (
                 <tr key={l.id} className="hover:bg-slate-50/80">
                   <td className="p-4 pl-6">
                     <p className="font-bold text-slate-800">{l.name}</p>
@@ -563,6 +625,14 @@ export default function AdminLessonsPage() {
                       >
                         <Pencil size={13} /> Sửa
                       </button>
+                      {l.status === "INACTIVE" && (
+                        <button
+                          onClick={() => handleRestoreLesson(l.id)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 inline-flex items-center gap-1"
+                        >
+                          <RotateCcw size={13} /> Khôi phục
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteLesson(l.id)}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 inline-flex items-center gap-1"
@@ -583,6 +653,30 @@ export default function AdminLessonsPage() {
               Không có bài học phù hợp bộ lọc.
             </div>
           ) : null}
+
+          {!loading && filtered.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <p className="text-xs text-slate-500">
+                Trang {currentPage}/{totalPages} • Tổng {filtered.length} bài học
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Trước
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

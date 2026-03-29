@@ -12,7 +12,6 @@ import {
   Facebook,
   Linkedin,
   Link as LinkIcon,
-  MessageCircle,
   ChevronUp,
   Bookmark,
 } from "lucide-react";
@@ -65,6 +64,7 @@ export default function BlogPostDetail({
   const [showScrollTop, setShowScrollTop] = useState(false); // Nút lên đầu trang
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [shareNotice, setShareNotice] = useState("");
 
   const normalizedContentHtml = useMemo(() => {
     const raw = String(post?.content ?? "").trim();
@@ -204,9 +204,29 @@ export default function BlogPostDetail({
   }, [post]);
 
   // --- ACTIONS ---
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Đã sao chép liên kết bài viết!");
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareNotice("Đã sao chép liên kết bài viết.");
+    } catch {
+      setShareNotice("Không thể sao chép liên kết.");
+    }
+    setTimeout(() => setShareNotice(""), 1800);
+  };
+
+  const handleShare = async () => {
+    await handleCopyLink();
+  };
+
+  const openSocialShare = (platform: "facebook" | "linkedin") => {
+    const shareUrl = encodeURIComponent(window.location.href);
+    const shareTitle = encodeURIComponent(post?.title || "Bài viết");
+    const targetUrl =
+      platform === "facebook"
+        ? `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`
+        : `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}&title=${shareTitle}`;
+
+    window.open(targetUrl, "_blank", "noopener,noreferrer,width=680,height=640");
   };
 
   const scrollToTop = () => {
@@ -310,13 +330,14 @@ export default function BlogPostDetail({
                 whileTap={{ scale: 0.9 }}
                 onClick={handleShare}
                 className="p-3 bg-white rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 shadow-md transition border border-slate-100"
-                title="Chia sẻ"
+                title="Sao chép liên kết"
               >
-                <Share2 size={20} />
+                <LinkIcon size={20} />
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.1, x: 5 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={() => openSocialShare("facebook")}
                 className="p-3 bg-white rounded-full text-slate-500 hover:text-blue-700 hover:bg-blue-50 shadow-md transition border border-slate-100"
                 title="Facebook"
               >
@@ -325,19 +346,11 @@ export default function BlogPostDetail({
               <motion.button
                 whileHover={{ scale: 1.1, x: 5 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={() => openSocialShare("linkedin")}
                 className="p-3 bg-white rounded-full text-slate-500 hover:text-blue-500 hover:bg-blue-50 shadow-md transition border border-slate-100"
                 title="LinkedIn"
               >
                 <Linkedin size={20} />
-              </motion.button>
-              <div className="h-8 w-px bg-slate-300 my-2"></div>
-              <motion.button
-                whileHover={{ scale: 1.1, x: 5 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-3 bg-white rounded-full text-slate-500 hover:text-yellow-600 hover:bg-yellow-50 shadow-md transition border border-slate-100"
-                title="Lưu bài viết"
-              >
-                <Bookmark size={20} />
               </motion.button>
             </motion.div>
           </div>
@@ -379,12 +392,18 @@ export default function BlogPostDetail({
 
                 {/* Mobile Share Button */}
                 <button
-                  onClick={handleShare}
+                  onClick={() => void handleShare()}
                   className="lg:hidden p-2 text-slate-400 hover:text-blue-600"
                 >
                   <LinkIcon size={20} />
                 </button>
               </div>
+
+              {shareNotice && (
+                <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                  {shareNotice}
+                </div>
+              )}
 
               {/* HTML CONTENT */}
               <article
@@ -538,21 +557,6 @@ export default function BlogPostDetail({
                 )}
               </div>
 
-              {/* Newsletter / CTA Box */}
-              <div className="mt-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
-                <h4 className="font-bold text-lg mb-2">Đăng ký nhận tin</h4>
-                <p className="text-blue-100 text-xs mb-4">
-                  Nhận bài viết mới nhất về giáo dục trẻ em hàng tuần.
-                </p>
-                <input
-                  type="email"
-                  placeholder="Email của bạn"
-                  className="w-full px-3 py-2 rounded-lg text-sm text-slate-800 focus:outline-none mb-3"
-                />
-                <button className="w-full bg-white text-blue-700 font-bold py-2 rounded-lg text-sm hover:bg-blue-50 transition">
-                  Đăng ký ngay
-                </button>
-              </div>
             </motion.div>
           </div>
         </div>

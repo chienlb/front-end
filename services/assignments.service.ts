@@ -17,9 +17,9 @@ export const assignmentsService = {
     title: string;
     description?: string;
     type: string;
-    lessonId: string;
-    classId: string;
-    dueDate: string;
+    lessonId?: string;
+    classId?: string;
+    dueDate?: string;
     maxScore: number;
     isPublished: boolean;
     file?: File | null;
@@ -28,9 +28,15 @@ export const assignmentsService = {
     formData.append("title", payload.title.trim());
     formData.append("description", (payload.description || "").trim());
     formData.append("type", payload.type.trim());
-    formData.append("lessonId", payload.lessonId.trim());
-    formData.append("classId", payload.classId.trim());
-    formData.append("dueDate", payload.dueDate);
+    if (payload.lessonId?.trim()) {
+      formData.append("lessonId", payload.lessonId.trim());
+    }
+    if (payload.classId?.trim()) {
+      formData.append("classId", payload.classId.trim());
+    }
+    if (payload.dueDate) {
+      formData.append("dueDate", payload.dueDate);
+    }
     formData.append("maxScore", String(payload.maxScore));
     formData.append("isPublished", String(Boolean(payload.isPublished)));
     if (payload.file) formData.append("file", payload.file);

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   BookOpen,
   Library,
   Heart,
@@ -29,6 +28,7 @@ import {
   ClipboardList,
   Users,
 } from "lucide-react";
+import { notificationService } from "@/services/notifications.service";
 
 // --- 1. COMPONENT SIDEBAR ---
 interface SidebarProps {
@@ -38,16 +38,45 @@ interface SidebarProps {
 
 function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (typeof window === "undefined") return;
+      try {
+        const raw = localStorage.getItem("currentUser");
+        if (!raw) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const user = JSON.parse(raw);
+        const userId = String(user?._id || user?.id || user?.userId || "").trim();
+        if (!userId) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const res = await notificationService.getNotificationsByUserId(userId, {
+          page: 1,
+          limit: 100,
+        });
+        const unread = Array.isArray(res?.data)
+          ? res.data.filter((n) => !n?.isRead).length
+          : 0;
+        setUnreadCount(unread);
+      } catch {
+        setUnreadCount(0);
+      }
+    };
+
+    void fetchUnreadCount();
+  }, [pathname]);
 
   const menuGroups = [
     {
       group: "GIÁO VIÊN",
       items: [
-        {
-          name: "Dashboard",
-          href: "/teacher",
-          icon: LayoutDashboard,
-        },
         {
           name: "Quản lý nhóm học tập",
           href: "/teacher/classes",
@@ -62,6 +91,16 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           name: "Bài tập",
           href: "/teacher/assignments",
           icon: ClipboardList,
+        },
+        {
+          name: "Chấm bài",
+          href: "/teacher/grading",
+          icon: FileInput,
+        },
+        {
+          name: "Lịch dạy",
+          href: "/teacher/schedule",
+          icon: CalendarDays,
         },
         {
           name: "Lịch sử luyện tập học sinh",
@@ -126,10 +165,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             <div className="space-y-1">
               {group.items.map((item) => {
                 const isActive =
-                  item.href === "/teacher"
-                    ? pathname === "/teacher"
-                    : pathname === item.href ||
-                      pathname.startsWith(item.href + "/");
+                  pathname === item.href || pathname.startsWith(item.href + "/");
 
                 return (
                   <Link
@@ -185,6 +221,27 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
       {/* --- FOOTER USER --- */}
       <div className="p-4 border-t border-slate-800 shrink-0 bg-[#0D1B2A]">
+        <div
+          className={`mb-3 rounded-xl border border-slate-800/60 bg-slate-800/40 ${
+            isCollapsed ? "p-2" : "p-3"
+          }`}
+        >
+          <div className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
+            <div className="flex items-center gap-2">
+              <Bell size={16} className="text-amber-300" />
+              {!isCollapsed && <span className="text-xs font-bold text-slate-200">Thông báo</span>}
+            </div>
+            {unreadCount > 0 && !isCollapsed && (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black">
+                {unreadCount}
+              </span>
+            )}
+            {unreadCount > 0 && isCollapsed && (
+              <span className="ml-1 w-2.5 h-2.5 rounded-full bg-rose-500" />
+            )}
+          </div>
+        </div>
+
         <div
           className={`bg-slate-800/40 rounded-xl transition-all duration-300 border border-slate-800/50 flex items-center ${isCollapsed ? "justify-center p-2" : "p-3 gap-3"}`}
         >
@@ -272,15 +329,6 @@ export default function TeacherLayout({
                 className="bg-transparent border-none outline-none text-xs font-medium text-slate-800 ml-2 w-full placeholder:text-slate-500"
               />
             </div>
-
-            {/* Notification */}
-            <button
-                className="relative p-2.5 rounded-xl text-slate-600 transition-colors border border-emerald-100
-              bg-emerald-50 shadow-sm hover:bg-emerald-100 hover:text-emerald-700"
-            >
-              <Bell size={20} />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-emerald-50 animate-pulse"></span>
-            </button>
 
             {/* User Profile */}
             <div className="flex items-center gap-3 pl-5 border-l border-emerald-200 cursor-pointer group">

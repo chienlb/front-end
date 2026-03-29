@@ -12,12 +12,14 @@ import {
   Hash,
   Calculator,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import { Question, AssignmentInfo } from "./types";
 import QuestionItem from "./QuestionItem";
 import PreviewModal from "./PreviewModal";
 import { groupsService } from "@/services/groups.service";
 import { assignmentsService } from "@/services/assignments.service";
+import { lessonService } from "@/services/lessons.service";
 
 interface AssignmentEditorProps {
   initialData?: {
@@ -37,6 +39,9 @@ export default function AssignmentEditor({
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [lessons, setLessons] = useState<Array<{ id: string; name: string }>>([]);
+  const [classQuery, setClassQuery] = useState("");
+  const [showClassOptions, setShowClassOptions] = useState(false);
   const [createForm, setCreateForm] = useState({
     type: "reading",
     lessonId: "",
@@ -76,14 +81,20 @@ export default function AssignmentEditor({
 
   useEffect(() => {
     if (mode !== "create") return;
-    const fetchGroups = async () => {
+    const fetchFormSources = async () => {
       try {
-        const res: any = await groupsService.getMyGroups({ page: 1, limit: 200 });
-        const payload = res?.data ?? res;
+        const [groupsRes, lessonsRes] = await Promise.all([
+          groupsService
+            .getAllGroupsForTeacher()
+            .catch(() => groupsService.getMyGroups({ page: 1, limit: 200 }))
+            .catch(() => [] as any),
+          lessonService.getAllLessons({ page: 1, limit: 500 }).catch(() => [] as any),
+        ]);
+
         const extractList = (source: any): any[] => {
           if (Array.isArray(source)) return source;
           if (!source || typeof source !== "object") return [];
-          const keys = ["data", "items", "results", "docs", "groups", "rows"];
+          const keys = ["data", "items", "results", "docs", "groups", "rows", "lessons"];
           for (const key of keys) {
             if (Array.isArray(source[key])) return source[key];
           }
@@ -96,18 +107,43 @@ export default function AssignmentEditor({
           }
           return [];
         };
-        const list = extractList(payload);
-        const mapped = list.map((it: any, idx: number) => ({
+
+        const classList = extractList(groupsRes?.data ?? groupsRes);
+        const classMapped = classList.map((it: any, idx: number) => ({
           id: String(it?._id ?? it?.id ?? `group-${idx}`),
-          name: String(it?.name ?? it?.title ?? "Nhóm học"),
+          name: String(
+            it?.name ?? it?.title ?? it?.groupName ?? `Nhóm học ${idx + 1}`,
+          ),
         }));
-        setClasses(mapped);
+        setClasses(classMapped);
+
+        const lessonList = extractList(lessonsRes?.data ?? lessonsRes);
+        const lessonMapped = lessonList.map((it: any, idx: number) => ({
+          id: String(it?._id ?? it?.id ?? `lesson-${idx}`),
+          name: String(
+            it?.title ??
+              it?.name ??
+              it?.lessonName ??
+              it?.data?.title ??
+              `Bài học ${idx + 1}`,
+          ),
+        }));
+        setLessons(lessonMapped);
       } catch {
         setClasses([]);
+        setLessons([]);
       }
     };
-    fetchGroups();
+    fetchFormSources();
   }, [mode]);
+
+  const filteredClasses = useMemo(() => {
+    const q = classQuery.trim().toLowerCase();
+    if (!q) return classes;
+    return classes.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q),
+    );
+  }, [classes, classQuery]);
 
   // --- COMPUTED VALUES ---
   const totalPoints = useMemo(() => {
@@ -166,16 +202,12 @@ export default function AssignmentEditor({
 
     try {
       if (mode === "create") {
-        if (!createForm.lessonId.trim()) {
-          setSaveError("Vui lòng nhập Lesson ID.");
-          return;
-        }
         if (!createForm.classId.trim()) {
           setSaveError("Vui lòng chọn lớp học.");
           return;
         }
-        if (!createForm.dueDate) {
-          setSaveError("Vui lòng chọn hạn nộp.");
+        if (!createForm.file) {
+          setSaveError("Vui lòng tải lên file bài tập.");
           return;
         }
 
@@ -230,19 +262,22 @@ export default function AssignmentEditor({
               autoFocus
             />
             <span className="text-xs text-slate-400 font-medium mt-1">
-              {mode === "create" ? "Đang tạo mới" : "Đang chỉnh sửa"} •{" "}
-              {questions.length} câu hỏi
+              {mode === "create"
+                ? "Đang tạo mới • Bài tập dạng file"
+                : `Đang chỉnh sửa • ${questions.length} câu hỏi`}
             </span>
           </div>
         </div>
 
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowPreview(true)}
-            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 hover:text-blue-600 transition flex items-center gap-2"
-          >
-            <Eye size={18} /> Xem trước
-          </button>
+          {mode !== "create" && (
+            <button
+              onClick={() => setShowPreview(true)}
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 hover:text-blue-600 transition flex items-center gap-2"
+            >
+              <Eye size={18} /> Xem trước
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -303,35 +338,89 @@ export default function AssignmentEditor({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                    Lesson ID
+                    Bài học liên kết (tuỳ chọn)
                   </label>
-                  <input
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition"
-                    placeholder="Nhập lessonId"
+                  <select
+                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
                     value={createForm.lessonId}
                     onChange={(e) =>
                       setCreateForm((p) => ({ ...p, lessonId: e.target.value }))
                     }
-                  />
+                  >
+                    <option value="">Không gắn bài học</option>
+                    {lessons.map((lesson) => (
+                      <option key={lesson.id} value={lesson.id}>
+                        {lesson.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
                     Lớp học
                   </label>
-                  <select
-                    className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
-                    value={createForm.classId}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, classId: e.target.value }))
-                    }
-                  >
-                    <option value="">Chọn lớp học</option>
-                    {classes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Search size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      value={classQuery}
+                      onFocus={() => setShowClassOptions(true)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setClassQuery(value);
+                        setShowClassOptions(true);
+
+                        const exact = classes.find(
+                          (c) =>
+                            c.name.toLowerCase() === value.trim().toLowerCase() ||
+                            c.id.toLowerCase() === value.trim().toLowerCase(),
+                        );
+                        setCreateForm((p) => ({ ...p, classId: exact?.id || "" }));
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowClassOptions(false), 120);
+                      }}
+                      className="w-full border border-slate-200 pl-9 pr-3 py-3 rounded-xl text-sm outline-none focus:border-blue-500 transition bg-white"
+                      placeholder="Chọn nhóm lớp giáo viên quản lý"
+                    />
+
+                    {showClassOptions && (
+                      <div className="absolute z-20 mt-2 w-full max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                        {filteredClasses.length > 0 ? (
+                          filteredClasses.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setCreateForm((p) => ({ ...p, classId: c.id }));
+                                setClassQuery(c.name);
+                                setShowClassOptions(false);
+                              }}
+                              className="w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-semibold text-slate-700">{c.name}</div>
+                              <div className="text-xs text-slate-400">ID: {c.id}</div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2.5 text-sm text-slate-500">
+                            Không tìm thấy nhóm lớp phù hợp.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {createForm.classId ? (
+                    <p className="mt-2 text-xs font-semibold text-emerald-600">
+                      Đã chọn lớp: {createForm.classId}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-400">
+                      Bạn cần chọn 1 nhóm lớp trước khi tạo bài tập.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
@@ -418,7 +507,8 @@ export default function AssignmentEditor({
             </div>
 
             {/* Duration */}
-            <div>
+            {mode !== "create" && (
+              <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
                 <Clock size={14} /> Thời gian (phút)
               </label>
@@ -434,20 +524,24 @@ export default function AssignmentEditor({
                   })
                 }
               />
-            </div>
+              </div>
+            )}
 
             {/* Total Points (Read-only) */}
-            <div>
+            {mode !== "create" && (
+              <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
                 <Calculator size={14} /> Tổng điểm
               </label>
               <div className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm font-bold text-slate-500 cursor-not-allowed select-none">
                 {totalPoints} điểm
               </div>
-            </div>
+              </div>
+            )}
 
             {/* Tags (Mock UI) */}
-            <div>
+            {mode !== "create" && (
+              <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
                 <Hash size={14} /> Thẻ phân loại
               </label>
@@ -456,42 +550,47 @@ export default function AssignmentEditor({
                 className="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500 transition"
                 placeholder="VD: Unit 1, Grammar..."
               />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {mode !== "create" && (
+          <>
+            {/* --- QUESTIONS LIST --- */}
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <QuestionItem
+                  key={q.id}
+                  question={q}
+                  index={idx}
+                  onUpdate={(updates) => updateQuestion(q.id, updates)}
+                  onDelete={() => deleteQuestion(q.id)}
+                />
+              ))}
             </div>
-          </div>
-        </div>
 
-        {/* --- QUESTIONS LIST --- */}
-        <div className="space-y-6">
-          {questions.map((q, idx) => (
-            <QuestionItem
-              key={q.id}
-              question={q}
-              index={idx}
-              onUpdate={(updates) => updateQuestion(q.id, updates)}
-              onDelete={() => deleteQuestion(q.id)}
-            />
-          ))}
-        </div>
+            {/* --- ADD BUTTON --- */}
+            <button
+              onClick={addQuestion}
+              className="w-full mt-8 py-5 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center gap-3 group"
+            >
+              <div className="bg-slate-200 group-hover:bg-blue-200 rounded-full p-1.5 text-white transition">
+                <Plus
+                  size={24}
+                  className="text-slate-500 group-hover:text-blue-600"
+                />
+              </div>
+              <span className="text-lg">Thêm câu hỏi mới</span>
+            </button>
 
-        {/* --- ADD BUTTON --- */}
-        <button
-          onClick={addQuestion}
-          className="w-full mt-8 py-5 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center gap-3 group"
-        >
-          <div className="bg-slate-200 group-hover:bg-blue-200 rounded-full p-1.5 text-white transition">
-            <Plus
-              size={24}
-              className="text-slate-500 group-hover:text-blue-600"
-            />
-          </div>
-          <span className="text-lg">Thêm câu hỏi mới</span>
-        </button>
-
-        {/* Empty State Warning */}
-        {questions.length === 0 && (
-          <div className="mt-4 p-4 bg-orange-50 text-orange-600 rounded-xl flex items-center gap-2 text-sm font-medium">
-            <AlertCircle size={18} /> Bài tập cần ít nhất 1 câu hỏi.
-          </div>
+            {/* Empty State Warning */}
+            {questions.length === 0 && (
+              <div className="mt-4 p-4 bg-orange-50 text-orange-600 rounded-xl flex items-center gap-2 text-sm font-medium">
+                <AlertCircle size={18} /> Bài tập cần ít nhất 1 câu hỏi.
+              </div>
+            )}
+          </>
         )}
       </div>
 

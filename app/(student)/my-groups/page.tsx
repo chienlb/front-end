@@ -26,13 +26,13 @@ type GroupMessage = {
 export default function MyGroupsPage() {
   const router = useRouter();
 
-  const CACHE_KEY = "my-groups-cache-v1";
-
   const [keyword, setKeyword] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Group[]>([]);
 
   const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [loadingMyGroups, setLoadingMyGroups] = useState(false);
+  const [myGroupsError, setMyGroupsError] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -52,38 +52,11 @@ export default function MyGroupsPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const loadFromLocalStorage = () => {
-      try {
-        const raw =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem(CACHE_KEY)
-            : null;
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-
-        const normalized: Group[] = parsed
-          .map((g: any) => ({
-            id: g?.id ?? g?._id ?? "",
-            name: g?.name ?? g?.groupName ?? "",
-            topic: g?.topic,
-            description: g?.description,
-            membersCount: g?.membersCount ?? g?.members?.length,
-          }))
-          .filter((g: Group) => Boolean(g.id) && Boolean(g.name));
-
-        setMyGroups(normalized);
-        if (!activeGroupId && normalized.length) {
-          setActiveGroupId(normalized[0].id);
-        }
-      } catch {
-        // ignore
-      }
-    };
-
     const load = async () => {
       try {
-        const res = await groupsService.getMyGroups({ page: 1, limit: 50 });
+        setLoadingMyGroups(true);
+        setMyGroupsError("");
+        const res = await groupsService.getMyGroupsAll({ limit: 100, maxPages: 50 });
         const data = res?.data ?? res;
         const raw = data?.items ?? data?.data ?? data;
         const items = (Array.isArray(raw) ? raw : raw ? [raw] : []) as any[];
@@ -102,24 +75,20 @@ export default function MyGroupsPage() {
         if (!activeGroupId && normalized.length) {
           setActiveGroupId(normalized[0].id);
         }
-      } catch {
-        // API chưa sẵn hoặc backend chưa trả đúng, fallback localStorage
-        loadFromLocalStorage();
+      } catch (error: any) {
+        const msg = error?.response?.data?.message ?? error?.message;
+        setMyGroups([]);
+        setMyGroupsError(
+          Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tải danh sách nhóm.",
+        );
+      } finally {
+        setLoadingMyGroups(false);
       }
     };
 
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      window.localStorage.setItem(CACHE_KEY, JSON.stringify(myGroups));
-    } catch {
-      // ignore
-    }
-  }, [myGroups]);
 
   useEffect(() => {
     // Xác định "tôi" để căn phải/trái tin nhắn.
@@ -411,7 +380,11 @@ export default function MyGroupsPage() {
             {/* My groups */}
             <div className="p-4 border-t border-slate-100">
               <h3 className="font-bold text-slate-800 mb-3">Nhóm của bạn</h3>
-              {myGroups?.length ? (
+              {loadingMyGroups ? (
+                <div className="text-slate-500 text-sm">Đang tải nhóm...</div>
+              ) : myGroupsError ? (
+                <div className="text-red-600 text-sm">{myGroupsError}</div>
+              ) : myGroups?.length ? (
                 <div className="space-y-2 max-h-[220px] overflow-auto pr-1 custom-scrollbar">
                   {myGroups.map((g) => {
                     const isActive = g.id === activeGroupId;

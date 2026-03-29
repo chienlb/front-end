@@ -33,30 +33,21 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { userService } from "@/services/user.service";
+import { notificationService } from "@/services/notifications.service";
 
 // Components
 import InventoryModal from "@/components/student/course/InventoryModal";
 import AITutorWidget from "./AITutorWidget";
 
-// --- MOCK NOTIFICATIONS ---
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 1,
-    title: "🎉 Khuyến mãi 50% Gói VIP",
-    desc: "Chỉ duy nhất hôm nay! Nâng cấp ngay để mở khóa toàn bộ tính năng.",
-    type: "PROMO",
-    read: false,
-    time: "2 giờ trước",
-  },
-  {
-    id: 2,
-    title: "⏰ Nhắc nhở học tập",
-    desc: "Bé ơi, đã đến giờ học bài rồi. Vào học ngay để giữ chuỗi Streak nhé!",
-    type: "REMINDER",
-    read: false,
-    time: "5 giờ trước",
-  },
-];
+type HeaderNotification = {
+  id: string;
+  title: string;
+  desc: string;
+  type: string;
+  read: boolean;
+  time: string;
+  link?: string;
+};
 
 /** Tránh crash khi localStorage `currentUser` rỗng / không phải JSON hợp lệ (JSON.parse → Unexpected end of JSON input). */
 function parseStoredUser(raw: string | null): Record<string, unknown> | null {
@@ -85,6 +76,10 @@ export default function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<HeaderNotification | null>(null);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const notiRef = useRef<HTMLDivElement>(null);
@@ -289,6 +284,100 @@ export default function Navbar() {
     window.location.reload();
   };
 
+  const formatTimeAgo = (dateString?: string) => {
+    if (!dateString) return "Vừa xong";
+    const diff = Date.now() - new Date(dateString).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (minutes < 60) return `${Math.max(minutes, 1)} phút trước`;
+    if (hours < 24) return `${hours} giờ trước`;
+    return `${days} ngày trước`;
+  };
+
+  const mapNotificationType = (rawType?: string) => {
+    const t = String(rawType || "").toUpperCase();
+    if (t.includes("PROMO") || t.includes("ANNOUNCE")) return "PROMO";
+    if (t.includes("REMINDER") || t.includes("WARNING")) return "REMINDER";
+    return "SYSTEM";
+  };
+
+  const getCurrentUserId = () => {
+    const stored = parseStoredUser(
+      typeof window !== "undefined" ? localStorage.getItem("currentUser") : null,
+    );
+    return String(
+      stored?._id ||
+        stored?.id ||
+        stored?.userId ||
+        "",
+    ).trim();
+  };
+
+  const loadNotifications = async () => {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      setLoadingNotifications(true);
+      const res = await notificationService.getNotificationsByUserId(userId, {
+        page: 1,
+        limit: 20,
+      });
+
+      const mapped: HeaderNotification[] = (res?.data || []).map((n: any) => ({
+        id: String(n?._id ?? n?.id ?? ""),
+        title: String(n?.title ?? "Thông báo"),
+        desc: String(n?.message ?? ""),
+        type: mapNotificationType(n?.type),
+        read: Boolean(n?.isRead),
+        time: formatTimeAgo(n?.createdAt),
+        link: String(n?.data?.link ?? "").trim() || undefined,
+      }));
+
+      setNotifications(mapped.filter((n) => n.id));
+    } catch (error) {
+      console.error("Lỗi tải thông báo header:", error);
+      setNotifications([]);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleReadAllNotifications = async () => {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    try {
+      await notificationService.markAllAsReadByUser(userId);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (error) {
+      console.error("Lỗi đánh dấu đọc tất cả:", error);
+    }
+  };
+
+  const handleNotificationClick = async (notif: HeaderNotification) => {
+    setExpandedNotificationId((prev) => (prev === notif.id ? null : notif.id));
+    setSelectedNotification(notif);
+
+    if (!notif.read) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)),
+      );
+      try {
+        await notificationService.markAsRead(notif.id);
+      } catch (error) {
+        console.error("Lỗi đánh dấu đã đọc:", error);
+      }
+    }
+
+  };
+
   const getNotiColor = (type: string) => {
     switch (type) {
       case "PROMO":
@@ -396,6 +485,9 @@ export default function Navbar() {
                   onClick={() => {
                     setShowNotiMenu(!showNotiMenu);
                     setShowUserMenu(false);
+                    if (!showNotiMenu) {
+                      void loadNotifications();
+                    }
                   }}
                   className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${showNotiMenu ? "bg-blue-50 text-blue-600" : "hover:bg-slate-100 text-slate-500"}`}
                 >
@@ -403,7 +495,9 @@ export default function Navbar() {
                     size={20}
                     className={showNotiMenu ? "animate-tada" : ""}
                   />
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                  )}
                 </button>
 
                 {/* Noti Dropdown */}
@@ -411,43 +505,55 @@ export default function Navbar() {
                   <div className="absolute top-full right-0 mt-4 w-96 bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-slate-100 p-2 animate-in fade-in slide-in-from-top-2 duration-200 z-[80] overflow-hidden">
                     <div className="px-4 py-3 flex justify-between items-center border-b border-slate-50">
                       <h3 className="font-bold text-slate-800">Thông báo</h3>
-                      <button className="text-xs font-bold text-blue-600 hover:underline">
+                      <button
+                        onClick={() => void handleReadAllNotifications()}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
                         Đọc tất cả
                       </button>
                     </div>
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2 space-y-1">
-                      {MOCK_NOTIFICATIONS.map((notif) => (
-                        <div
-                          key={notif.id}
-                          className={`flex gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors group ${!notif.read ? "bg-blue-50/50" : ""}`}
-                        >
+                      {loadingNotifications ? (
+                        <div className="p-4 text-xs text-slate-500">Đang tải thông báo...</div>
+                      ) : notifications.length > 0 ? (
+                        notifications.map((notif) => (
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg ${getNotiColor(notif.type)}`}
+                            key={notif.id}
+                            onClick={() => void handleNotificationClick(notif)}
+                            className={`flex gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors group ${!notif.read ? "bg-blue-50/50" : ""}`}
                           >
-                            {notif.type === "PROMO" ? (
-                              <Tag size={16} className="text-white" />
-                            ) : (
-                              <Clock size={16} className="text-white" />
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg ${getNotiColor(notif.type)}`}
+                            >
+                              {notif.type === "PROMO" ? (
+                                <Tag size={16} className="text-white" />
+                              ) : (
+                                <Clock size={16} className="text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <h4
+                                className={`text-sm font-bold mb-1 ${!notif.read ? "text-slate-900" : "text-slate-600"}`}
+                              >
+                                {notif.title}
+                              </h4>
+                              <p
+                                className={`text-xs text-slate-500 ${expandedNotificationId === notif.id ? "" : "line-clamp-2"}`}
+                              >
+                                {notif.desc}
+                              </p>
+                              <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                                {notif.time}
+                              </span>
+                            </div>
+                            {!notif.read && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 shrink-0"></div>
                             )}
                           </div>
-                          <div className="flex-1">
-                            <h4
-                              className={`text-sm font-bold mb-1 ${!notif.read ? "text-slate-900" : "text-slate-600"}`}
-                            >
-                              {notif.title}
-                            </h4>
-                            <p className="text-xs text-slate-500 line-clamp-2">
-                              {notif.desc}
-                            </p>
-                            <span className="text-[10px] text-slate-400 font-medium mt-1 block">
-                              {notif.time}
-                            </span>
-                          </div>
-                          {!notif.read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 shrink-0"></div>
-                          )}
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <div className="p-4 text-xs text-slate-500">Chưa có thông báo nào.</div>
+                      )}
                     </div>
                     <div className="p-2 border-t border-slate-50 text-center">
                       <Link
@@ -648,6 +754,67 @@ export default function Navbar() {
                         </span>
                       </Link>
                     ))}
+
+                    {selectedNotification && (
+                      <div
+                        className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                        onMouseDown={(e) => {
+                          if (e.target !== e.currentTarget) return;
+                          setSelectedNotification(null);
+                        }}
+                      >
+                        <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+                          <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="text-base font-black text-slate-900">
+                                Chi tiết thông báo
+                              </h3>
+                              <p className="text-xs text-slate-400 mt-1">{selectedNotification.time}</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                              onClick={() => setSelectedNotification(null)}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <div className="px-5 py-4">
+                            <h4 className="text-sm font-bold text-slate-800 mb-2">
+                              {selectedNotification.title}
+                            </h4>
+                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                              {selectedNotification.desc || "Không có nội dung chi tiết."}
+                            </p>
+                          </div>
+
+                          <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedNotification(null)}
+                              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50"
+                            >
+                              Đóng
+                            </button>
+                            {selectedNotification.link && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const target = selectedNotification.link;
+                                  setSelectedNotification(null);
+                                  setShowNotiMenu(false);
+                                  router.push(target);
+                                }}
+                                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700"
+                              >
+                                Đi tới liên quan
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

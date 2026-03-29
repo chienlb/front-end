@@ -14,6 +14,7 @@ import {
   Eye,
 } from "lucide-react";
 import { literatureService } from "@/services/literatures.service";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 type LiteratureRow = {
   id: string;
@@ -99,6 +100,7 @@ export default function ResourceLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [rows, setRows] = useState<LiteratureRow[]>([]);
 
   const [openCreate, setOpenCreate] = useState(false);
@@ -298,14 +300,35 @@ export default function ResourceLibraryPage() {
     });
   }, [rows, search]);
 
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedType]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const handleDeleteLiterature = async (id: string) => {
-    const ok = window.confirm("Bạn có chắc muốn xóa tác phẩm này?");
+    const ok = await showConfirm("Bạn có chắc muốn xóa tác phẩm này?", "Xóa tác phẩm");
     if (!ok) return;
     try {
       await literatureService.deleteLiterature(id);
       await fetchLiteratures();
+      await showAlert("Đã xóa tác phẩm thành công.", "Thành công");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Không thể xóa tác phẩm.");
+      await showAlert(
+        error?.response?.data?.message || "Không thể xóa tác phẩm.",
+        "Xóa thất bại",
+      );
     }
   };
 
@@ -335,7 +358,10 @@ export default function ResourceLibraryPage() {
       });
       setOpenEdit(true);
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Không thể mở dữ liệu chỉnh sửa.");
+      await showAlert(
+        error?.response?.data?.message || "Không thể mở dữ liệu chỉnh sửa.",
+        "Không thể mở chỉnh sửa",
+      );
     }
   };
 
@@ -412,7 +438,7 @@ export default function ResourceLibraryPage() {
               Thư viện văn học
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Danh sách văn/thơ đồng bộ từ API `GET /literatures`.
+              Danh sách văn/thơ đồng bộ từ API thư viện văn học.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -496,14 +522,14 @@ export default function ResourceLibraryPage() {
                 <th className="p-4 pl-6">Tác phẩm</th>
                 <th className="p-4 text-center">Ảnh</th>
                 <th className="p-4">Thể loại</th>
-                <th className="p-4">Level</th>
+                <th className="p-4">Cấp độ</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Cập nhật</th>
                 <th className="p-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredRows.map((r) => (
+              {paginatedRows.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="p-4 pl-6">
                     <p className="font-bold text-slate-800">{r.title}</p>
@@ -526,11 +552,11 @@ export default function ResourceLibraryPage() {
                   <td className="p-4 text-center">
                     {r.isPublished ? (
                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-                        Published
+                        Đã xuất bản
                       </span>
                     ) : (
                       <span className="px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
-                        Draft
+                        Bản nháp
                       </span>
                     )}
                   </td>
@@ -574,6 +600,30 @@ export default function ResourceLibraryPage() {
               Không có dữ liệu phù hợp.
             </div>
           ) : null}
+
+          {!loading && filteredRows.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <p className="text-xs text-slate-500">
+                Trang {currentPage}/{totalPages} • Tổng {filteredRows.length} tác phẩm
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Trước
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

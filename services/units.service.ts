@@ -22,12 +22,28 @@ export const unitService = {
 
   // Cập nhật unit
   updateUnit: async (id: string, data: any) => {
-    return api.patch(`/units/${id}`, data);
+    if (data instanceof FormData) {
+      return api.patch(`/units/${id}`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    }
+    return api.patch(`/units/${id}`, data, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   },
 
   // Xóa unit
   deleteUnit: async (id: string) => {
     return api.delete(`/units/${id}`);
+  },
+
+  // Lấy unit theo trạng thái
+  getUnitsByStatus: async (status: "active" | "inactive") => {
+    return api.get(`/units/status/${status}`);
   },
 
   // Lấy unit theo userId

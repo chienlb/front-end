@@ -6,6 +6,11 @@ export const lessonService = {
     return api.get("/lessons", { params });
   },
 
+  // Lấy danh sách lesson theo trạng thái
+  getLessonsByStatus: async (status: "active" | "inactive") => {
+    return api.get(`/lessons/status/${status}`);
+  },
+
   // Lấy chi tiết lesson theo ID
   getLessonById: async (id: string) => {
     return api.get(`/lessons/${id}`);

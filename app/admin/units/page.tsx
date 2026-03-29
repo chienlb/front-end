@@ -11,8 +11,10 @@ import {
   X,
   Pencil,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { unitService } from "@/services/units.service";
+import { showAlert, showConfirm } from "@/utils/dialog";
 
 type UnitStatus = "ACTIVE" | "INACTIVE";
 type UnitRow = {
@@ -31,6 +33,7 @@ type UnitRow = {
 export default function AdminUnitsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | UnitStatus>("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [openCreate, setOpenCreate] = useState(false);
@@ -66,10 +69,19 @@ export default function AdminUnitsPage() {
     exercises: [],
   });
 
-  const fetchUnits = async () => {
+  const fetchUnits = async (filterStatus?: "ALL" | UnitStatus) => {
     try {
       setLoading(true);
-      const res: any = await unitService.getAllUnits({ page: 1, limit: 500 });
+      const statusToFetch = filterStatus ?? status;
+      let res: any;
+
+      if (statusToFetch === "ALL") {
+        res = await unitService.getAllUnits({ page: 1, limit: 500 });
+      } else {
+        const statusParam = statusToFetch === "ACTIVE" ? "active" : "inactive";
+        res = await unitService.getUnitsByStatus(statusParam);
+      }
+
       const payload = res?.data ?? res;
       const list: any[] = Array.isArray(payload)
         ? payload
@@ -108,6 +120,10 @@ export default function AdminUnitsPage() {
   useEffect(() => {
     fetchUnits();
   }, []);
+
+  useEffect(() => {
+    fetchUnits(status);
+  }, [status]);
 
   const resetCreateForm = () => {
     setForm({
@@ -191,7 +207,7 @@ export default function AdminUnitsPage() {
 
       await unitService.createUnit(fd);
       setCreateSuccess("Tạo chủ đề bài học thành công.");
-      await fetchUnits();
+      await fetchUnits(status);
       setTimeout(() => {
         setOpenCreate(false);
         resetCreateForm();
@@ -212,19 +228,65 @@ export default function AdminUnitsPage() {
       const okText =
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.description?.toLowerCase().includes(search.toLowerCase());
-      const okStatus = status === "ALL" || u.status === status;
-      return okText && okStatus;
+      return okText;
     });
-  }, [search, status, units]);
+  }, [search, units]);
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedUnits = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleDeleteUnit = async (id: string) => {
-    const ok = window.confirm("Bạn có chắc muốn xóa chủ đề này?");
+    const ok = await showConfirm("Bạn có chắc muốn xóa chủ đề này?", "Xóa chủ đề");
     if (!ok) return;
+
+    const previousUnits = [...units];
+    setUnits((prev) => prev.filter((u) => u.id !== id));
+
     try {
       await unitService.deleteUnit(id);
-      await fetchUnits();
+      await fetchUnits(status);
+      await showAlert("Đã xóa chủ đề thành công.", "Thành công");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Không thể xóa chủ đề.");
+      setUnits(previousUnits);
+      await showAlert(
+        error?.response?.data?.message || "Không thể xóa chủ đề.",
+        "Xóa thất bại",
+      );
+    }
+  };
+
+  const handleRestoreUnit = async (id: string) => {
+    const ok = await showConfirm("Bạn có chắc muốn kích hoạt lại chủ đề này?", "Kích hoạt");
+    if (!ok) return;
+
+    const previousUnits = [...units];
+    setUnits((prev) => prev.filter((u) => u.id !== id));
+
+    try {
+      await unitService.updateUnit(id, { isActive: true });
+      // Fetch "ALL" thay vì fetch status hiện tại, vì unit vừa đổi status
+      await fetchUnits("ALL");
+      await showAlert("Đã kích hoạt chủ đề thành công.", "Thành công");
+    } catch (error: any) {
+      setUnits(previousUnits);
+      await showAlert(
+        error?.response?.data?.message || "Không thể kích hoạt chủ đề.",
+        "Kích hoạt thất bại",
+      );
     }
   };
 
@@ -238,18 +300,33 @@ export default function AdminUnitsPage() {
     if (!editRow) return;
     try {
       setSavingEdit(true);
-      const fd = new FormData();
-      fd.append("name", editRow.name || "");
-      fd.append("topic", editRow.topic || "");
-      fd.append("description", editRow.description || "");
-      if (editThumbnailFile) fd.append("thumbnail", editThumbnailFile);
-      await unitService.updateUnit(editRow.id, fd);
+      // Nếu có file thumbnail, dùng FormData; không thì dùng JSON
+      let updateData: any;
+      if (editThumbnailFile) {
+        const fd = new FormData();
+        fd.append("name", editRow.name || "");
+        fd.append("topic", editRow.topic || "");
+        fd.append("description", editRow.description || "");
+        fd.append("thumbnail", editThumbnailFile);
+        updateData = fd;
+      } else {
+        updateData = {
+          name: editRow.name,
+          topic: editRow.topic,
+          description: editRow.description,
+        };
+      }
+      await unitService.updateUnit(editRow.id, updateData);
       setOpenEdit(false);
       setEditRow(null);
       setEditThumbnailFile(null);
-      await fetchUnits();
+      await fetchUnits(status);
+      await showAlert("Đã cập nhật chủ đề thành công.", "Thành công");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Không thể cập nhật chủ đề.");
+      await showAlert(
+        error?.response?.data?.message || "Không thể cập nhật chủ đề.",
+        "Cập nhật thất bại",
+      );
     } finally {
       setSavingEdit(false);
     }
@@ -276,40 +353,42 @@ export default function AdminUnitsPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
               <BookOpen size={24} className="text-indigo-600" />
-              Chủ đề bài học (Units)
+              Chủ đề bài học
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Danh sách unit đồng bộ từ API `GET /units`.
+              Danh sách chủ đề đồng bộ từ API chủ đề bài học.
             </p>
           </div>
-          <button
-            onClick={fetchUnits}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition inline-flex items-center gap-2"
-          >
-            <RefreshCw size={16} /> Làm mới
-          </button>
-          <button
-            onClick={() => {
-              resetCreateForm();
-              setOpenCreate(true);
-            }}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2"
-          >
-            <Plus size={16} /> Tạo chủ đề bài học
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchUnits(status)}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition inline-flex items-center gap-2"
+            >
+              <RefreshCw size={16} /> Làm mới
+            </button>
+            <button
+              onClick={() => {
+                resetCreateForm();
+                setOpenCreate(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition inline-flex items-center gap-2"
+            >
+              <Plus size={16} /> Tạo chủ đề bài học
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-xs uppercase text-slate-500 font-bold">Tổng Unit</p>
+            <p className="text-xs uppercase text-slate-500 font-bold">Tổng chủ đề</p>
             <p className="text-2xl font-black text-slate-800 mt-1">{units.length}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-xs uppercase text-slate-500 font-bold">Đang active</p>
+            <p className="text-xs uppercase text-slate-500 font-bold">Đang hoạt động</p>
             <p className="text-2xl font-black text-green-600 mt-1">{activeCount}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <p className="text-xs uppercase text-slate-500 font-bold">Inactive</p>
+            <p className="text-xs uppercase text-slate-500 font-bold">Ngừng hoạt động</p>
             <p className="text-2xl font-black text-amber-600 mt-1">{inactiveCount}</p>
           </div>
         </div>
@@ -354,7 +433,7 @@ export default function AdminUnitsPage() {
                 <th className="p-4 text-center">Thumbnail</th>
                 <th className="p-4">Mô tả</th>
                 <th className="p-4">Độ khó</th>
-                <th className="p-4 text-center">Order</th>
+                <th className="p-4 text-center">Thứ tự</th>
                 <th className="p-4 text-center">Số bài</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Cập nhật</th>
@@ -362,7 +441,7 @@ export default function AdminUnitsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filtered.map((u) => (
+              {paginatedUnits.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/80">
                   <td className="p-4 pl-6">
                     <p className="font-bold text-slate-800">{u.name}</p>
@@ -395,6 +474,14 @@ export default function AdminUnitsPage() {
                       >
                         <Pencil size={13} /> Sửa
                       </button>
+                      {u.status === "INACTIVE" && (
+                        <button
+                          onClick={() => handleRestoreUnit(u.id)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 inline-flex items-center gap-1"
+                        >
+                          <RotateCcw size={13} /> Kích hoạt
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteUnit(u.id)}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 inline-flex items-center gap-1"
@@ -408,13 +495,37 @@ export default function AdminUnitsPage() {
             </tbody>
           </table>
           {loading ? (
-            <div className="p-10 text-center text-slate-500">Đang tải dữ liệu unit...</div>
+            <div className="p-10 text-center text-slate-500">Đang tải dữ liệu chủ đề...</div>
           ) : filtered.length === 0 ? (
             <div className="p-10 text-center text-slate-500">
               <CheckCircle2 className="mx-auto mb-2 text-slate-300" size={24} />
-              Không có unit phù hợp bộ lọc.
+              Không có chủ đề phù hợp bộ lọc.
             </div>
           ) : null}
+
+          {!loading && filtered.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <p className="text-xs text-slate-500">
+                Trang {currentPage}/{totalPages} • Tổng {filtered.length} chủ đề
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Trước
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -475,7 +586,7 @@ export default function AdminUnitsPage() {
                   type="number"
                   value={form.orderIndex}
                   onChange={(e) => setForm((p) => ({ ...p, orderIndex: e.target.value }))}
-                  placeholder="Order index"
+                  placeholder="Thứ tự hiển thị"
                   className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                 />
                 <input

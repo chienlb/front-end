@@ -37,6 +37,16 @@ export const authService = {
     return res as any;
   },
 
+  updateProfile: async (data: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    avatar?: string;
+  }): Promise<any> => {
+    const res = await api.patch("/auths/profile", data);
+    return res as any;
+  },
+
   forgotPassword: async (email: string): Promise<any> => {
     const res = await api.post("/auths/forgot-password", { email });
     return res as any;
