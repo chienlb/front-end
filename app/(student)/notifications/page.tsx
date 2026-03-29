@@ -94,8 +94,7 @@ export default function NotificationsPage() {
 
         // If backend returns pagination, use it; else infer from page size.
         const totalPages =
-          (typeof res.totalPages === "number" ? res.totalPages : null) ??
-          (typeof res?.meta?.totalPages === "number" ? res.meta.totalPages : null);
+          typeof res.totalPages === "number" ? res.totalPages : null;
 
         if (typeof totalPages === "number") setHasMore(1 < totalPages);
         else setHasMore(mapped.length >= 20);
@@ -140,8 +139,7 @@ export default function NotificationsPage() {
       setPage(nextPage);
 
       const totalPages =
-        (typeof res.totalPages === "number" ? res.totalPages : null) ??
-        (typeof res?.meta?.totalPages === "number" ? res.meta.totalPages : null);
+        typeof res.totalPages === "number" ? res.totalPages : null;
       if (typeof totalPages === "number") setHasMore(nextPage < totalPages);
       else setHasMore(mapped.length >= 20);
     } catch (err) {

@@ -802,6 +802,7 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => {
                                   const target = selectedNotification.link;
+                                  if (!target) return;
                                   setSelectedNotification(null);
                                   setShowNotiMenu(false);
                                   router.push(target);

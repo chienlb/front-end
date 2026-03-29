@@ -57,8 +57,8 @@ export default function MyGroupsPage() {
         setLoadingMyGroups(true);
         setMyGroupsError("");
         const res = await groupsService.getMyGroupsAll({ limit: 100, maxPages: 50 });
-        const data = res?.data ?? res;
-        const raw = data?.items ?? data?.data ?? data;
+        const payload: any = (res as any)?.data ?? res;
+        const raw = payload?.items ?? payload?.data ?? payload;
         const items = (Array.isArray(raw) ? raw : raw ? [raw] : []) as any[];
 
         const normalized: Group[] = items
