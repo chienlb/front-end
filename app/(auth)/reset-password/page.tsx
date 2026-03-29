@@ -96,7 +96,7 @@ function ResetPasswordContent() {
               Thiết lập mật khẩu mới
             </h2>
             <p className="text-purple-100 text-base font-medium">
-              Hãy chọn một mật khẩu mạnh để bảo vệ tài khoản SmartKids của bạn.
+              Hãy chọn một mật khẩu mạnh để bảo vệ tài khoản Happy Cat của bạn.
             </p>
           </div>
         </div>
@@ -113,7 +113,7 @@ function ResetPasswordContent() {
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-black text-slate-800 tracking-tighter leading-none">
-                SmartKids
+                Happy Cat
               </span>
               <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">
                 Education System

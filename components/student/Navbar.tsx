@@ -321,7 +321,7 @@ export default function Navbar() {
             </div>
             <div className="hidden md:flex flex-col">
               <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-blue-700 transition-colors">
-                SmartKids
+                Happy Cat
               </span>
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-400 transition-colors">
                 Education System

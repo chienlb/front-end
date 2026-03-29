@@ -30,7 +30,7 @@ export default function Footer() {
               {/* Text Brand */}
               <div className="flex flex-col">
                 <span className="text-xl font-extrabold text-white tracking-tight leading-none group-hover:text-blue-400 transition-colors">
-                  SmartKids
+                  Happy Cat
                 </span>
                 <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
                   Education System
@@ -130,7 +130,7 @@ export default function Footer() {
       {/* 2. BOTTOM BAR */}
       <div className="bg-gray-950 py-6 border-t border-gray-800">
         <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <p>© 2024 SmartKids English Center. All rights reserved.</p>
+          <p>© 2024 Happy Cat English Center. All rights reserved.</p>
           <div className="flex gap-6">
             <Link href="/sitemap" className="hover:text-blue-400 transition">
               Sitemap

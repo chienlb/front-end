@@ -251,7 +251,7 @@ export default function RegisterPage() {
             <h2 className="text-3xl font-extrabold mb-3 drop-shadow-sm">
               {formData.role === "TEACHER"
                 ? "Trở thành Đối tác 🤝"
-                : "Tham gia cùng SmartKids 🚀"}
+                : "Tham gia cùng Happy Cat 🚀"}
             </h2>
             <p className="text-orange-50 text-base font-medium">
               {formData.role === "TEACHER"
@@ -273,7 +273,7 @@ export default function RegisterPage() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-black text-slate-800 tracking-tighter leading-none">
-                SmartKids
+                Happy Cat
               </span>
               <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">
                 Education System
@@ -334,7 +334,7 @@ export default function RegisterPage() {
                 <input
                   type="text"
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all font-medium text-slate-700 text-sm"
-                  placeholder="smartkids_2026"
+                  placeholder="happycat_2026"
                   value={formData.username}
                   onChange={(e) =>
                     setFormData({ ...formData, username: e.target.value })

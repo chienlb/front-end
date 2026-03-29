@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-black text-slate-800 tracking-tighter leading-none">
-                SmartKids
+                Happy Cat
               </span>
               <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">
                 Education System
