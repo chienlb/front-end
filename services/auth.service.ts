@@ -13,40 +13,54 @@ export const authService = {
     phone?: string;
     gender?: string;
     typeAccount?: string;
-  }) => {
-    return api.post("/auths/register", data);
+  }): Promise<any> => {
+    const res = await api.post("/auths/register", data);
+    return res as any;
   },
 
   login: async (data: {
     email: string;
     password: string;
     deviceId: string;
-  }) => {
-    return api.post("/auths/login", data);
+  }): Promise<any> => {
+    const res = await api.post("/auths/login", data);
+    return res as any;
   },
 
-  logout: async () => {
-    return api.post("/auths/logout");
+  logout: async (): Promise<any> => {
+    const res = await api.post("/auths/logout");
+    return res as any;
   },
 
-  getProfile: async () => {
-    return api.get("/auths/profile");
+  getProfile: async (): Promise<any> => {
+    const res = await api.get("/auths/profile");
+    return res as any;
   },
 
-  forgotPassword: (email: string) => {
-    return api.post("/auths/forgot-password", { email });
+  forgotPassword: async (email: string): Promise<any> => {
+    const res = await api.post("/auths/forgot-password", { email });
+    return res as any;
   },
 
-  resetPassword: (data: { codeVerify: string; password: string }) => {
-    return api.post("/auths/reset-password", data);
+  resetPassword: async (data: {
+    codeVerify: string;
+    password: string;
+  }): Promise<any> => {
+    const res = await api.post("/auths/reset-password", data);
+    return res as any;
   },
 
-  verifyEmail: (data: { email: string; codeVerify: string }) => {
-    return api.post("/auths/verify-email", data);
+  verifyEmail: async (data: {
+    email: string;
+    codeVerify: string;
+  }): Promise<any> => {
+    const res = await api.post("/auths/verify-email", data);
+    return res as any;
   },
 
-  resendVerificationEmail: (email: string) => {
-    return api.post("/auths/resend-verification-email", { email });
+  resendVerificationEmail: async (email: string): Promise<any> => {
+    const res = await api.post("/auths/resend-verification-email", { email });
+    return res as any;
   },
 
   /**
@@ -64,12 +78,12 @@ export const authService = {
     };
     try {
       const res = await api.post("/auths/change-password", body);
-      return res.data ?? res;
+      return res as any;
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 404 || status === 405) {
         const res = await api.patch("/auths/password", body);
-        return res.data ?? res;
+        return res as any;
       }
       throw err;
     }
