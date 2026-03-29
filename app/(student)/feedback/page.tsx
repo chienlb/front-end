@@ -2,17 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { Send, MessageSquareText, Star } from "lucide-react";
-import { feedbackService, type FeedbackCategory } from "@/services/feedback.service";
+import { feedbackService, type FeedbackType } from "@/services/feedback.service";
 
-const CATEGORIES: Array<{ value: FeedbackCategory; label: string; hint: string }> = [
-  { value: "BUG", label: "Báo lỗi", hint: "Có lỗi hiển thị, không bấm được, sai dữ liệu..." },
-  { value: "SUGGESTION", label: "Góp ý", hint: "Gợi ý cải thiện trải nghiệm học tập, UI/UX..." },
-  { value: "CONTENT", label: "Nội dung", hint: "Sai chính tả, ví dụ chưa chuẩn, bài học khó hiểu..." },
-  { value: "OTHER", label: "Khác", hint: "Các phản hồi khác." },
+const CATEGORIES: Array<{ value: FeedbackType; label: string; hint: string }> = [
+  { value: "bug", label: "Báo lỗi", hint: "Có lỗi hiển thị, không bấm được, sai dữ liệu..." },
+  { value: "general", label: "Góp ý chung", hint: "Gợi ý cải thiện trải nghiệm học tập, UI/UX..." },
+  { value: "lesson", label: "Bài học", hint: "Vấn đề liên quan nội dung bài học hoặc tài liệu." },
+  { value: "feature", label: "Tính năng", hint: "Đề xuất thêm hoặc chỉnh sửa tính năng." },
 ];
 
 export default function StudentFeedbackPage() {
-  const [category, setCategory] = useState<FeedbackCategory>("SUGGESTION");
+  const [category, setCategory] = useState<FeedbackType>("general");
+  const [title, setTitle] = useState("");
   const [rating, setRating] = useState<number>(5);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +26,11 @@ export default function StudentFeedbackPage() {
   );
 
   const submit = async () => {
+    if (!title.trim()) {
+      setError("Bạn hãy nhập tiêu đề phản hồi.");
+      return;
+    }
+
     if (!message.trim()) {
       setError("Bạn hãy nhập nội dung phản hồi trước khi gửi.");
       return;
@@ -38,18 +44,21 @@ export default function StudentFeedbackPage() {
       const pageUrl = typeof window !== "undefined" ? window.location.href : undefined;
 
       await feedbackService.create({
-        category,
+        type: category,
+        title: title.trim(),
+        content: message.trim(),
         rating,
-        message: message.trim(),
-        pageUrl,
+        relatedId: pageUrl,
+        isResolved: false,
       });
 
       setDone(true);
+      setTitle("");
       setMessage("");
       setRating(5);
-      setCategory("SUGGESTION");
+      setCategory("general");
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Gửi feedback thất bại.");
+      setError(e?.response?.data?.message || e?.message || "Gửi nhận xét thất bại.");
     } finally {
       setSubmitting(false);
     }
@@ -65,7 +74,7 @@ export default function StudentFeedbackPage() {
             </div>
             <div className="flex-1">
               <h1 className="text-2xl md:text-3xl font-black text-slate-900">
-                Feedback
+                Nhận xét
               </h1>
               <p className="text-slate-500 mt-1 font-medium">
                 Góp ý để mình cải thiện bài học và trải nghiệm của bạn tốt hơn.
@@ -80,7 +89,7 @@ export default function StudentFeedbackPage() {
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
+                onChange={(e) => setCategory(e.target.value as FeedbackType)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 font-semibold outline-none focus:border-blue-400"
               >
                 {CATEGORIES.map((c) => (
@@ -124,6 +133,18 @@ export default function StudentFeedbackPage() {
 
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Tiêu đề
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ví dụ: Không mở được bài luyện nghe Unit 3"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 font-medium outline-none focus:border-blue-400"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
                 Nội dung
               </label>
               <textarea
@@ -150,7 +171,7 @@ export default function StudentFeedbackPage() {
 
           {done && (
             <div className="mt-5 p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 font-semibold text-sm">
-              Đã gửi feedback. Cảm ơn bạn!
+              Đã gửi nhận xét. Cảm ơn bạn!
             </div>
           )}
 
@@ -161,7 +182,7 @@ export default function StudentFeedbackPage() {
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-lg shadow-blue-200 transition disabled:opacity-60"
             >
               <Send size={18} />
-              {submitting ? "Đang gửi..." : "Gửi feedback"}
+              {submitting ? "Đang gửi..." : "Gửi nhận xét"}
             </button>
           </div>
         </div>

@@ -5,9 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LogOut,
-  CreditCard,
   Menu,
-  Cat,
   ChevronDown,
   BookOpen,
   Gamepad2,
@@ -32,7 +30,6 @@ import {
   ClipboardList,
   BarChart3,
   MessageSquare,
-  PlayCircle,
   ShieldCheck,
 } from "lucide-react";
 import { userService } from "@/services/user.service";
@@ -533,42 +530,23 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {/* Resume Learning Button */}
-                    <div className="mb-3">
-                      <button className="w-full p-3 bg-green-50 hover:bg-green-100 border border-green-200 rounded-2xl flex items-center gap-3 transition group text-left">
-                        <div className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-green-200 group-hover:scale-110 transition-transform">
-                          <PlayCircle size={20} fill="currentColor" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-green-600 uppercase">
-                            Tiếp tục học
-                          </p>
-                          <p className="text-xs font-bold text-slate-800 line-clamp-1">
-                            Unit 3: My Family - Lesson 2
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-2 mb-3">
                       <Link
-                        href="/shop"
+                        href="/progress"
                         onClick={() => setShowUserMenu(false)}
-                        className="flex flex-col items-center justify-center p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-slate-600 hover:text-amber-700 transition border border-amber-100"
+                        className="flex flex-col items-center justify-center p-3 rounded-2xl bg-cyan-50 hover:bg-cyan-100 text-slate-600 hover:text-cyan-700 transition border border-cyan-100"
                       >
-                        <CreditCard size={24} className="mb-2 text-amber-500" />
-                        <span className="text-xs font-bold">Cửa hàng</span>
+                        <BarChart3 size={22} className="mb-2 text-cyan-500" />
+                        <span className="text-xs font-bold">Tiến độ học</span>
                       </Link>
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setShowInventory(true);
-                        }}
-                        className="flex flex-col items-center justify-center p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-slate-600 hover:text-purple-700 transition border border-purple-100"
+                      <Link
+                        href="/notifications"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-slate-600 hover:text-blue-700 transition border border-blue-100"
                       >
-                        <Cat size={24} className="mb-2 text-purple-500" />
-                        <span className="text-xs font-bold">Thú cưng</span>
-                      </button>
+                        <Bell size={22} className="mb-2 text-blue-500" />
+                        <span className="text-xs font-bold">Thông báo</span>
+                      </Link>
                     </div>
 
                     <div className="space-y-1 mb-3">

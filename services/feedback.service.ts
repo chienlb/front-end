@@ -1,19 +1,59 @@
 import api from "@/utils/api";
 
-export type FeedbackCategory = "BUG" | "SUGGESTION" | "CONTENT" | "OTHER";
+export type FeedbackType = "general" | "lesson" | "feature" | "bug";
+
+export interface FeedbackItem {
+  _id: string;
+  userId: string;
+  type: FeedbackType;
+  title: string;
+  content: string;
+  rating?: number;
+  relatedId?: string;
+  isResolved?: boolean;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface CreateFeedbackPayload {
-  category: FeedbackCategory;
-  rating?: number; // 1..5
-  message: string;
-  pageUrl?: string;
+  type: FeedbackType;
+  title: string;
+  content: string;
+  rating?: number;
+  relatedId?: string;
+  isResolved?: boolean;
+}
+
+export interface UpdateFeedbackPayload {
+  type?: FeedbackType;
+  title?: string;
+  content?: string;
+  rating?: number;
+  relatedId?: string;
+  isResolved?: boolean;
 }
 
 export const feedbackService = {
   create: async (payload: CreateFeedbackPayload) => {
-    // If your backend uses a different endpoint, change it here.
-    // Common patterns: POST /feedback, POST /feedbacks
-    return api.post("/feedback", payload);
+    return api.post("/feedbacks", payload);
+  },
+
+  findAll: async (page = 1, limit = 10) => {
+    return api.get("/feedbacks", { params: { page, limit } });
+  },
+
+  findById: async (id: string) => {
+    return api.get(`/feedbacks/${id}`);
+  },
+
+  updateById: async (id: string, payload: UpdateFeedbackPayload) => {
+    return api.put(`/feedbacks/${id}`, payload);
+  },
+
+  deleteById: async (id: string) => {
+    return api.delete(`/feedbacks/${id}`);
   },
 };
 

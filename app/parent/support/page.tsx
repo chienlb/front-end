@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { supportsService } from "@/services/supports.service";
 import {
   LifeBuoy,
   MessageCircle,
@@ -43,57 +44,62 @@ interface FAQ {
   answer: string;
 }
 
-// --- MOCK DATA ---
-const MY_TICKETS: Ticket[] = [
-  {
-    id: "#TK-2023-001",
-    subject: "Lỗi thanh toán gói Premium qua VNPay",
-    category: "Thanh toán",
-    createdAt: "10:30 AM, Hôm nay",
-    status: "OPEN",
-    priority: "URGENT",
-    lastUpdate: "Vừa xong",
+interface SupportDto {
+  _id?: string;
+  id?: string;
+  subject?: string;
+  message?: string;
+  attachments?: string[];
+  status?: string;
+  priority?: string;
+  category?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const normalizeSupportStatus = (statusRaw?: string): TicketStatus => {
+  const status = String(statusRaw || "").trim().toUpperCase();
+  if (status === "IN_PROGRESS" || status === "PROCESSING") return "IN_PROGRESS";
+  if (status === "RESOLVED") return "RESOLVED";
+  if (status === "CLOSED" || status === "REJECTED") return "CLOSED";
+  return "OPEN";
+};
+
+const normalizeSupportPriority = (priorityRaw?: string): TicketPriority => {
+  const priority = String(priorityRaw || "").trim().toUpperCase();
+  if (priority === "URGENT") return "URGENT";
+  if (priority === "HIGH") return "HIGH";
+  if (priority === "MEDIUM" || priority === "NORMAL") return "MEDIUM";
+  return "LOW";
+};
+
+const normalizeSupport = (item: SupportDto, idx: number): Ticket => {
+  const id = item._id || item.id || `support-${idx}`;
+  const createdAt = item.createdAt
+    ? new Date(item.createdAt).toLocaleString("vi-VN")
+    : "Vừa xong";
+  const updatedAt = item.updatedAt
+    ? new Date(item.updatedAt).toLocaleString("vi-VN")
+    : createdAt;
+
+  return {
+    id,
+    subject: item.subject || "Yêu cầu hỗ trợ",
+    category: item.category || "Hỗ trợ chung",
+    createdAt,
+    status: normalizeSupportStatus(item.status),
+    priority: normalizeSupportPriority(item.priority),
+    lastUpdate: updatedAt,
     messages: [
       {
-        id: "m1",
+        id: `${id}-m1`,
         sender: "ME",
-        content:
-          "Tôi đã thanh toán qua VNPay nhưng tài khoản vẫn chưa được nâng cấp.",
-        timestamp: "10:30 AM",
+        content: item.message || "",
+        timestamp: createdAt,
       },
     ],
-  },
-  {
-    id: "#TK-2023-002",
-    subject: "Không xem được video bài học Unit 5",
-    category: "Lỗi kỹ thuật",
-    createdAt: "15/11/2023",
-    status: "RESOLVED",
-    priority: "MEDIUM",
-    lastUpdate: "16/11/2023",
-    messages: [
-      {
-        id: "m1",
-        sender: "ME",
-        content: "Video bài học Unit 5 bị lỗi loading mãi không chạy.",
-        timestamp: "15/11/2023 09:00",
-      },
-      {
-        id: "m2",
-        sender: "ADMIN",
-        content:
-          "Chào bạn, kỹ thuật đã kiểm tra và khắc phục server. Bạn thử tải lại trang nhé.",
-        timestamp: "15/11/2023 10:30",
-      },
-      {
-        id: "m3",
-        sender: "ME",
-        content: "Cảm ơn, mình xem được rồi ạ.",
-        timestamp: "15/11/2023 11:00",
-      },
-    ],
-  },
-];
+  };
+};
 
 const FAQS: FAQ[] = [
   {
@@ -111,12 +117,65 @@ const FAQS: FAQ[] = [
 export default function ParentSupportPage() {
   const [activeTab, setActiveTab] = useState<"TICKETS" | "FAQ">("TICKETS");
   const [isCreating, setIsCreating] = useState(false);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [createSubject, setCreateSubject] = useState("");
+  const [createMessage, setCreateMessage] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [replyInput, setReplyInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const selectedTicket = MY_TICKETS.find((t) => t.id === selectedTicketId);
+  const selectedTicket = tickets.find((t) => t.id === selectedTicketId);
+
+  useEffect(() => {
+    const loadTickets = async () => {
+      try {
+        setLoadingTickets(true);
+        setTicketsError(null);
+
+        const currentUserRaw = localStorage.getItem("currentUser");
+        const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : null;
+        const userId =
+          currentUser?._id ||
+          currentUser?.id ||
+          currentUser?.userId ||
+          currentUser?.data?._id ||
+          currentUser?.data?.id ||
+          "";
+
+        const res: any = userId
+          ? await supportsService.getSupportsByUserId(String(userId))
+          : await supportsService.getSupports();
+
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+            ? res
+            : [];
+
+        const normalized = list.map((item: SupportDto, idx: number) =>
+          normalizeSupport(item, idx),
+        );
+        setTickets(normalized);
+        setSelectedTicketId((prev) => prev || normalized[0]?.id || null);
+      } catch (error: any) {
+        setTickets([]);
+        setTicketsError(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Không tải được danh sách hỗ trợ.",
+        );
+      } finally {
+        setLoadingTickets(false);
+      }
+    };
+
+    void loadTickets();
+  }, []);
 
   // Auto scroll khi mở ticket hoặc có tin nhắn mới
   useEffect(() => {
@@ -125,15 +184,59 @@ export default function ParentSupportPage() {
 
   const handleSendReply = () => {
     if (!replyInput.trim() || !selectedTicket) return;
-    // Mock gửi tin nhắn (Trong thực tế sẽ gọi API)
     const newMessage: Message = {
       id: Date.now().toString(),
       sender: "ME",
       content: replyInput,
       timestamp: "Vừa xong",
     };
-    selectedTicket.messages.push(newMessage);
+
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === selectedTicket.id
+          ? {
+              ...ticket,
+              messages: [...ticket.messages, newMessage],
+              lastUpdate: "Vừa xong",
+            }
+          : ticket,
+      ),
+    );
     setReplyInput("");
+  };
+
+  const handleCreateTicket = async () => {
+    if (!createSubject.trim() || !createMessage.trim()) {
+      setCreateError("Vui lòng nhập tiêu đề và nội dung yêu cầu.");
+      return;
+    }
+
+    try {
+      setCreatingTicket(true);
+      setCreateError(null);
+
+      const created: any = await supportsService.createSupport({
+        subject: createSubject.trim(),
+        message: createMessage.trim(),
+      });
+
+      const createdSupport = created?.data || created;
+      const normalized = normalizeSupport(createdSupport, Date.now());
+
+      setTickets((prev) => [normalized, ...prev]);
+      setSelectedTicketId(normalized.id);
+      setCreateSubject("");
+      setCreateMessage("");
+      setIsCreating(false);
+    } catch (error: any) {
+      setCreateError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Tạo yêu cầu hỗ trợ thất bại.",
+      );
+    } finally {
+      setCreatingTicket(false);
+    }
   };
 
   const getStatusBadge = (status: TicketStatus) => {
@@ -206,7 +309,19 @@ export default function ParentSupportPage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
             {activeTab === "TICKETS" ? (
               <div className="flex-1 overflow-y-auto">
-                {MY_TICKETS.map((ticket) => (
+                {loadingTickets && (
+                  <div className="p-6 text-sm text-slate-500">Đang tải yêu cầu hỗ trợ...</div>
+                )}
+
+                {!loadingTickets && ticketsError && (
+                  <div className="p-6 text-sm font-semibold text-red-600">{ticketsError}</div>
+                )}
+
+                {!loadingTickets && !ticketsError && tickets.length === 0 && (
+                  <div className="p-6 text-sm text-slate-500">Chưa có yêu cầu hỗ trợ nào.</div>
+                )}
+
+                {tickets.map((ticket) => (
                   <div
                     key={ticket.id}
                     onClick={() => setSelectedTicketId(ticket.id)}
@@ -380,16 +495,24 @@ export default function ParentSupportPage() {
               <input
                 className="w-full border rounded-xl p-3 text-sm"
                 placeholder="Tiêu đề..."
+                value={createSubject}
+                onChange={(e) => setCreateSubject(e.target.value)}
               />
               <textarea
                 className="w-full border rounded-xl p-3 text-sm h-32"
                 placeholder="Chi tiết..."
+                value={createMessage}
+                onChange={(e) => setCreateMessage(e.target.value)}
               />
+              {createError && (
+                <p className="text-sm font-semibold text-red-600">{createError}</p>
+              )}
               <button
-                onClick={() => setIsCreating(false)}
-                className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl"
+                onClick={() => void handleCreateTicket()}
+                disabled={creatingTicket}
+                className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl disabled:opacity-60"
               >
-                Gửi yêu cầu
+                {creatingTicket ? "Đang gửi..." : "Gửi yêu cầu"}
               </button>
             </div>
           </div>
