@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import { blogService } from "@/services/blogs.service";
 import {
   Calendar,
@@ -63,6 +63,39 @@ export default function BlogPostDetail({
   const [activeId, setActiveId] = useState<string>(""); // State để highlight mục lục
   const [scrollProgress, setScrollProgress] = useState(0); // State thanh tiến độ
   const [showScrollTop, setShowScrollTop] = useState(false); // Nút lên đầu trang
+  const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+
+  const normalizedContentHtml = useMemo(() => {
+    const raw = String(post?.content ?? "").trim();
+    if (!raw) return "<p>Bài viết đang được cập nhật.</p>";
+
+    // Nếu backend đã trả HTML thì giữ nguyên; nếu chỉ là text thì tự bọc <p> để hiển thị đúng.
+    const hasHtmlTag = /<\/?[a-z][\s\S]*>/i.test(raw);
+    if (hasHtmlTag) return raw;
+
+    return raw
+      .split(/\n{2,}/)
+      .map((block) => {
+        const normalizedBlock = block
+          .replace(/\n+/g, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+        return `<p>${normalizedBlock}</p>`;
+      })
+      .join("");
+  }, [post?.content]);
+
+  const normalizeCategory = (value?: string) => String(value || "").trim().toUpperCase();
+
+  const getContentPreview = (html: string, maxLength = 110) => {
+    const plain = String(html || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!plain) return "Bài viết đang được cập nhật nội dung.";
+    return plain.length > maxLength ? `${plain.slice(0, maxLength)}...` : plain;
+  };
 
   // --- 2. CONFIG FRAMER MOTION HOOKS ---
   const { scrollYProgress, scrollY } = useScroll();
@@ -84,6 +117,46 @@ export default function BlogPostDetail({
     };
     fetchPost();
   }, [id]);
+
+  useEffect(() => {
+    if (!post?._id || !post.category) {
+      setRelatedPosts([]);
+      return;
+    }
+
+    const fetchRelatedPosts = async () => {
+      try {
+        setRelatedLoading(true);
+        const res: any = await blogService.findAllBlogs({
+          page: 1,
+          limit: 30,
+          sort: "createdAt",
+          order: "desc",
+        });
+
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+            ? res
+            : [];
+
+        const currentCategory = normalizeCategory(post.category);
+        const filtered = list
+          .filter((item: BlogPost) => item?._id !== post._id)
+          .filter((item: BlogPost) => normalizeCategory(item?.category) === currentCategory)
+          .slice(0, 4);
+
+        setRelatedPosts(filtered);
+      } catch (error) {
+        console.error("Lỗi tải bài viết liên quan:", error);
+        setRelatedPosts([]);
+      } finally {
+        setRelatedLoading(false);
+      }
+    };
+
+    void fetchRelatedPosts();
+  }, [post?._id, post?.category]);
 
   // --- HANDLE SCROLL & TOC ---
   useEffect(() => {
@@ -166,7 +239,7 @@ export default function BlogPostDetail({
       />
 
       {/* 2. HEADER HERO */}
-      <div className="h-[55vh] relative group overflow-hidden bg-slate-900">
+      <div className="relative group overflow-hidden bg-slate-900 min-h-[420px] md:min-h-[520px] h-[62vh] md:h-[58vh]">
         {/* Parallax Image */}
         <motion.div
           style={{ y: headerY, opacity: headerOpacity }}
@@ -205,7 +278,7 @@ export default function BlogPostDetail({
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="absolute bottom-0 left-0 w-full p-6 md:p-12 pb-24 max-w-5xl mx-auto z-10"
+          className="absolute bottom-0 left-0 w-full p-6 md:p-12 pb-32 md:pb-36 max-w-5xl mx-auto z-10"
         >
           <div className="flex items-center gap-3 mb-4">
             <span className="bg-blue-600 text-white px-3 py-1 rounded-md font-bold text-xs uppercase tracking-wider">
@@ -222,7 +295,7 @@ export default function BlogPostDetail({
       </div>
 
       {/* 3. MAIN CONTENT LAYOUT */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 -mt-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 -mt-6 md:-mt-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* --- LEFT SIDEBAR (Social Share - Sticky) --- */}
           <div className="hidden lg:block lg:col-span-1 relative">
@@ -323,9 +396,11 @@ export default function BlogPostDetail({
                 prose-img:rounded-2xl prose-img:shadow-lg prose-img:w-full prose-img:object-cover prose-img:my-8
                 prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:bg-blue-50/30 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:rounded-r-xl prose-blockquote:italic
                 prose-li:marker:text-blue-500
+                break-words [word-break:normal] [overflow-wrap:break-word]
+                [&_*]:max-w-full [&_*]:break-words [&_*]:[word-break:normal] [&_*]:[overflow-wrap:break-word]
               "
               >
-                <div dangerouslySetInnerHTML={{ __html: post.content }} />
+                <div dangerouslySetInnerHTML={{ __html: normalizedContentHtml }} />
               </article>
 
               {/* Tags */}
@@ -358,39 +433,64 @@ export default function BlogPostDetail({
             </div>
 
             {/* Related Posts Section */}
-            <div className="mt-12">
-              <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Bookmark className="text-blue-600" /> Bài viết liên quan
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2].map((item) => (
-                  <motion.div
-                    whileHover={{ y: -5 }}
-                    key={item}
-                    className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition cursor-pointer group"
-                  >
-                    <div className="h-40 bg-slate-200 relative overflow-hidden">
-                      <img
-                        src={`https://source.unsplash.com/random/800x600?sig=${item}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                        alt="Related"
-                      />
-                    </div>
-                    <div className="p-5">
-                      <span className="text-xs font-bold text-blue-600 uppercase">
-                        Mẹo học tập
-                      </span>
-                      <h4 className="font-bold text-slate-800 mt-2 mb-2 line-clamp-2 group-hover:text-blue-600 transition">
-                        5 phương pháp giúp trẻ nhớ từ vựng tiếng Anh lâu hơn
-                      </h4>
-                      <p className="text-slate-500 text-xs">
-                        20 Tháng 10, 2024
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
+            {(relatedLoading || relatedPosts.length > 0) && (
+              <div className="mt-12">
+                <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <Bookmark className="text-blue-600" /> Bài viết liên quan
+                </h3>
+                {relatedLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {[1, 2].map((item) => (
+                      <div
+                        key={item}
+                        className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse"
+                      >
+                        <div className="h-36 rounded-xl bg-slate-200 mb-4" />
+                        <div className="h-3 w-20 bg-slate-200 rounded mb-3" />
+                        <div className="h-5 w-full bg-slate-200 rounded mb-2" />
+                        <div className="h-4 w-4/5 bg-slate-200 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {relatedPosts.map((item) => (
+                      <motion.a
+                        whileHover={{ y: -5 }}
+                        key={item._id}
+                        href={`/blogs/${item._id}`}
+                        className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition cursor-pointer group block"
+                      >
+                        <div className="h-40 bg-slate-200 relative overflow-hidden">
+                          <img
+                            src={
+                              item.thumbnail ||
+                              "https://images.unsplash.com/photo-1499750310159-525446cc0ef6"
+                            }
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                            alt={item.title}
+                          />
+                        </div>
+                        <div className="p-5">
+                          <span className="text-xs font-bold text-blue-600 uppercase">
+                            {item.category || "Blog"}
+                          </span>
+                          <h4 className="font-bold text-slate-800 mt-2 mb-2 line-clamp-2 group-hover:text-blue-600 transition">
+                            {item.title}
+                          </h4>
+                          <p className="text-slate-500 text-sm line-clamp-2 mb-2">
+                            {getContentPreview(item.content)}
+                          </p>
+                          <p className="text-slate-500 text-xs">
+                            {new Date(item.createdAt || Date.now()).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
+                      </motion.a>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </motion.div>
 
           {/* --- RIGHT SIDEBAR (Table of Contents - Sticky) --- */}

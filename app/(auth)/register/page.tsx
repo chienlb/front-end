@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 export default function RegisterPage() {
+  const OTP_LENGTH = 6;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +30,11 @@ export default function RegisterPage() {
   const [verifyDismissed, setVerifyDismissed] = useState(false);
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyEmail, setVerifyEmail] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
+  const [verifyNotice, setVerifyNotice] = useState("");
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   // Password Visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +42,7 @@ export default function RegisterPage() {
 
   // Form Data
   const [formData, setFormData] = useState({
+    username: "",
     fullname: "",
     email: "",
     password: "",
@@ -55,12 +62,20 @@ export default function RegisterPage() {
       return setError("Mật khẩu không khớp.");
     }
 
+    if (!formData.username.trim()) {
+      return setError("Vui lòng nhập username.");
+    }
+
+    if (!/^[a-zA-Z0-9._-]{4,30}$/.test(formData.username.trim())) {
+      return setError("Username chỉ gồm chữ, số, ., _, - và từ 4-30 ký tự.");
+    }
+
     try {
       setLoading(true);
 
       await authService.register({
         fullname: formData.fullname,
-        username: formData.email.split("@")[0], 
+        username: formData.username.trim(),
         email: formData.email,
         password: formData.password,
         role: formData.role.toLowerCase(),
@@ -80,6 +95,8 @@ export default function RegisterPage() {
         // Không redirect ngay để user có thể nhập mã xác thực trên cùng trang.
         setVerifyEmail(formData.email);
         setVerifyCode("");
+        setVerifyError("");
+        setVerifyNotice("");
         setVerifyModalOpen(true);
         setVerifyDismissed(false);
         // Vẫn giữ thông báo tối thiểu thay vì alert để tránh che modal.
@@ -93,6 +110,102 @@ export default function RegisterPage() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, rawValue: string) => {
+    const digit = rawValue.replace(/\D/g, "").slice(-1);
+    const nextCode = Array.from({ length: OTP_LENGTH }, (_, i) => verifyCode[i] ?? "");
+    nextCode[index] = digit;
+
+    const finalCode = nextCode.join("");
+    setVerifyCode(finalCode);
+
+    if (digit && index < OTP_LENGTH - 1) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (
+    index: number,
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === "Backspace" && !verifyCode[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+      return;
+    }
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+
+    if (event.key === "ArrowRight" && index < OTP_LENGTH - 1) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    const pastedDigits = event.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, OTP_LENGTH);
+
+    if (!pastedDigits) return;
+
+    setVerifyCode(pastedDigits);
+    const focusIndex = Math.min(pastedDigits.length, OTP_LENGTH - 1);
+    otpInputRefs.current[focusIndex]?.focus();
+  };
+
+  const otpDigits = Array.from({ length: OTP_LENGTH }, (_, i) => verifyCode[i] ?? "");
+  const isOtpComplete = verifyCode.length === OTP_LENGTH;
+
+  const handleVerifyEmail = async () => {
+    if (!isOtpComplete) return;
+    setVerifyError("");
+    setVerifyNotice("");
+
+    try {
+      setVerifyLoading(true);
+      const result = await authService.verifyEmail({
+        email: verifyEmail,
+        codeVerify: verifyCode,
+      });
+      setVerifyNotice(result?.message || "Xác minh thành công. Đang chuyển đến đăng nhập...");
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 900);
+    } catch (err: any) {
+      setVerifyError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Mã xác minh không hợp lệ hoặc đã hết hạn.",
+      );
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleResendVerificationEmail = async () => {
+    if (!verifyEmail) return;
+    setVerifyError("");
+    setVerifyNotice("");
+    try {
+      setResendLoading(true);
+      const result = await authService.resendVerificationEmail(verifyEmail);
+      setVerifyCode("");
+      otpInputRefs.current[0]?.focus();
+      setVerifyNotice(result?.message || "Đã gửi lại mã xác minh.");
+    } catch (err: any) {
+      setVerifyError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể gửi lại mã. Vui lòng thử lại.",
+      );
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -210,6 +323,30 @@ export default function RegisterPage() {
             </div>
 
             {/* 2. NHẬP THÔNG TIN */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700 ml-1">
+                Username
+              </label>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors">
+                  <User size={18} />
+                </div>
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-100 focus:border-orange-500 transition-all font-medium text-slate-700 text-sm"
+                  placeholder="smartkids_2026"
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 ml-1">
+                4-30 ký tự, dùng chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.
+              </p>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700 ml-1">
                 Họ và tên
@@ -363,6 +500,22 @@ export default function RegisterPage() {
         </div>
       </div>
 
+      {verifyDismissed && !verifyModalOpen && (
+        <div className="fixed bottom-4 right-4 z-[2400]">
+          <button
+            type="button"
+            onClick={() => {
+              setVerifyModalOpen(true);
+              setVerifyDismissed(false);
+            }}
+            className="rounded-2xl bg-slate-900 text-white px-4 py-3 shadow-2xl shadow-slate-900/30 border border-white/10 hover:bg-slate-800 transition-all active:scale-95 inline-flex items-center gap-2"
+          >
+            <Mail size={16} />
+            <span className="text-sm font-bold">Nhập lại mã xác minh</span>
+          </button>
+        </div>
+      )}
+
       {/* Email verification modal */}
       {verifyModalOpen && (
         <div
@@ -400,32 +553,72 @@ export default function RegisterPage() {
             </div>
 
             <div className="px-6 py-5">
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase">
-                  Mã xác thực
+              <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-pink-50 p-4">
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-3">
+                  Nhập mã xác minh (6 số)
                 </label>
-                <input
-                  value={verifyCode}
-                  onChange={(e) => setVerifyCode(e.target.value)}
-                  placeholder="Nhập mã (ví dụ 6 số)"
-                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 outline-none focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100 transition"
-                />
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Nếu bạn vừa tắt popup, hãy dùng nút “Mở lại nhập mã xác thực” để mở lại.
-                </p>
+
+                <div className="grid grid-cols-6 gap-2">
+                  {otpDigits.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(element) => {
+                        otpInputRefs.current[index] = element;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(event) => handleOtpChange(index, event.target.value)}
+                      onKeyDown={(event) => handleOtpKeyDown(index, event)}
+                      onPaste={handleOtpPaste}
+                      className="h-12 rounded-xl border border-orange-200 bg-white text-center text-lg font-black text-slate-800 shadow-sm outline-none transition-all focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                      aria-label={`Mã xác minh số ${index + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                  <p className="text-slate-500">
+                    Chưa thấy email? Kiểm tra mục Spam hoặc gửi lại mã.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResendVerificationEmail}
+                    disabled={resendLoading}
+                    className="shrink-0 rounded-lg border border-orange-200 bg-white px-3 py-2 font-bold text-orange-600 hover:bg-orange-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {resendLoading ? "Đang gửi..." : "Gửi lại mã"}
+                  </button>
+                </div>
               </div>
+
+              {verifyError && (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">
+                  {verifyError}
+                </p>
+              )}
+
+              {verifyNotice && (
+                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                  {verifyNotice}
+                </p>
+              )}
+
+              <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                Nếu bạn vừa tắt popup, hãy dùng nút “Mở lại nhập mã xác thực” để mở lại.
+              </p>
 
               <div className="mt-5 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    // Hiện tại frontend chỉ đảm bảo UI nhập mã.
-                    // Sau khi bạn cung cấp endpoint verify backend, mình sẽ nối API ở đây.
-                    router.push("/login");
-                  }}
-                  className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-extrabold shadow-lg shadow-pink-500/20 transition-all active:scale-[0.99]"
+                  onClick={handleVerifyEmail}
+                  disabled={!isOtpComplete || verifyLoading}
+                  className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-extrabold shadow-lg shadow-pink-500/20 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Tiếp tục đăng nhập
+                  {verifyLoading ? "Đang xác minh..." : "Xác minh và đăng nhập"}
                 </button>
               </div>
             </div>

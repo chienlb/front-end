@@ -18,54 +18,62 @@ import {
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token"); // Lấy token từ URL (VD: ?token=xyz...)
+  const codeFromQuery =
+    searchParams.get("codeVerify") ||
+    searchParams.get("code") ||
+    searchParams.get("token") ||
+    "";
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Password State
+  const [codeVerify, setCodeVerify] = useState(codeFromQuery);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Validate Token khi vừa vào trang (Optional)
+  // Đồng bộ code từ URL khi param thay đổi.
   useEffect(() => {
-    if (!token) {
-      setError("Đường dẫn không hợp lệ hoặc đã hết hạn.");
-    }
-  }, [token]);
+    setCodeVerify(codeFromQuery);
+  }, [codeFromQuery]);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
 
     // Validate Input
     if (password.length < 6)
       return setError("Mật khẩu phải có ít nhất 6 ký tự.");
     if (password !== confirmPassword)
       return setError("Mật khẩu xác nhận không khớp.");
-    if (!token)
+    if (!codeVerify.trim())
       return setError(
-        "Thiếu mã xác thực (Token). Vui lòng kiểm tra lại email.",
+        "Thiếu mã xác thực. Vui lòng nhập mã đã nhận trong email.",
       );
 
     try {
       setLoading(true);
 
-      // Gọi API Reset Password
-      // await authService.resetPassword({ token, newPassword: password });
-
-      // Giả lập API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const result = await authService.resetPassword({
+        codeVerify: codeVerify.trim(),
+        password,
+      });
+      setSuccessMessage(
+        result?.message || "Mật khẩu đã được cập nhật thành công.",
+      );
 
       setSuccess(true);
-
-      // Tự động chuyển trang sau 3s (Optional)
-      // setTimeout(() => router.push("/login"), 3000);
     } catch (err: any) {
-      setError(err.message || "Đã xảy ra lỗi. Vui lòng thử lại.");
+      setError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đã xảy ra lỗi. Vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
     }
@@ -129,6 +137,25 @@ function ResetPasswordContent() {
               )}
 
               <form onSubmit={handleReset} className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-700 ml-1">
+                    Mã xác thực
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-600 transition-colors">
+                      <KeyRound size={20} />
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-100 focus:border-purple-600 transition-all font-medium text-slate-700"
+                      placeholder="Nhập mã xác thực từ email"
+                      value={codeVerify}
+                      onChange={(e) => setCodeVerify(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
                 {/* Mật khẩu mới */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700 ml-1">
@@ -211,6 +238,9 @@ function ResetPasswordContent() {
                 Mật khẩu của bạn đã được cập nhật. Bạn có thể đăng nhập ngay bây
                 giờ.
               </p>
+              {successMessage && (
+                <p className="text-sm text-slate-500 mb-4 max-w-xs">{successMessage}</p>
+              )}
 
               <Link
                 href="/login"

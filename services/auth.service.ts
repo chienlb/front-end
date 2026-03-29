@@ -14,8 +14,7 @@ export const authService = {
     gender?: string;
     typeAccount?: string;
   }) => {
-    const res = await api.post("/auths/register", data);
-    return res.data;
+    return api.post("/auths/register", data);
   },
 
   login: async (data: {
@@ -23,8 +22,7 @@ export const authService = {
     password: string;
     deviceId: string;
   }) => {
-    const res = await api.post("/auths/login", data);
-    return res.data;
+    return api.post("/auths/login", data);
   },
 
   logout: async () => {
@@ -37,6 +35,18 @@ export const authService = {
 
   forgotPassword: (email: string) => {
     return api.post("/auths/forgot-password", { email });
+  },
+
+  resetPassword: (data: { codeVerify: string; password: string }) => {
+    return api.post("/auths/reset-password", data);
+  },
+
+  verifyEmail: (data: { email: string; codeVerify: string }) => {
+    return api.post("/auths/verify-email", data);
+  },
+
+  resendVerificationEmail: (email: string) => {
+    return api.post("/auths/resend-verification-email", { email });
   },
 
   /**

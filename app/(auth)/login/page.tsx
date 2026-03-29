@@ -161,21 +161,22 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Input Email */}
+            {/* Input Email / Username */}
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700 ml-1">
-                Email
-              </label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                  <Mail size={20} />
-                </div>
-                <input
-                  type="email"
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium text-slate-700 outline-none"
-                  placeholder="name@example.com"
+                 Email
+               </label>
+               <div className="relative group">
+                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                   <Mail size={20} />
+                 </div>
+                 <input
+                   type="text"
+                   className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all font-medium text-slate-700 outline-none"
+                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="username"
                   disabled={loading}
                   required
                 />

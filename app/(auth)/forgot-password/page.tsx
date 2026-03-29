@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { authService } from "@/services/auth.service";
 import {
   Mail,
   ArrowLeft,
@@ -17,17 +18,25 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
     if (!email) return setError("Vui lòng nhập địa chỉ email.");
     try {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await authService.forgotPassword(email.trim());
+      const message = result?.message || "Yêu cầu đặt lại mật khẩu đã được gửi.";
+      setSuccessMessage(message);
       setIsSubmitted(true);
-    } catch (err) {
-      setError("Có lỗi xảy ra.");
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể gửi yêu cầu. Vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
     }
@@ -149,6 +158,9 @@ export default function ForgotPasswordPage() {
                 Vui lòng kiểm tra hộp thư đến tại: <br />
                 <strong className="text-purple-600 text-lg">{email}</strong>
               </p>
+              {successMessage && (
+                <p className="text-sm text-slate-500 mb-4">{successMessage}</p>
+              )}
 
               <div className="space-y-3">
                 <Link
