@@ -46,7 +46,7 @@ export default function ReportsPage() {
   const mapFeedback = (fb: FeedbackItem): UiFeedback => ({
     id: fb._id,
     reporter: `Người dùng ${String(fb.userId || "").slice(-6) || "Ẩn danh"}`,
-    type: fb.type,
+    type: fb.type ?? "general",
     title: fb.title || "Không có tiêu đề",
     content: fb.content || "(Không có nội dung)",
     rating: Number(fb.rating ?? 0),

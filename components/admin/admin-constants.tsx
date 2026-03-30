@@ -3,6 +3,7 @@ import {
   Tags,
   LibraryBig,
   BookOpen,
+  Package,
   Trophy,
   School,
   Users,
@@ -66,6 +67,11 @@ export const ADMIN_MENU = [
         name: "Cuộc thi",
         icon: <Trophy size={20} />,
         href: "/admin/competitions",
+      },
+      {
+        name: "Gói đăng ký",
+        icon: <Package size={20} />,
+        href: "/admin/packages",
       },
       {
         name: "Tin tức & blogs",

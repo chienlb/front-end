@@ -19,7 +19,6 @@ import {
   CalendarDays,
   School,
   Contact,
-  GraduationCap,
   Bell,
   Search,
   Menu,
@@ -29,6 +28,7 @@ import {
   Users,
 } from "lucide-react";
 import { notificationService } from "@/services/notifications.service";
+import { userService } from "@/services/user.service";
 
 // --- 1. COMPONENT SIDEBAR ---
 interface SidebarProps {
@@ -93,16 +93,6 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           icon: ClipboardList,
         },
         {
-          name: "Chấm bài",
-          href: "/teacher/grading",
-          icon: FileInput,
-        },
-        {
-          name: "Lịch dạy",
-          href: "/teacher/schedule",
-          icon: CalendarDays,
-        },
-        {
           name: "Lịch sử luyện tập học sinh",
           href: "/teacher/practice",
           icon: Dumbbell,
@@ -131,9 +121,9 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
         <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap px-4">
           {/* Logo Icon */}
           <div
-            className={`w-10 h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transition-all duration-300 shrink-0 ${isCollapsed ? "scale-110" : "scale-100"}`}
+            className={`w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/20 transition-all duration-300 shrink-0 ${isCollapsed ? "scale-110" : "scale-100"}`}
           >
-            <GraduationCap className="text-white" size={22} />
+            <span className="text-lg">🐱</span>
           </div>
 
           {/* Logo Text */}
@@ -141,7 +131,7 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             className={`transition-all duration-300 overflow-hidden ${isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"}`}
           >
             <span className="text-xl font-bold text-white tracking-tight block">
-              Smart<span className="text-emerald-400">Teach</span>
+              Happy<span className="text-orange-300">Cat</span>
             </span>
           </div>
         </div>
@@ -273,6 +263,51 @@ export default function TeacherLayout({
 }) {
   // State quản lý mở/đóng sidebar
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [teacherName, setTeacherName] = useState("Giáo viên");
+  const [teacherAvatar, setTeacherAvatar] = useState("https://ui-avatars.com/api/?name=Teacher");
+
+  useEffect(() => {
+    const loadTeacherProfile = async () => {
+      try {
+        const profile: any = await userService.getProfile();
+        const fullName =
+          profile?.fullName ||
+          profile?.fullname ||
+          profile?.name ||
+          profile?.displayName ||
+          "Giáo viên";
+        const avatar =
+          profile?.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`;
+
+        setTeacherName(String(fullName));
+        setTeacherAvatar(String(avatar));
+      } catch {
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("currentUser");
+            if (!raw) return;
+            const user = JSON.parse(raw);
+            const fullName =
+              user?.fullName ||
+              user?.fullname ||
+              user?.name ||
+              user?.displayName ||
+              "Giáo viên";
+            const avatar =
+              user?.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`;
+            setTeacherName(String(fullName));
+            setTeacherAvatar(String(avatar));
+          } catch {
+            // noop
+          }
+        }
+      }
+    };
+
+    void loadTeacherProfile();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-neutral-200/60">
@@ -334,7 +369,7 @@ export default function TeacherLayout({
             <div className="flex items-center gap-3 pl-5 border-l border-emerald-200 cursor-pointer group">
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 transition">
-                  Cô Minh Anh
+                  {teacherName}
                 </p>
                 <span className="text-[10px] font-bold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100">
                   Giáo viên
@@ -342,7 +377,7 @@ export default function TeacherLayout({
               </div>
               <div className="relative">
                 <img
-                  src="https://i.pravatar.cc/150?img=5"
+                  src={teacherAvatar}
                   className="w-9 h-9 rounded-full ring-2 ring-emerald-900/10 shadow-[2px_2px_6px_rgba(15,23,42,0.12)] group-hover:scale-105 transition-transform"
                   alt="Avatar"
                 />
@@ -360,7 +395,7 @@ export default function TeacherLayout({
 
         <footer className="py-6 text-center border-t border-emerald-900/10 bg-white">
           <p className="text-xs font-medium text-slate-400">
-            © 2026 SmartKids Education System.{" "}
+            © 2026 Happy Cat Education System. {" "}
             <span className="hidden sm:inline opacity-70">
               All rights reserved.
             </span>

@@ -7,7 +7,6 @@ import {
   Bell,
   Search,
   Menu,
-  GraduationCap,
   MessageSquare,
   LogOut,
   Settings,
@@ -29,14 +28,14 @@ function AdminSidebar({ collapsed }: { collapsed: boolean }) {
       {/* --- 1. LOGO --- */}
       <div className="h-16 flex items-center justify-center border-b border-slate-800/50 shrink-0">
         <Link href="/admin" className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-2.5 rounded-xl shrink-0">
-            <GraduationCap size={20} />
+          <div className="bg-gradient-to-br from-pink-500 to-orange-500 text-white p-2.5 rounded-xl shrink-0">
+            <span className="text-xl">🐱</span>
           </div>
 
           {!collapsed && (
             <div className="overflow-hidden whitespace-nowrap">
               <p className="text-lg font-bold text-white leading-none">
-                Smart<span className="text-blue-500">Admin</span>
+                Happy<span className="text-orange-400">Cat</span>
               </p>
             </div>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   User,
   FileText,
@@ -20,6 +20,7 @@ import {
   ChevronRight,
   PenLine,
 } from "lucide-react";
+import { userService } from "@/services/user.service";
 
 // --- TYPES ---
 interface TeacherProfile {
@@ -47,16 +48,15 @@ interface TeacherProfile {
   };
 }
 
-// --- MOCK DATA ---
-const MOCK_PROFILE: TeacherProfile = {
+const DEFAULT_PROFILE: TeacherProfile = {
   id: "T001",
-  fullName: "Cô Minh Anh",
-  email: "minhanh@smartteach.com",
-  phone: "0912.345.678",
-  avatar: "https://i.pravatar.cc/150?img=9",
-  bio: "Thạc sĩ Ngôn ngữ Anh với 5 năm kinh nghiệm luyện thi IELTS. Phương pháp dạy: Student-centered, tập trung vào tư duy phản biện.",
-  address: "Quận 1, TP. Hồ Chí Minh",
-  joinDate: "15/01/2023",
+  fullName: "Giáo viên",
+  email: "",
+  phone: "",
+  avatar: "https://ui-avatars.com/api/?name=Teacher",
+  bio: "",
+  address: "",
+  joinDate: "",
   certificates: [
     { name: "IELTS 8.5 Certificate", url: "#", status: "VERIFIED" },
     { name: "TESOL Certification", url: "#", status: "VERIFIED" },
@@ -82,16 +82,67 @@ export default function TeacherProfilePage() {
     "GENERAL" | "CONTRACT" | "SECURITY"
   >("GENERAL");
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState(MOCK_PROFILE);
+  const [profile, setProfile] = useState<TeacherProfile>(DEFAULT_PROFILE);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoadingProfile(true);
+        const res: any = await userService.getProfile();
+        const fullName =
+          res?.fullName || res?.fullname || res?.name || "Giáo viên";
+        const avatar =
+          res?.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`;
+        const joinDateSource = res?.createdAt || res?.joinDate || "";
+
+        setProfile((prev) => ({
+          ...prev,
+          id: String(res?._id || res?.id || prev.id),
+          fullName: String(fullName),
+          email: String(res?.email || ""),
+          phone: String(res?.phone || res?.phoneNumber || ""),
+          avatar: String(avatar),
+          bio: String(res?.bio || prev.bio || ""),
+          address: String(res?.address || ""),
+          joinDate: joinDateSource
+            ? new Date(joinDateSource).toLocaleDateString("vi-VN")
+            : prev.joinDate,
+          certificates: Array.isArray(res?.certificates)
+            ? res.certificates
+            : prev.certificates,
+          contract: res?.contract || prev.contract,
+          banking: res?.banking || prev.banking,
+        }));
+      } catch {
+        // Keep fallback data if API fails
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    void loadProfile();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await userService.updateMyProfile(profile.id, {
+        fullName: profile.fullName,
+        phone: profile.phone,
+        avatar: profile.avatar,
+        bio: profile.bio,
+        address: profile.address,
+      });
       setIsEditing(false);
       alert("Đã cập nhật hồ sơ thành công!");
-    }, 800);
+    } catch (error: any) {
+      alert(error?.message || "Không thể cập nhật hồ sơ");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -126,6 +177,11 @@ export default function TeacherProfilePage() {
               <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2">
                 {profile.fullName}
               </h1>
+              {isLoadingProfile && (
+                <p className="text-xs font-semibold text-slate-500 mb-2">
+                  Đang tải dữ liệu tài khoản...
+                </p>
+              )}
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-slate-500">
                 <span className="flex items-center gap-1.5 bg-white/50 backdrop-blur-sm px-3 py-1 rounded-lg border border-slate-200/50 shadow-sm">
                   <Briefcase size={16} className="text-blue-500" /> Giáo viên
@@ -144,7 +200,7 @@ export default function TeacherProfilePage() {
 
             <button
               onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-              disabled={isSaving}
+              disabled={isSaving || isLoadingProfile}
               className={`px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-2 active:scale-95
                 ${
                   isEditing
@@ -233,12 +289,18 @@ export default function TeacherProfilePage() {
                       label="Họ và tên"
                       value={profile.fullName}
                       disabled={!isEditing}
+                      onChange={(v: string) =>
+                        setProfile((prev) => ({ ...prev, fullName: v }))
+                      }
                     />
                     <InputGroup
                       label="Số điện thoại"
                       value={profile.phone}
                       disabled={!isEditing}
                       icon={Phone}
+                      onChange={(v: string) =>
+                        setProfile((prev) => ({ ...prev, phone: v }))
+                      }
                     />
                     <InputGroup
                       label="Email đăng nhập"
@@ -252,6 +314,9 @@ export default function TeacherProfilePage() {
                       value={profile.address}
                       disabled={!isEditing}
                       icon={MapPin}
+                      onChange={(v: string) =>
+                        setProfile((prev) => ({ ...prev, address: v }))
+                      }
                     />
 
                     <div className="md:col-span-2">
@@ -267,7 +332,10 @@ export default function TeacherProfilePage() {
                           }`}
                         rows={4}
                         disabled={!isEditing}
-                        defaultValue={profile.bio}
+                        value={profile.bio}
+                        onChange={(e) =>
+                          setProfile((prev) => ({ ...prev, bio: e.target.value }))
+                        }
                       />
                     </div>
                   </div>
@@ -416,17 +484,35 @@ export default function TeacherProfilePage() {
                       label="Ngân hàng thụ hưởng"
                       value={profile.banking.bankName}
                       disabled={!isEditing}
+                      onChange={(v: string) =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          banking: { ...prev.banking, bankName: v },
+                        }))
+                      }
                     />
                     <InputGroup
                       label="Số tài khoản"
                       value={profile.banking.accountNumber}
                       disabled={!isEditing}
+                      onChange={(v: string) =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          banking: { ...prev.banking, accountNumber: v },
+                        }))
+                      }
                     />
                     <div className="md:col-span-2">
                       <InputGroup
                         label="Tên chủ tài khoản (Viết hoa không dấu)"
                         value={profile.banking.accountName}
                         disabled={!isEditing}
+                        onChange={(v: string) =>
+                          setProfile((prev) => ({
+                            ...prev,
+                            banking: { ...prev.banking, accountName: v },
+                          }))
+                        }
                       />
                     </div>
                   </div>
@@ -511,6 +597,7 @@ function InputGroup({
   helpText,
   icon: Icon,
   className,
+  onChange,
 }: any) {
   return (
     <div className={className}>
@@ -520,7 +607,8 @@ function InputGroup({
       <div className="relative">
         <input
           type={type}
-          defaultValue={value}
+          value={value ?? ""}
+          onChange={(e) => onChange?.(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
           className={`w-full border rounded-xl p-3 pl-4 text-sm font-medium outline-none transition-all shadow-sm

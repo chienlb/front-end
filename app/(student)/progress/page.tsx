@@ -291,8 +291,24 @@ export default function ProgressPage() {
           page += 1;
         }
 
-        const mapped = allRows
-          .map((row) => {
+        // Fetch full lesson details for missing data
+        const fetchedLessonCache = new Map<string, any>();
+        const getFullLessonDetail = async (lessonId: string) => {
+          if (fetchedLessonCache.has(lessonId)) {
+            return fetchedLessonCache.get(lessonId);
+          }
+          try {
+            const res = await lessonService.getLessonById(lessonId);
+            const data = res?.data ?? res;
+            fetchedLessonCache.set(lessonId, data);
+            return data;
+          } catch {
+            return null;
+          }
+        };
+
+        const mapped = await Promise.all(
+          allRows.map(async (row) => {
             const progressNum = Number(row?.progress ?? 0);
             const status = String(row?.status ?? "").toLowerCase();
             const isLearned =
@@ -308,17 +324,34 @@ export default function ProgressPage() {
             );
             if (!lid) return null;
 
-            const title =
+            let title =
               lessonRef?.title ||
               lessonRef?.name ||
-              row?.title ||
-              `Bài học ${lid.slice(-6)}`;
-
-            const unitName =
+              row?.title;
+            let unitName =
               lessonRef?.unitId?.name ||
               lessonRef?.unit?.name ||
-              row?.unitName ||
-              undefined;
+              row?.unitName;
+
+            // If missing critical data, fetch full lesson details
+            if (!title || !unitName) {
+              const fullLessonDetail = await getFullLessonDetail(lid);
+              if (fullLessonDetail) {
+                if (!title) {
+                  title = fullLessonDetail?.title || fullLessonDetail?.name || `Bài học ${lid.slice(-6)}`;
+                }
+                if (!unitName) {
+                  unitName =
+                    fullLessonDetail?.unitId?.name ||
+                    fullLessonDetail?.unit?.name ||
+                    fullLessonDetail?.unitName;
+                }
+              }
+            }
+
+            if (!title) {
+              title = `Bài học ${lid.slice(-6)}`;
+            }
 
             const updatedAt =
               row?.updatedAt || row?.lastActivityAt || row?.createdAt || undefined;
@@ -326,13 +359,13 @@ export default function ProgressPage() {
             return {
               id: lid,
               title: String(title),
-              unitName,
+              unitName: unitName || "",
               progress: Number.isFinite(progressNum) ? progressNum : 0,
               status: String(row?.status || ""),
               updatedAt,
             } as LearnedLessonItem;
           })
-          .filter(Boolean) as LearnedLessonItem[];
+        ).then(items => items.filter(Boolean) as LearnedLessonItem[]);
 
         const unique = new Map<string, LearnedLessonItem>();
         for (const item of mapped) {
@@ -455,7 +488,7 @@ export default function ProgressPage() {
           </div>
 
           {activeTab === "OVERVIEW" && (
-            <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl border border-indigo-100 text-sm font-bold">
+            <div className="hidden">
               Dữ liệu đồng bộ từ lesson-progress
             </div>
           )}
@@ -464,7 +497,7 @@ export default function ProgressPage() {
         {/* === TAB 1: OVERVIEW === */}
         {activeTab === "OVERVIEW" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 hidden">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
                   <BookOpen size={18} className="text-indigo-500" /> Bài học đã học
@@ -488,8 +521,8 @@ export default function ProgressPage() {
                       className="rounded-2xl border border-slate-200 p-3 hover:border-indigo-200 hover:bg-indigo-50/40 transition"
                     >
                       <p className="font-bold text-slate-800 line-clamp-1">{lesson.title}</p>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">
-                        {lesson.unitName || "Không rõ chương"}
+                      <p className="text-xs text-slate-600 font-semibold mt-1 line-clamp-1">
+                        {lesson.unitName}
                       </p>
                       <div className="mt-2 flex items-center justify-between text-xs">
                         <span className="font-bold text-indigo-600">
@@ -604,8 +637,8 @@ export default function ProgressPage() {
                             {Math.round(lesson.progress)}%
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {lesson.unitName || "Không rõ chương"}
+                        <p className="text-xs text-slate-600 font-semibold mt-1 line-clamp-1">
+                          {lesson.unitName}
                         </p>
                       </div>
                     ))}
@@ -680,8 +713,8 @@ export default function ProgressPage() {
                         </p>
                       </td>
                       <td className="p-5">
-                        <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold border border-slate-200">
-                          {lesson.unitName || "Không rõ chương"}
+                        <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold border border-indigo-200">
+                          {lesson.unitName}
                         </span>
                       </td>
                       <td className="p-5 text-center">

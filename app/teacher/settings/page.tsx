@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   Globe,
@@ -16,6 +16,15 @@ import {
   Laptop,
   Monitor,
 } from "lucide-react";
+import { userService } from "@/services/user.service";
+
+type TeacherAccount = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  avatar: string;
+};
 
 export default function AdminSettingsPage() {
   // --- STATE ---
@@ -39,6 +48,15 @@ export default function AdminSettingsPage() {
 
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [account, setAccount] = useState<TeacherAccount>({
+    id: "",
+    fullName: "",
+    email: "",
+    phone: "",
+    avatar: "",
+  });
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountSaving, setAccountSaving] = useState(false);
 
   type BooleanSettingKey = {
     [K in keyof typeof settings]: (typeof settings)[K] extends boolean ? K : never;
@@ -64,16 +82,88 @@ export default function AdminSettingsPage() {
     }, 800);
   };
 
+  useEffect(() => {
+    const loadAccount = async () => {
+      try {
+        setAccountLoading(true);
+        const profile: any = await userService.getProfile();
+        const id = String(profile?._id || profile?.id || "");
+        const fullName = String(
+          profile?.fullName || profile?.fullname || profile?.name || "Giáo viên",
+        );
+        const email = String(profile?.email || "");
+        const phone = String(profile?.phone || profile?.phoneNumber || "");
+        const avatar = String(
+          profile?.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`,
+        );
+
+        setAccount({ id, fullName, email, phone, avatar });
+      } catch {
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("currentUser");
+            if (raw) {
+              const u = JSON.parse(raw);
+              const fullName = String(
+                u?.fullName || u?.fullname || u?.name || "Giáo viên",
+              );
+              setAccount({
+                id: String(u?._id || u?.id || ""),
+                fullName,
+                email: String(u?.email || ""),
+                phone: String(u?.phone || u?.phoneNumber || ""),
+                avatar: String(
+                  u?.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`,
+                ),
+              });
+            }
+          } catch {
+            // noop
+          }
+        }
+      } finally {
+        setAccountLoading(false);
+      }
+    };
+
+    void loadAccount();
+  }, []);
+
+  const saveAccount = async () => {
+    try {
+      setAccountSaving(true);
+      const userId = account.id;
+      if (!userId) throw new Error("Thiếu userId");
+
+      await userService.updateMyProfile(userId, {
+        fullName: account.fullName,
+        email: account.email,
+        phone: account.phone,
+        avatar: account.avatar,
+      });
+
+      alert("Đã lưu thông tin tài khoản thành công!");
+    } catch (err: any) {
+      alert(err?.message || "Không thể lưu thông tin tài khoản");
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F1F5F9] pb-32 font-sans text-slate-800">
       {/* 1. HEADER (Sticky) */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200 px-6 py-4 flex justify-between items-center transition-all shadow-sm">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">
-            Cấu hình hệ thống
+            Cài đặt tài khoản giáo viên
           </h1>
           <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
-            Quản lý thông báo & tự động hóa.
+            {accountLoading
+              ? "Đang tải dữ liệu tài khoản..."
+              : `Xin chào, ${account.fullName || "Giáo viên"}`}
           </p>
         </div>
 
@@ -188,6 +278,85 @@ export default function AdminSettingsPage() {
 
           {/* === RIGHT COLUMN: NOTIFICATIONS & AUTOMATION (8 cols) === */}
           <div className="lg:col-span-8 space-y-6">
+            <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                <Laptop size={18} className="text-indigo-500" />
+                <h3 className="font-bold text-slate-700">Thông tin tài khoản</h3>
+              </div>
+
+              <div className="p-6 grid grid-cols-1 md:grid-cols-[120px_1fr] gap-6">
+                <div className="flex flex-col items-center gap-2">
+                  <img
+                    src={account.avatar || "https://ui-avatars.com/api/?name=Teacher"}
+                    alt="Teacher Avatar"
+                    className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-100"
+                  />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Avatar</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Họ và tên</span>
+                    <input
+                      value={account.fullName}
+                      onChange={(e) =>
+                        setAccount((prev) => ({ ...prev, fullName: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Email</span>
+                    <input
+                      value={account.email}
+                      onChange={(e) =>
+                        setAccount((prev) => ({ ...prev, email: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Số điện thoại</span>
+                    <input
+                      value={account.phone}
+                      onChange={(e) =>
+                        setAccount((prev) => ({ ...prev, phone: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Link avatar</span>
+                    <input
+                      value={account.avatar}
+                      onChange={(e) =>
+                        setAccount((prev) => ({ ...prev, avatar: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 flex justify-end">
+                <button
+                  onClick={saveAccount}
+                  disabled={accountSaving || accountLoading}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 inline-flex items-center gap-2"
+                >
+                  {accountSaving ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {accountSaving ? "Đang lưu..." : "Lưu tài khoản"}
+                </button>
+              </div>
+            </section>
+
             {/* Notification Settings */}
             <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
