@@ -125,7 +125,7 @@ export const lessonService = {
    */
   getProgressByUserAndLessonId: async (lessonId: string) => {
     try {
-      const res = await api.get(`/lesson-progress/user/lessons/${lessonId}`);
+      const res = await api.get(`/lesson-progress/user/${lessonId}`);
       const body = res as any;
       return body?.data ?? body;
     } catch (err: any) {

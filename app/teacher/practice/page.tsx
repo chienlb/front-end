@@ -1,282 +1,316 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Plus,
-  Trash2,
-  Edit,
-  Search,
-  Filter,
+  BookOpen,
+  CalendarDays,
+  CircleAlert,
+  Dumbbell,
   Loader2,
-  FileQuestion,
-  MoreVertical,
+  Search,
+  UserRound,
 } from "lucide-react";
-import api from "@/utils/api";
-import QuestionFormModal from "@/components/teacher/practice/forms/QuestionFormModal";
 import { practiceService } from "@/services/practice.service";
+import { groupsService } from "@/services/groups.service";
 
 export default function QuestionManager() {
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState(null);
-
-  // State tìm kiếm
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [students, setStudents] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      groupName: string;
+    }>
+  >([]);
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // 1. Fetch dữ liệu
-  const fetchQuestions = async () => {
-    setLoading(true);
+  const extractList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+
+    const keys = ["items", "data", "results", "docs", "rows", "members", "users"];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of keys) {
+        if (Array.isArray(nested[k])) return nested[k];
+      }
+    }
+
+    return [];
+  };
+
+  const fetchStudents = async () => {
     try {
-      const res: any = await api.get("/practice/questions");
-      setQuestions(res);
+      setStudentsLoading(true);
+      const res: any = await groupsService.getAllMembersInTeacherGroups();
+      const payload = res?.data ?? res;
+      const list = extractList(payload);
+
+      const mapped = list.map((it: any, idx: number) => {
+        const profile = it?.user ?? it?.student ?? it?.member ?? it;
+        return {
+          id: String(it?._id ?? it?.id ?? profile?._id ?? profile?.id ?? `student-${idx}`),
+          name: String(profile?.fullName ?? profile?.name ?? it?.fullName ?? it?.name ?? "Học viên"),
+          email: String(profile?.email ?? it?.email ?? ""),
+          groupName: String(it?.group?.groupName ?? it?.groupName ?? ""),
+        };
+      });
+
+      const deduped = new Map<string, (typeof mapped)[number]>();
+      mapped.forEach((st) => {
+        if (!deduped.has(st.id)) deduped.set(st.id, st);
+      });
+
+      const uniqStudents = Array.from(deduped.values());
+      setStudents(uniqStudents);
+      if (uniqStudents.length > 0) {
+        setSelectedStudentId((prev) => prev || uniqStudents[0].id);
+      }
     } catch (e) {
-      console.error("Lỗi tải câu hỏi:", e);
+      console.error("Lỗi tải học viên:", e);
+      setStudents([]);
     } finally {
-      setLoading(false);
+      setStudentsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchQuestions();
+    void fetchStudents();
   }, []);
 
-  // Filter client-side
-  const filteredQuestions = questions.filter(
-    (q) =>
-      q.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.type.toLowerCase().includes(searchTerm.toLowerCase()),
+  const fetchHistory = async (studentId: string) => {
+    if (!studentId.trim()) {
+      setHistoryItems([]);
+      return;
+    }
+
+    try {
+      setHistoryLoading(true);
+      setErrorMessage("");
+      const res: any = await practiceService.getAllPracticesByStudentId(studentId.trim());
+      const payload = res?.data ?? res;
+      const list = extractList(payload);
+      setHistoryItems(list);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setErrorMessage(
+        Array.isArray(msg)
+          ? msg.join(", ")
+          : msg || "Không thể tải lịch sử luyện tập của học viên.",
+      );
+      setHistoryItems([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    void fetchHistory(selectedStudentId);
+  }, [selectedStudentId]);
+
+  const filteredStudents = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter(
+      (st) =>
+        st.name.toLowerCase().includes(q) ||
+        st.email.toLowerCase().includes(q) ||
+        st.groupName.toLowerCase().includes(q),
+    );
+  }, [students, searchTerm]);
+
+  const selectedStudent = useMemo(
+    () => students.find((st) => st.id === selectedStudentId) || null,
+    [students, selectedStudentId],
   );
 
-  // 2. Xóa câu hỏi
-  const handleDelete = async (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này?")) {
-      try {
-        await api.delete(`/practice/questions/${id}`);
-        fetchQuestions();
-      } catch (e) {
-        alert("Xóa thất bại!");
-      }
-    }
+  const formatDate = (value: any) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString("vi-VN");
   };
 
-  // 3. Handlers
-  const handleCreate = () => {
-    setEditingQuestion(null);
-    setShowModal(true);
+  const displayScore = (item: any) => {
+    const aiScore = item?.AIFeedback?.score;
+    if (typeof aiScore === "number") return aiScore;
+    if (typeof item?.score === "number") return item.score;
+    return null;
   };
 
-  const handleEdit = (question: any) => {
-    setEditingQuestion(question);
-    setShowModal(true);
+  const displayStatus = (item: any) => {
+    const raw = String(item?.status ?? item?.state ?? "").toLowerCase();
+    if (!raw) return "Chưa rõ";
+    if (raw === "submitted") return "Đã nộp";
+    if (raw === "draft") return "Bản nháp";
+    if (raw === "graded") return "Đã chấm";
+    return raw;
   };
 
-  const handleSubmit = async (formData: any) => {
-    try {
-      if (editingQuestion) {
-        await practiceService.update(formData._id, formData);
-      } else {
-        await practiceService.create(formData);
-      }
-      setShowModal(false);
-      fetchQuestions();
-    } catch (e) {
-      alert("Có lỗi xảy ra khi lưu!");
-      console.error(e);
-    }
+  const displayType = (item: any) => {
+    const raw = String(item?.type ?? item?.exerciseType ?? "").toLowerCase();
+    if (!raw) return "-";
+    if (raw === "sentence") return "Viết câu";
+    if (raw === "essay") return "Viết luận";
+    if (raw === "letter") return "Viết thư";
+    return raw;
   };
 
-  // Helper: Màu sắc cho Badge loại câu hỏi
-  const getTypeBadgeStyle = (type: string) => {
-    switch (type) {
-      case "quiz":
-        return "bg-purple-50 text-purple-700 border-purple-200";
-      case "listening":
-        return "bg-red-50 text-red-700 border-red-200";
-      case "matching":
-        return "bg-green-50 text-green-700 border-green-200";
-      case "flashcard":
-        return "bg-teal-50 text-teal-700 border-teal-200";
-      case "spelling":
-        return "bg-orange-50 text-orange-700 border-orange-200";
-      case "speaking":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      default:
-        return "bg-gray-50 text-gray-600 border-gray-200";
-    }
+  const totalScore = historyItems.reduce((sum, item) => {
+    const score = displayScore(item);
+    return sum + (typeof score === "number" ? score : 0);
+  }, 0);
+  const avgScore = historyItems.length > 0 ? Math.round(totalScore / historyItems.length) : 0;
+
+  const handleManualRefresh = () => {
+    if (!selectedStudentId) return;
+    void fetchHistory(selectedStudentId);
   };
 
   return (
-    <div className="min-h-screen bg-transparent p-4 md:p-6 font-sans rounded-[2rem]">
-      <div className="w-full max-w-[1920px] mx-auto">
-        {/* HEADER SECTION */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="min-h-screen rounded-[2rem] bg-transparent p-4 font-sans md:p-6">
+      <div className="mx-auto w-full max-w-[1920px]">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-              Câu hỏi luyện tập
+            <h1 className="flex items-center gap-3 text-3xl font-black text-slate-800">
+              <Dumbbell className="text-blue-600" /> Lịch sử luyện tập học sinh
             </h1>
-            <p className="text-slate-500 font-medium mt-1 ml-1">
-              Quản lý và biên soạn nội dung bài tập, kiểm tra.
+            <p className="ml-1 mt-1 font-medium text-slate-500">
+              Theo dõi lịch sử luyện tập theo từng học viên từ endpoint student/:studentId.
             </p>
           </div>
           <button
-            onClick={handleCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition transform hover:-translate-y-1"
+            onClick={handleManualRefresh}
+            disabled={!selectedStudentId || historyLoading}
+            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
           >
-            <Plus size={20} /> Tạo Câu Hỏi Mới
+            Làm mới lịch sử
           </button>
         </div>
 
-        {/* TOOLBAR (Search & Actions) */}
-        <div className="bg-white p-4 rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="relative w-full md:w-96">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Tìm kiếm nội dung, loại câu hỏi..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-            <Filter size={16} /> <span>{questions.length} câu hỏi</span>
-          </div>
-        </div>
-
-        {/* DATA TABLE */}
-        <div className="bg-white rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 overflow-hidden">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
-              <Loader2 className="animate-spin text-blue-500" size={40} />
-              <p className="font-medium">Đang tải dữ liệu...</p>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+          <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm học viên..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-blue-200 focus:bg-white"
+              />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                  <tr>
-                    <th className="p-5 pl-6">Loại Game</th>
-                    <th className="p-5 min-w-[300px]">Nội dung / Đề bài</th>
-                    <th className="p-5">Đáp án / Chi tiết</th>
-                    <th className="p-5 text-right pr-6">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredQuestions.map((q: any) => (
-                    <tr
-                      key={q._id}
-                      className="hover:bg-blue-50/30 transition-colors group"
-                    >
-                      {/* Cột 1: Loại */}
-                      <td className="p-5 pl-6 align-top">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide border ${getTypeBadgeStyle(q.type)}`}
-                        >
-                          {q.type}
-                        </span>
-                      </td>
 
-                      {/* Cột 2: Nội dung */}
-                      <td className="p-5 align-top">
-                        <p
-                          className="font-bold text-slate-800 text-base line-clamp-2 max-w-2xl"
-                          title={q.content}
-                        >
-                          {q.content}
-                        </p>
-                        {q.mediaUrl && (
-                          <div className="mt-2 text-xs text-blue-500 font-medium flex items-center gap-1 bg-blue-50 w-fit px-2 py-1 rounded">
-                            📎 Có đính kèm Media
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Cột 3: Chi tiết */}
-                      <td className="p-5 align-top text-slate-600">
-                        {q.type === "quiz" && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-slate-400 uppercase">
-                              Đáp án đúng:
-                            </span>
-                            <span className="font-mono text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded w-fit">
-                              {q.correctAnswer}
-                            </span>
-                          </div>
-                        )}
-                        {(q.type === "matching" || q.type === "flashcard") && (
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800">
-                              {q.pairs?.length || 0}
-                            </span>
-                            <span>cặp từ vựng</span>
-                          </div>
-                        )}
-                        {(q.type === "spelling" || q.type === "speaking") && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-slate-400 uppercase">
-                              Mẫu câu:
-                            </span>
-                            <span className="italic">"{q.correctAnswer}"</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Cột 4: Hành động */}
-                      <td className="p-5 pr-6 align-top text-right">
-                        <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleEdit(q)}
-                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(q._id)}
-                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Xóa"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-[620px] space-y-2 overflow-y-auto pr-1">
+              {studentsLoading ? (
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+                  <Loader2 size={16} className="animate-spin" /> Đang tải học viên...
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+                  Không có học viên phù hợp.
+                </div>
+              ) : (
+                filteredStudents.map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => setSelectedStudentId(st.id)}
+                    className={`w-full rounded-xl border p-3 text-left transition ${
+                      st.id === selectedStudentId
+                        ? "border-blue-200 bg-blue-50"
+                        : "border-slate-200 bg-white hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-slate-800">{st.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{st.email || "Không có email"}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">{st.groupName || "Chưa rõ nhóm"}</p>
+                  </button>
+                ))
+              )}
             </div>
-          )}
+          </aside>
 
-          {/* EMPTY STATE */}
-          {!loading && filteredQuestions.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                <FileQuestion size={32} className="opacity-50" />
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <p className="text-xs font-bold uppercase text-blue-700">Học viên đang xem</p>
+                <p className="mt-1 flex items-center gap-2 text-sm font-black text-slate-800">
+                  <UserRound size={16} className="text-blue-600" /> {selectedStudent?.name || "Chưa chọn"}
+                </p>
               </div>
-              <p className="text-lg font-bold text-slate-600">
-                Chưa có câu hỏi nào
-              </p>
-              <p className="text-sm">
-                Hãy bắt đầu bằng việc tạo câu hỏi mới nhé.
-              </p>
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                <p className="text-xs font-bold uppercase text-indigo-700">Số bài luyện</p>
+                <p className="mt-1 flex items-center gap-2 text-sm font-black text-slate-800">
+                  <BookOpen size={16} className="text-indigo-600" /> {historyItems.length}
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                <p className="text-xs font-bold uppercase text-emerald-700">Điểm trung bình</p>
+                <p className="mt-1 text-sm font-black text-slate-800">{historyItems.length ? `${avgScore}/100` : "-"}</p>
+              </div>
             </div>
-          )}
+
+            {errorMessage && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <CircleAlert size={16} className="mt-0.5 shrink-0" /> {errorMessage}
+              </div>
+            )}
+
+            {historyLoading ? (
+              <div className="flex h-64 items-center justify-center gap-2 text-slate-500">
+                <Loader2 className="animate-spin" size={20} /> Đang tải lịch sử luyện tập...
+              </div>
+            ) : historyItems.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                Chưa có dữ liệu luyện tập cho học viên này.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="p-3">Loại bài</th>
+                      <th className="p-3">Trạng thái</th>
+                      <th className="p-3">Điểm</th>
+                      <th className="p-3">Thời gian</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {historyItems.map((item: any, idx: number) => {
+                      const score = displayScore(item);
+                      return (
+                        <tr key={String(item?._id ?? item?.id ?? idx)} className="hover:bg-slate-50">
+                          <td className="p-3 font-semibold text-slate-700">{displayType(item)}</td>
+                          <td className="p-3 text-slate-600">{displayStatus(item)}</td>
+                          <td className="p-3 font-bold text-slate-800">
+                            {typeof score === "number" ? `${Math.round(score)}/100` : "-"}
+                          </td>
+                          <td className="p-3 text-slate-600">
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays size={14} />
+                              {formatDate(item?.submittedAt ?? item?.updatedAt ?? item?.createdAt)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       </div>
-
-      {/* MODAL */}
-      {showModal && (
-        <QuestionFormModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          initialData={editingQuestion}
-          onSubmit={handleSubmit}
-        />
-      )}
     </div>
   );
 }

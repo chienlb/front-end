@@ -23,4 +23,7 @@ export const practiceService = {
   createWritingPractice: async (studentId: string, type: string) => {
     return api.post("/practices/", { studentId, type });
   },
+  getAllPracticesByStudentId: async (studentId: string) => {
+    return api.get(`/practices/student/${encodeURIComponent(studentId.trim())}`);
+  },
 };
