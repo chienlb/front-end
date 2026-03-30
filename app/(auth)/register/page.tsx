@@ -304,22 +304,11 @@ export default function RegisterPage() {
               <label className="text-xs font-bold text-slate-500 uppercase mb-2 block ml-1">
                 Bạn là ai?
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                <RoleCard value="STUDENT" label="Học sinh" icon={Baby} />
-                <RoleCard value="PARENT" label="Phụ huynh" icon={User} />
+              <div className="grid grid-cols-2 gap-3">
+                <RoleCard value="STUDENT" label="Học viên" icon={Baby} />
                 <RoleCard value="TEACHER" label="Giáo viên" icon={BookOpen} />
               </div>
 
-              {/* Thông báo lưu ý cho Giáo viên */}
-              {formData.role === "TEACHER" && (
-                <div className="mt-3 p-3 bg-orange-50 border border-orange-100 rounded-xl flex gap-2 items-start text-xs text-orange-700 animate-in slide-in-from-top-2 fade-in">
-                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                  <p>
-                    Lưu ý: Sau khi tạo tài khoản, bạn sẽ được chuyển đến trang
-                    nộp hồ sơ (CV & Video dạy thử) để xét duyệt.
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* 2. NHẬP THÔNG TIN */}
