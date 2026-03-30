@@ -14,6 +14,7 @@ import {
   Trash2,
   RotateCcw,
 } from "lucide-react";
+import { Editor } from "@tinymce/tinymce-react";
 import { lessonService } from "@/services/lessons.service";
 import { unitService } from "@/services/units.service";
 import { showAlert, showConfirm } from "@/utils/dialog";
@@ -24,6 +25,7 @@ type LessonRow = {
   unitId: string;
   name: string;
   description?: string;
+  descriptionHtml?: string;
   unitName: string;
   type: string;
   status: LessonStatus;
@@ -41,6 +43,93 @@ type VocabularyContent = {
   words: VocabWord[];
   tags?: string[];
 };
+type GenericContentField = {
+  key: string;
+  value: string;
+};
+type QaPair = { question: string; answer: string };
+type GrammarExample = { example: string; translation: string };
+type CreateTypedContentState = {
+  grammar: {
+    description: string;
+    rule: string;
+    explanation_vi: string;
+    explanation_en: string;
+    examples: GrammarExample[];
+    commonMistakesText: string;
+    tagsText: string;
+  };
+  dialogue: {
+    description: string;
+    script: string;
+    audio: string;
+    translation: string;
+    tagsText: string;
+  };
+  reading: {
+    description: string;
+    passage: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  listening: {
+    description: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  speaking: {
+    description: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  writing: {
+    description: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  quiz: {
+    description: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  review: {
+    description: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+  song: {
+    description: string;
+    lyrics: string;
+    translation: string;
+    audio: string;
+    video: string;
+    vocabularyText: string;
+    questionsAndAnswers: QaPair[];
+    tagsText: string;
+  };
+};
+
+const normalizeSkillFocusByType = (type: string): string => {
+  if (type === "song") return "listening";
+  return type;
+};
+
+const normalizeApiLessonType = (type: string): string => {
+  if (type === "song") return "listening";
+  return type;
+};
+
+const tinymceInit: any = {
+  menubar: false,
+  height: 220,
+  plugins: "lists link table code autolink",
+  toolbar:
+    "undo redo | blocks | bold italic underline | bullist numlist | link table | removeformat | code",
+  branding: false,
+  statusbar: false,
+  entity_encoding: "raw",
+  content_style: "body { font-family: Inter, Arial, sans-serif; font-size: 14px; }",
+};
 
 export default function AdminLessonsPage() {
   const [search, setSearch] = useState("");
@@ -55,10 +144,12 @@ export default function AdminLessonsPage() {
   const [createSuccess, setCreateSuccess] = useState("");
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [openEdit, setOpenEdit] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
   const [editThumbnailFile, setEditThumbnailFile] = useState<File | null>(null);
+  const [editThumbnailUrl, setEditThumbnailUrl] = useState("");
   const [editForm, setEditForm] = useState({
     id: "",
     unitId: "",
@@ -90,8 +181,280 @@ export default function AdminLessonsPage() {
     tags: [],
   });
 
+  const defaultQaPairs = (): QaPair[] => [{ question: "", answer: "" }];
+
+  const defaultCreateTypedContent = (): CreateTypedContentState => ({
+    grammar: {
+      description: "",
+      rule: "",
+      explanation_vi: "",
+      explanation_en: "",
+      examples: [{ example: "", translation: "" }],
+      commonMistakesText: "",
+      tagsText: "",
+    },
+    dialogue: {
+      description: "",
+      script: "",
+      audio: "",
+      translation: "",
+      tagsText: "",
+    },
+    reading: {
+      description: "",
+      passage: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    listening: {
+      description: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    speaking: {
+      description: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    writing: {
+      description: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    quiz: {
+      description: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    review: {
+      description: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+    song: {
+      description: "",
+      lyrics: "",
+      translation: "",
+      audio: "",
+      video: "",
+      vocabularyText: "",
+      questionsAndAnswers: defaultQaPairs(),
+      tagsText: "",
+    },
+  });
+
+  const defaultGenericContentFields = (): GenericContentField[] => [{ key: "", value: "" }];
+
+  const decodeHtmlEntitiesDeep = (value: string): string => {
+    if (!value || typeof document === "undefined") return value;
+
+    let current = value;
+    // Decode 2-3 rounds to handle payloads like "&amp;agrave;".
+    for (let i = 0; i < 3; i += 1) {
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = current;
+      const next = textarea.value;
+      if (next === current) break;
+      current = next;
+    }
+    return current;
+  };
+
+  const normalizeIncomingHtml = (input: unknown): string => {
+    const raw = String(input ?? "");
+    if (!raw.trim() || typeof document === "undefined") return raw;
+
+    const decoded = decodeHtmlEntitiesDeep(raw);
+
+    // Let browser parser repair malformed HTML structure.
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = decoded;
+    return wrapper.innerHTML;
+  };
+
+  const normalizeShortDescription = (input: unknown): string => {
+    const raw = String(input ?? "");
+    if (!raw.trim() || typeof document === "undefined") return raw;
+
+    const decoded = decodeHtmlEntitiesDeep(raw);
+
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = decoded;
+    const text = (wrapper.textContent || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return text;
+  };
+
+  const objectToFields = (obj: any): GenericContentField[] => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+      return defaultGenericContentFields();
+    }
+    const entries = Object.entries(obj);
+    if (!entries.length) return defaultGenericContentFields();
+    return entries.map(([key, value]) => ({
+      key,
+      value:
+        typeof value === "string"
+          ? normalizeIncomingHtml(value)
+          : typeof value === "number" || typeof value === "boolean"
+            ? String(value)
+            : JSON.stringify(value),
+    }));
+  };
+
+  const parseFieldValue = (raw: string): any => {
+    const text = raw.trim();
+    if (!text) return "";
+    if (text === "true") return true;
+    if (text === "false") return false;
+    if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+    if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
+  };
+
+  const parseTagsText = (raw: string): string[] =>
+    String(raw || "")
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const cleanQaPairs = (pairs: QaPair[]): QaPair[] =>
+    (pairs || [])
+      .map((x) => ({ question: String(x.question || "").trim(), answer: String(x.answer || "").trim() }))
+      .filter((x) => x.question && x.answer);
+
+  const fieldsToObject = (fields: GenericContentField[]): Record<string, any> => {
+    const out: Record<string, any> = {};
+    fields.forEach((item) => {
+      const key = item.key.trim();
+      if (!key) return;
+      out[key] = parseFieldValue(item.value);
+    });
+    return out;
+  };
+
+  const normalizeContentBySchema = (lessonType: string, rawContent: any, apiData: any) => {
+    const content = rawContent && typeof rawContent === "object" ? rawContent : {};
+    const tags = Array.isArray(content?.tags) ? content.tags : Array.isArray(apiData?.tags) ? apiData.tags : [];
+
+    if (lessonType === "vocabulary") {
+      return {
+        type: "vocabulary",
+        description: normalizeIncomingHtml(content?.description || apiData?.description || ""),
+        words: Array.isArray(content?.words) ? content.words : [],
+        tags,
+      };
+    }
+
+    if (lessonType === "grammar") {
+      return {
+        type: "grammar",
+        description: normalizeIncomingHtml(content?.description || ""),
+        rule: String(content?.rule || ""),
+        explanation_vi: String(content?.explanation_vi || ""),
+        explanation_en: String(content?.explanation_en || ""),
+        examples: Array.isArray(content?.examples) ? content.examples : [],
+        commonMistakes: Array.isArray(content?.commonMistakes) ? content.commonMistakes : [],
+        tags,
+      };
+    }
+
+    if (lessonType === "dialogue") {
+      return {
+        type: "dialogue",
+        description: normalizeIncomingHtml(content?.description || ""),
+        script: String(content?.script || ""),
+        audio: String(content?.audio || ""),
+        translation: String(content?.translation || ""),
+        tags,
+      };
+    }
+
+    if (lessonType === "reading") {
+      return {
+        type: "reading",
+        description: normalizeIncomingHtml(content?.description || ""),
+        passage: String(content?.passage || ""),
+        questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+          ? content.questionsAndAnswers
+          : [],
+        tags,
+      };
+    }
+
+    if (["listening", "speaking", "writing"].includes(lessonType)) {
+      return {
+        type: "exercises",
+        exerciseType: String(content?.exerciseType || lessonType),
+        description: normalizeIncomingHtml(content?.description || ""),
+        questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+          ? content.questionsAndAnswers
+          : [],
+        tags,
+      };
+    }
+
+    if (lessonType === "quiz") {
+      return {
+        type: "quizzes",
+        description: normalizeIncomingHtml(content?.description || ""),
+        questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+          ? content.questionsAndAnswers
+          : [],
+        tags,
+      };
+    }
+
+    if (lessonType === "review") {
+      return {
+        type: "reviews",
+        description: normalizeIncomingHtml(content?.description || ""),
+        questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+          ? content.questionsAndAnswers
+          : [],
+        tags,
+      };
+    }
+
+    return {
+      ...(content || {}),
+      description: normalizeIncomingHtml(content?.description || ""),
+      tags,
+    };
+  };
+
+  const getImageFromClipboardData = (data: DataTransfer | null): File | null => {
+    if (!data) return null;
+    const items = Array.from(data.items || []);
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) return file;
+      }
+    }
+    return null;
+  };
+
+
   const [createContent, setCreateContent] = useState<VocabularyContent>(defaultVocabularyContent());
   const [editContent, setEditContent] = useState<VocabularyContent>(defaultVocabularyContent());
+  const [createTypedContent, setCreateTypedContent] = useState<CreateTypedContentState>(
+    defaultCreateTypedContent(),
+  );
+  const [createContentFields, setCreateContentFields] = useState<GenericContentField[]>(
+    defaultGenericContentFields(),
+  );
+  const [editContentFields, setEditContentFields] = useState<GenericContentField[]>(
+    defaultGenericContentFields(),
+  );
 
   const fetchLessons = async (filterStatus?: "ALL" | LessonStatus) => {
     try {
@@ -133,7 +496,8 @@ export default function AdminLessonsPage() {
           id: String(l?._id || l?.id || ""),
           unitId,
           name: String(l?.title || l?.name || "Bài học chưa đặt tên"),
-          description: l?.description || "",
+          description: normalizeShortDescription(l?.description || ""),
+          descriptionHtml: normalizeIncomingHtml(l?.description || ""),
           unitName: String(
             l?.unitId?.name || l?.unit?.name || l?.unitName || "Không rõ chủ đề",
           ),
@@ -201,7 +565,10 @@ export default function AdminLessonsPage() {
       isActive: "active",
     });
     setCreateContent(defaultVocabularyContent());
+    setCreateTypedContent(defaultCreateTypedContent());
+    setCreateContentFields(defaultGenericContentFields());
     setThumbnailFile(null);
+    setThumbnailUrl("");
     setCreateError("");
     setCreateSuccess("");
   };
@@ -220,8 +587,143 @@ export default function AdminLessonsPage() {
       isActive: "active",
     });
     setEditContent(defaultVocabularyContent());
+    setEditContentFields(defaultGenericContentFields());
     setEditThumbnailFile(null);
+    setEditThumbnailUrl("");
     setEditError("");
+  };
+
+  const buildCreateContentByType = (): any | null => {
+    switch (lessonForm.type) {
+      case "grammar": {
+        const data = createTypedContent.grammar;
+        if (!data.rule.trim()) {
+          setCreateError("Vui lòng nhập quy tắc ngữ pháp.");
+          return null;
+        }
+        return {
+          type: "grammar",
+          description: data.description,
+          rule: data.rule,
+          explanation_vi: data.explanation_vi,
+          explanation_en: data.explanation_en,
+          examples: data.examples
+            .map((x) => ({ example: x.example.trim(), translation: x.translation.trim() }))
+            .filter((x) => x.example && x.translation),
+          commonMistakes: data.commonMistakesText
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "dialogue": {
+        const data = createTypedContent.dialogue;
+        if (!data.script.trim()) {
+          setCreateError("Vui lòng nhập hội thoại (script).");
+          return null;
+        }
+        return {
+          type: "dialogue",
+          description: data.description,
+          script: data.script,
+          audio: data.audio,
+          translation: data.translation,
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "reading": {
+        const data = createTypedContent.reading;
+        if (!data.passage.trim()) {
+          setCreateError("Vui lòng nhập đoạn đọc.");
+          return null;
+        }
+        return {
+          type: "reading",
+          description: data.description,
+          passage: data.passage,
+          questionsAndAnswers: cleanQaPairs(data.questionsAndAnswers),
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "listening":
+      case "speaking":
+      case "writing": {
+        const data = createTypedContent[lessonForm.type];
+        const qa = cleanQaPairs(data.questionsAndAnswers);
+        if (!qa.length) {
+          setCreateError("Vui lòng nhập ít nhất 1 câu hỏi và đáp án.");
+          return null;
+        }
+        return {
+          type: "exercises",
+          description: data.description,
+          exerciseType: lessonForm.type,
+          questionsAndAnswers: qa,
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "quiz": {
+        const data = createTypedContent.quiz;
+        const qa = cleanQaPairs(data.questionsAndAnswers);
+        if (!qa.length) {
+          setCreateError("Vui lòng nhập ít nhất 1 câu hỏi và đáp án cho quiz.");
+          return null;
+        }
+        return {
+          type: "quizzes",
+          description: data.description,
+          questionsAndAnswers: qa,
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "review": {
+        const data = createTypedContent.review;
+        const qa = cleanQaPairs(data.questionsAndAnswers);
+        if (!qa.length) {
+          setCreateError("Vui lòng nhập ít nhất 1 câu hỏi và đáp án cho phần ôn tập.");
+          return null;
+        }
+        return {
+          type: "reviews",
+          description: data.description,
+          questionsAndAnswers: qa,
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      case "song": {
+        const data = createTypedContent.song;
+        if (!data.lyrics.trim()) {
+          setCreateError("Vui lòng nhập lời bài hát.");
+          return null;
+        }
+        const qa = cleanQaPairs(data.questionsAndAnswers);
+        const vocabulary = String(data.vocabularyText || "")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [word = "", definition = "", ipa = ""] = line.split("|").map((x) => x.trim());
+            return { word, definition, ...(ipa ? { ipa } : {}) };
+          })
+          .filter((x) => x.word && x.definition);
+
+        return {
+          type: "songs",
+          description: data.description,
+          lyrics: data.lyrics,
+          translation: data.translation,
+          audio: data.audio,
+          video: data.video,
+          vocabulary,
+          questionsAndAnswers: qa,
+          tags: parseTagsText(data.tagsText),
+        };
+      }
+      default:
+        setCreateError("Loại bài học chưa được hỗ trợ trong form tạo mới.");
+        return null;
+    }
   };
 
   const handleCreateLesson = async () => {
@@ -233,37 +735,41 @@ export default function AdminLessonsPage() {
       setCreateError("Vui lòng nhập tiêu đề bài học.");
       return;
     }
-    if (lessonForm.type !== "vocabulary") {
-      setCreateError("Hiện tại form chỉ hỗ trợ content dạng Từ vựng (vocabulary).");
-      return;
-    }
     try {
       setCreating(true);
       setCreateError("");
       setCreateSuccess("");
 
-      const contentObj: VocabularyContent = {
-        ...createContent,
-        type: "vocabulary",
-        words: (createContent.words || []).filter(
-          (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
-        ),
-      };
-      if (!contentObj.words.length) {
-        setCreateError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
-        return;
+      let contentObj: any = {};
+      if (lessonForm.type === "vocabulary") {
+        const vocabContent: VocabularyContent = {
+          ...createContent,
+          type: "vocabulary",
+          words: (createContent.words || []).filter(
+            (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
+          ),
+        };
+        if (!vocabContent.words.length) {
+          setCreateError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
+          return;
+        }
+        contentObj = vocabContent;
+      } else {
+        const built = buildCreateContentByType();
+        if (!built) return;
+        contentObj = built;
       }
 
       if (thumbnailFile) {
         const fd = new FormData();
         fd.append("unit", lessonForm.unitId.trim());
         fd.append("title", lessonForm.title.trim());
-        fd.append("description", lessonForm.description.trim());
-        fd.append("type", "vocabulary");
+        fd.append("description", normalizeShortDescription(lessonForm.description));
+        fd.append("type", normalizeApiLessonType(lessonForm.type));
         fd.append("level", lessonForm.level);
         fd.append("orderIndex", lessonForm.orderIndex || "0");
         fd.append("estimatedDuration", lessonForm.duration || "0");
-        fd.append("skillFocus", "vocabulary");
+        fd.append("skillFocus", lessonForm.skillFocus || normalizeSkillFocusByType(lessonForm.type));
         fd.append("isActive", lessonForm.isActive);
         fd.append("thumbnail", thumbnailFile);
         fd.append("content", JSON.stringify(contentObj));
@@ -272,13 +778,14 @@ export default function AdminLessonsPage() {
         await lessonService.createLesson({
           unit: lessonForm.unitId.trim(),
           title: lessonForm.title.trim(),
-          description: lessonForm.description.trim(),
-          type: "vocabulary",
+          description: normalizeShortDescription(lessonForm.description),
+          type: normalizeApiLessonType(lessonForm.type),
           level: lessonForm.level,
           orderIndex: Number(lessonForm.orderIndex || 0),
           estimatedDuration: Number(lessonForm.duration || 0),
-          skillFocus: "vocabulary",
+          skillFocus: lessonForm.skillFocus || normalizeSkillFocusByType(lessonForm.type),
           isActive: lessonForm.isActive,
+          ...(thumbnailUrl.trim() ? { thumbnail: thumbnailUrl.trim() } : {}),
           content: contentObj,
         } as any);
       }
@@ -338,11 +845,18 @@ export default function AdminLessonsPage() {
   const handleOpenEdit = async (row: LessonRow) => {
     setEditError("");
     setEditThumbnailFile(null);
+    setEditThumbnailUrl("");
     try {
       const res: any = await lessonService.getLessonById(row.id);
       const detail = res?.data ?? res;
+      const rawContentType = String(detail?.content?.type || "").toLowerCase();
+      const normalizedType =
+        rawContentType === "song" || rawContentType === "songs"
+          ? "song"
+          : String(detail?.type || row.type || "vocabulary").toLowerCase();
 
       const rawContent = detail?.content && typeof detail.content === "object" ? detail.content : null;
+      const normalizedContent = normalizeContentBySchema(normalizedType, rawContent, detail);
       const rawWords = Array.isArray(rawContent?.words) ? rawContent.words : [];
       const mappedWords: VocabWord[] = rawWords
         .map((w: any) => ({
@@ -355,20 +869,20 @@ export default function AdminLessonsPage() {
       setEditForm({
         id: row.id,
         unitId: String(
-          detail?.unit?._id ||
-            detail?.unit?.id ||
-            detail?.unitId?._id ||
+          detail?.unitId?._id ||
             detail?.unitId?.id ||
-            detail?.unit ||
+            detail?.unit?._id ||
+            detail?.unit?.id ||
             detail?.unitId ||
+            detail?.unit ||
             row.unitId ||
             "",
         ),
         title: String(detail?.title || detail?.name || row.name || ""),
-        description: String(detail?.description || row.description || ""),
-        type: String(detail?.type || row.type || "vocabulary"),
+        description: normalizeShortDescription(detail?.description || row.description || ""),
+        type: normalizedType,
         level: String(detail?.level || "A1"),
-        skillFocus: String(detail?.skillFocus || "vocabulary"),
+        skillFocus: String(detail?.skillFocus || normalizeSkillFocusByType(normalizedType)),
         orderIndex: String(detail?.orderIndex ?? row.orderIndex ?? 0),
         duration: String(detail?.estimatedDuration ?? detail?.duration ?? row.duration ?? 0),
         isActive: String(detail?.isActive || (row.status === "ACTIVE" ? "active" : "inactive")).toLowerCase(),
@@ -376,10 +890,12 @@ export default function AdminLessonsPage() {
 
       setEditContent({
         type: "vocabulary",
-        description: String(rawContent?.description || detail?.description || ""),
+        description: normalizeIncomingHtml(normalizedContent?.description || detail?.description || ""),
         words: mappedWords.length ? mappedWords : [{ word: "", definition: "", ipa: "" }],
-        tags: Array.isArray(rawContent?.tags) ? rawContent.tags : [],
+        tags: Array.isArray(normalizedContent?.tags) ? normalizedContent.tags : [],
       });
+      setEditThumbnailUrl(String(detail?.thumbnail || detail?.thumbnailUrl || ""));
+      setEditContentFields(objectToFields(normalizedContent));
       setOpenEdit(true);
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
@@ -400,36 +916,38 @@ export default function AdminLessonsPage() {
       setEditError("Vui lòng nhập tiêu đề bài học.");
       return;
     }
-    if (editForm.type !== "vocabulary") {
-      setEditError("Hiện tại form chỉ hỗ trợ content dạng Từ vựng (vocabulary).");
-      return;
-    }
     try {
       setSavingEdit(true);
       setEditError("");
 
-      const contentObj: VocabularyContent = {
-        ...editContent,
-        type: "vocabulary",
-        words: (editContent.words || []).filter(
-          (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
-        ),
-      };
-      if (!contentObj.words.length) {
-        setEditError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
-        return;
+      let contentObj: any = {};
+      if (editForm.type === "vocabulary") {
+        const vocabContent: VocabularyContent = {
+          ...editContent,
+          type: "vocabulary",
+          words: (editContent.words || []).filter(
+            (w) => String(w.word || "").trim() && String(w.definition || "").trim(),
+          ),
+        };
+        if (!vocabContent.words.length) {
+          setEditError("Vui lòng nhập ít nhất 1 từ vựng (word + definition).");
+          return;
+        }
+        contentObj = vocabContent;
+      } else {
+        contentObj = fieldsToObject(editContentFields);
       }
 
       if (editThumbnailFile) {
         const fd = new FormData();
         fd.append("unit", editForm.unitId.trim());
         fd.append("title", editForm.title.trim());
-        fd.append("description", editForm.description.trim());
-        fd.append("type", "vocabulary");
+        fd.append("description", normalizeShortDescription(editForm.description));
+        fd.append("type", normalizeApiLessonType(editForm.type));
         fd.append("level", editForm.level);
         fd.append("orderIndex", editForm.orderIndex || "0");
         fd.append("estimatedDuration", editForm.duration || "0");
-        fd.append("skillFocus", "vocabulary");
+        fd.append("skillFocus", editForm.skillFocus || normalizeSkillFocusByType(editForm.type));
         fd.append("isActive", editForm.isActive);
         fd.append("thumbnail", editThumbnailFile);
         fd.append("content", JSON.stringify(contentObj));
@@ -438,13 +956,14 @@ export default function AdminLessonsPage() {
         await lessonService.updateLesson(editForm.id, {
           unit: editForm.unitId.trim(),
           title: editForm.title.trim(),
-          description: editForm.description.trim(),
-          type: "vocabulary",
+          description: normalizeShortDescription(editForm.description),
+          type: normalizeApiLessonType(editForm.type),
           level: editForm.level,
           orderIndex: Number(editForm.orderIndex || 0),
           estimatedDuration: Number(editForm.duration || 0),
-          skillFocus: "vocabulary",
+          skillFocus: editForm.skillFocus || normalizeSkillFocusByType(editForm.type),
           isActive: editForm.isActive,
+          ...(editThumbnailUrl.trim() ? { thumbnail: editThumbnailUrl.trim() } : {}),
           content: contentObj,
         });
       }
@@ -606,7 +1125,14 @@ export default function AdminLessonsPage() {
                     <p className="text-xs text-slate-400 mt-1">ID: {l.id}</p>
                   </td>
                   <td className="p-4 text-slate-600 max-w-md">
-                    <span className="line-clamp-2">{l.description || "—"}</span>
+                    {l.descriptionHtml ? (
+                      <div
+                        className="line-clamp-2 [&_p]:m-0 [&_img]:hidden"
+                        dangerouslySetInnerHTML={{ __html: l.descriptionHtml }}
+                      />
+                    ) : (
+                      <span className="line-clamp-2">{l.description || "—"}</span>
+                    )}
                   </td>
                   <td className="p-4 text-slate-600">{l.unitName}</td>
                   <td className="p-4 text-center text-slate-600">{l.orderIndex}</td>
@@ -683,7 +1209,7 @@ export default function AdminLessonsPage() {
       {openCreate && (
         <div className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
           <div className="min-h-full w-full flex justify-center p-3 md:p-6">
-            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+            <div className="w-[min(980px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
                 <h2 className="text-lg font-black text-slate-800">Tạo bài học mới</h2>
                 <button
@@ -695,7 +1221,7 @@ export default function AdminLessonsPage() {
                 </button>
               </div>
 
-              <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="p-6 space-y-5 overflow-y-auto [&_input]:text-base [&_select]:text-base [&_textarea]:text-base [&_input]:py-3 [&_select]:py-3 [&_textarea]:py-3">
                 {createError && (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
                     {createError}
@@ -709,7 +1235,7 @@ export default function AdminLessonsPage() {
 
                 <div className="grid grid-cols-1 gap-3">
                   <label className="text-xs font-bold text-slate-600">
-                    Chủ đề (Unit) *
+                    Chủ đề *
                     <select
                       value={lessonForm.unitId}
                       onChange={(e) =>
@@ -717,7 +1243,7 @@ export default function AdminLessonsPage() {
                       }
                       className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 bg-white"
                     >
-                      <option value="">— Chọn unit —</option>
+                      <option value="">— Chọn chủ đề —</option>
                       {unitOptions.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
@@ -748,7 +1274,7 @@ export default function AdminLessonsPage() {
                         setLessonForm((p) => ({
                           ...p,
                           type: e.target.value,
-                          skillFocus: e.target.value,
+                          skillFocus: normalizeSkillFocusByType(e.target.value),
                         }))
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
@@ -760,6 +1286,7 @@ export default function AdminLessonsPage() {
                       <option value="speaking">Nói</option>
                       <option value="writing">Viết</option>
                       <option value="dialogue">Hội thoại</option>
+                      <option value="song">Bài hát</option>
                       <option value="quiz">Quiz</option>
                       <option value="review">Ôn tập</option>
                     </select>
@@ -772,7 +1299,7 @@ export default function AdminLessonsPage() {
                     >
                       {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((lv) => (
                         <option key={lv} value={lv}>
-                          Level {lv}
+                          Trình độ {lv}
                         </option>
                       ))}
                     </select>
@@ -792,7 +1319,7 @@ export default function AdminLessonsPage() {
                       onChange={(e) =>
                         setLessonForm((p) => ({ ...p, orderIndex: e.target.value }))
                       }
-                      placeholder="Thứ tự (order)"
+                      placeholder="Thứ tự"
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     />
                     <input
@@ -807,104 +1334,487 @@ export default function AdminLessonsPage() {
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="text-xs font-bold text-slate-600 mb-2">
-                      Content (Từ vựng)
+                      {lessonForm.type === "vocabulary" ? "Nội dung (Từ vựng)" : "Nội dung (Các trường dữ liệu)"}
                     </div>
-                    <textarea
-                      value={createContent.description}
-                      onChange={(e) =>
-                        setCreateContent((c) => ({ ...c, description: e.target.value }))
-                      }
-                      placeholder="Mô tả (tuỳ chọn)"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
-                    />
-                    <div className="mt-3 space-y-2">
-                      {createContent.words.map((w, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
-                          <input
-                            value={w.word}
-                            onChange={(e) =>
-                              setCreateContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, word: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="word"
-                            className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <input
-                            value={w.definition}
-                            onChange={(e) =>
-                              setCreateContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, definition: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="definition"
-                            className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <input
-                            value={w.ipa || ""}
-                            onChange={(e) =>
-                              setCreateContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, ipa: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="ipa"
-                            className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <div className="sm:col-span-6 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setCreateContent((c) => ({
-                                  ...c,
-                                  words:
-                                    c.words.length <= 1
-                                      ? c.words
-                                      : c.words.filter((_, i) => i !== idx),
-                                }))
-                              }
-                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                            >
-                              Xóa dòng
-                            </button>
+                    {lessonForm.type === "vocabulary" ? (
+                      <>
+                        <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                          <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                            Mô tả nội dung (tuỳ chọn)
                           </div>
+                          <Editor
+                            apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                            value={createContent.description}
+                            onEditorChange={(content) =>
+                              setCreateContent((c) => ({
+                                ...c,
+                                description: normalizeIncomingHtml(content),
+                              }))
+                            }
+                            init={tinymceInit}
+                          />
                         </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCreateContent((c) => ({
-                            ...c,
-                            words: [...c.words, { word: "", definition: "", ipa: "" }],
-                          }))
+                        <div className="mt-3 space-y-2">
+                          {createContent.words.map((w, idx) => (
+                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                              <input
+                                value={w.word}
+                                onChange={(e) =>
+                                  setCreateContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, word: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Từ vựng"
+                                className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={w.definition}
+                                onChange={(e) =>
+                                  setCreateContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, definition: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Nghĩa"
+                                className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={w.ipa || ""}
+                                onChange={(e) =>
+                                  setCreateContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, ipa: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Phiên âm (IPA)"
+                                className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <div className="sm:col-span-6 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCreateContent((c) => ({
+                                      ...c,
+                                      words:
+                                        c.words.length <= 1
+                                          ? c.words
+                                          : c.words.filter((_, i) => i !== idx),
+                                    }))
+                                  }
+                                  className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                >
+                                  Xóa dòng
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCreateContent((c) => ({
+                                ...c,
+                                words: [...c.words, { word: "", definition: "", ipa: "" }],
+                              }))
+                            }
+                            className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                          >
+                            + Thêm từ
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      (() => {
+                        if (lessonForm.type === "grammar") {
+                          const data = createTypedContent.grammar;
+                          return (
+                            <div className="space-y-2">
+                              <input
+                                value={data.rule}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, rule: e.target.value } }))
+                                }
+                                placeholder="Quy tắc chính *"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={data.explanation_vi}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, explanation_vi: e.target.value } }))
+                                }
+                                placeholder="Giải thích tiếng Việt"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={data.explanation_en}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, explanation_en: e.target.value } }))
+                                }
+                                placeholder="Giải thích tiếng Anh"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                                <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">Mô tả</div>
+                                <Editor
+                                  apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                                  value={data.description}
+                                  onEditorChange={(content) =>
+                                    setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, description: normalizeIncomingHtml(content) } }))
+                                  }
+                                  init={{ ...tinymceInit, height: 160 }}
+                                />
+                              </div>
+                              <textarea
+                                value={data.commonMistakesText}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, commonMistakesText: e.target.value } }))
+                                }
+                                placeholder="Lỗi thường gặp (mỗi dòng 1 lỗi)"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
+                              />
+                              <input
+                                value={data.tagsText}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, grammar: { ...p.grammar, tagsText: e.target.value } }))
+                                }
+                                placeholder="Tags (cách nhau bởi dấu phẩy)"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                            </div>
+                          );
                         }
-                        className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
-                      >
-                        + Thêm từ
-                      </button>
-                    </div>
+
+                        if (lessonForm.type === "dialogue") {
+                          const data = createTypedContent.dialogue;
+                          return (
+                            <div className="space-y-2">
+                              <textarea
+                                value={data.script}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, dialogue: { ...p.dialogue, script: e.target.value } }))
+                                }
+                                placeholder="Nội dung hội thoại (script) *"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-24"
+                              />
+                              <input
+                                value={data.translation}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, dialogue: { ...p.dialogue, translation: e.target.value } }))
+                                }
+                                placeholder="Bản dịch"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={data.audio}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, dialogue: { ...p.dialogue, audio: e.target.value } }))
+                                }
+                                placeholder="Link audio"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={data.tagsText}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, dialogue: { ...p.dialogue, tagsText: e.target.value } }))
+                                }
+                                placeholder="Tags (cách nhau bởi dấu phẩy)"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                            </div>
+                          );
+                        }
+
+                        if (lessonForm.type === "song") {
+                          const data = createTypedContent.song;
+                          return (
+                            <div className="space-y-2">
+                              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                                <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">Mô tả bài hát</div>
+                                <Editor
+                                  apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                                  value={data.description}
+                                  onEditorChange={(content) =>
+                                    setCreateTypedContent((p) => ({ ...p, song: { ...p.song, description: normalizeIncomingHtml(content) } }))
+                                  }
+                                  init={{ ...tinymceInit, height: 140 }}
+                                />
+                              </div>
+                              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                                <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">Lời bài hát *</div>
+                                <Editor
+                                  apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                                  value={data.lyrics}
+                                  onEditorChange={(content) =>
+                                    setCreateTypedContent((p) => ({ ...p, song: { ...p.song, lyrics: normalizeIncomingHtml(content) } }))
+                                  }
+                                  init={{ ...tinymceInit, height: 180 }}
+                                />
+                              </div>
+                              <textarea
+                                value={data.translation}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, song: { ...p.song, translation: e.target.value } }))
+                                }
+                                placeholder="Bản dịch"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
+                              />
+                              <input
+                                value={data.audio}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, song: { ...p.song, audio: e.target.value } }))
+                                }
+                                placeholder="Link audio"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={data.video}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, song: { ...p.song, video: e.target.value } }))
+                                }
+                                placeholder="Link video"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <textarea
+                                value={data.vocabularyText}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, song: { ...p.song, vocabularyText: e.target.value } }))
+                                }
+                                placeholder="Từ vựng theo dòng: tu|nghia|ipa (ipa tùy chọn)"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
+                              />
+                              <div className="space-y-2">
+                                {data.questionsAndAnswers.map((qa, idx) => (
+                                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                    <input
+                                      value={qa.question}
+                                      onChange={(e) =>
+                                        setCreateTypedContent((p) => ({
+                                          ...p,
+                                          song: {
+                                            ...p.song,
+                                            questionsAndAnswers: p.song.questionsAndAnswers.map((x, i) =>
+                                              i === idx ? { ...x, question: e.target.value } : x,
+                                            ),
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Câu hỏi"
+                                      className="sm:col-span-5 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                                    />
+                                    <input
+                                      value={qa.answer}
+                                      onChange={(e) =>
+                                        setCreateTypedContent((p) => ({
+                                          ...p,
+                                          song: {
+                                            ...p.song,
+                                            questionsAndAnswers: p.song.questionsAndAnswers.map((x, i) =>
+                                              i === idx ? { ...x, answer: e.target.value } : x,
+                                            ),
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Đáp án"
+                                      className="sm:col-span-6 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCreateTypedContent((p) => ({
+                                          ...p,
+                                          song: {
+                                            ...p.song,
+                                            questionsAndAnswers:
+                                              p.song.questionsAndAnswers.length <= 1
+                                                ? p.song.questionsAndAnswers
+                                                : p.song.questionsAndAnswers.filter((_, i) => i !== idx),
+                                          },
+                                        }))
+                                      }
+                                      className="sm:col-span-1 px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                    >
+                                      Xóa
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCreateTypedContent((p) => ({
+                                      ...p,
+                                      song: {
+                                        ...p.song,
+                                        questionsAndAnswers: [...p.song.questionsAndAnswers, { question: "", answer: "" }],
+                                      },
+                                    }))
+                                  }
+                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                                >
+                                  + Thêm câu hỏi
+                                </button>
+                              </div>
+                              <input
+                                value={data.tagsText}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, song: { ...p.song, tagsText: e.target.value } }))
+                                }
+                                placeholder="Tags (cách nhau bởi dấu phẩy)"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                            </div>
+                          );
+                        }
+
+                        const key = lessonForm.type as "reading" | "listening" | "speaking" | "writing" | "quiz" | "review";
+                        const data = createTypedContent[key];
+                        return (
+                          <div className="space-y-2">
+                            {lessonForm.type === "reading" ? (
+                              <textarea
+                                value={createTypedContent.reading.passage}
+                                onChange={(e) =>
+                                  setCreateTypedContent((p) => ({ ...p, reading: { ...p.reading, passage: e.target.value } }))
+                                }
+                                placeholder="Đoạn văn đọc *"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-24"
+                              />
+                            ) : null}
+                            <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                              <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">Mô tả</div>
+                              <Editor
+                                apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                                value={data.description}
+                                onEditorChange={(content) =>
+                                  setCreateTypedContent((p) => ({ ...p, [key]: { ...p[key], description: normalizeIncomingHtml(content) } }))
+                                }
+                                init={{ ...tinymceInit, height: 140 }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              {data.questionsAndAnswers.map((qa, idx) => (
+                                <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                  <input
+                                    value={qa.question}
+                                    onChange={(e) =>
+                                      setCreateTypedContent((p) => ({
+                                        ...p,
+                                        [key]: {
+                                          ...p[key],
+                                          questionsAndAnswers: p[key].questionsAndAnswers.map((x, i) =>
+                                            i === idx ? { ...x, question: e.target.value } : x,
+                                          ),
+                                        },
+                                      }))
+                                    }
+                                    placeholder="Câu hỏi"
+                                    className="sm:col-span-5 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                                  />
+                                  <input
+                                    value={qa.answer}
+                                    onChange={(e) =>
+                                      setCreateTypedContent((p) => ({
+                                        ...p,
+                                        [key]: {
+                                          ...p[key],
+                                          questionsAndAnswers: p[key].questionsAndAnswers.map((x, i) =>
+                                            i === idx ? { ...x, answer: e.target.value } : x,
+                                          ),
+                                        },
+                                      }))
+                                    }
+                                    placeholder="Đáp án"
+                                    className="sm:col-span-6 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setCreateTypedContent((p) => ({
+                                        ...p,
+                                        [key]: {
+                                          ...p[key],
+                                          questionsAndAnswers:
+                                            p[key].questionsAndAnswers.length <= 1
+                                              ? p[key].questionsAndAnswers
+                                              : p[key].questionsAndAnswers.filter((_, i) => i !== idx),
+                                        },
+                                      }))
+                                    }
+                                    className="sm:col-span-1 px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCreateTypedContent((p) => ({
+                                    ...p,
+                                    [key]: {
+                                      ...p[key],
+                                      questionsAndAnswers: [...p[key].questionsAndAnswers, { question: "", answer: "" }],
+                                    },
+                                  }))
+                                }
+                                className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                              >
+                                + Thêm câu hỏi
+                              </button>
+                            </div>
+                            <input
+                              value={data.tagsText}
+                              onChange={(e) =>
+                                setCreateTypedContent((p) => ({ ...p, [key]: { ...p[key], tagsText: e.target.value } }))
+                              }
+                              placeholder="Tags (cách nhau bởi dấu phẩy)"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                            />
+                          </div>
+                        );
+                      })()
+                    )}
                   </div>
-                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
-                    <span className="text-xs font-semibold text-slate-600">
+                  <div className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm space-y-2">
+                    <span className="text-xs font-semibold text-slate-600 block">
                       Ảnh đại diện (tuỳ chọn)
                     </span>
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) =>
-                        setThumbnailFile(e.target.files?.[0] || null)
-                      }
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setThumbnailFile(file);
+                        if (file) setThumbnailUrl("");
+                      }}
                       className="mt-1 block w-full text-sm"
                     />
-                  </label>
+                    <input
+                      type="text"
+                      value={thumbnailUrl}
+                      onChange={(e) => {
+                        setThumbnailUrl(e.target.value);
+                        if (e.target.value.trim()) setThumbnailFile(null);
+                      }}
+                      onPaste={(e) => {
+                        const pasted = getImageFromClipboardData(e.clipboardData);
+                        if (!pasted) return;
+                        e.preventDefault();
+                        setThumbnailFile(pasted);
+                        setThumbnailUrl("");
+                      }}
+                      placeholder="Dán link ảnh hoặc dán ảnh trực tiếp (Ctrl+V)"
+                      className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                    />
+                    {thumbnailFile ? (
+                      <p className="text-xs text-emerald-700">Đang dùng file: {thumbnailFile.name}</p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -933,7 +1843,7 @@ export default function AdminLessonsPage() {
       {openEdit && (
         <div className="fixed inset-0 z-[130] bg-black/45 backdrop-blur-[2px] overflow-y-auto">
           <div className="min-h-full w-full flex justify-center p-3 md:p-6">
-            <div className="w-[min(720px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+            <div className="w-[min(980px,calc(100vw-1.5rem))] mt-16 md:mt-20 mb-4 bg-white rounded-2xl border border-slate-200 shadow-2xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
                 <h2 className="text-lg font-black text-slate-800">Chỉnh sửa bài học</h2>
                 <button
@@ -948,7 +1858,7 @@ export default function AdminLessonsPage() {
                 </button>
               </div>
 
-              <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="p-6 space-y-5 overflow-y-auto [&_input]:text-base [&_select]:text-base [&_textarea]:text-base [&_input]:py-3 [&_select]:py-3 [&_textarea]:py-3">
                 {editError && (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
                     {editError}
@@ -957,7 +1867,7 @@ export default function AdminLessonsPage() {
 
                 <div className="grid grid-cols-1 gap-3">
                   <label className="text-xs font-bold text-slate-600">
-                    Chủ đề (Unit) *
+                    Chủ đề *
                     <select
                       value={editForm.unitId}
                       onChange={(e) =>
@@ -965,7 +1875,7 @@ export default function AdminLessonsPage() {
                       }
                       className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 bg-white"
                     >
-                      <option value="">— Chọn unit —</option>
+                      <option value="">— Chọn chủ đề —</option>
                       {unitOptions.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
@@ -996,7 +1906,7 @@ export default function AdminLessonsPage() {
                         setEditForm((p) => ({
                           ...p,
                           type: e.target.value,
-                          skillFocus: e.target.value,
+                          skillFocus: normalizeSkillFocusByType(e.target.value),
                         }))
                       }
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
@@ -1008,6 +1918,7 @@ export default function AdminLessonsPage() {
                       <option value="speaking">Nói</option>
                       <option value="writing">Viết</option>
                       <option value="dialogue">Hội thoại</option>
+                      <option value="song">Bài hát</option>
                       <option value="quiz">Quiz</option>
                       <option value="review">Ôn tập</option>
                     </select>
@@ -1020,7 +1931,7 @@ export default function AdminLessonsPage() {
                     >
                       {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((lv) => (
                         <option key={lv} value={lv}>
-                          Level {lv}
+                          Trình độ {lv}
                         </option>
                       ))}
                     </select>
@@ -1040,7 +1951,7 @@ export default function AdminLessonsPage() {
                       onChange={(e) =>
                         setEditForm((p) => ({ ...p, orderIndex: e.target.value }))
                       }
-                      placeholder="Thứ tự (order)"
+                      placeholder="Thứ tự"
                       className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400"
                     />
                     <input
@@ -1055,104 +1966,203 @@ export default function AdminLessonsPage() {
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="text-xs font-bold text-slate-600 mb-2">
-                      Content (Từ vựng)
+                      {editForm.type === "vocabulary" ? "Nội dung (Từ vựng)" : "Nội dung (Các trường dữ liệu)"}
                     </div>
-                    <textarea
-                      value={editContent.description}
-                      onChange={(e) =>
-                        setEditContent((c) => ({ ...c, description: e.target.value }))
-                      }
-                      placeholder="Mô tả (tuỳ chọn)"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400 min-h-20"
-                    />
-                    <div className="mt-3 space-y-2">
-                      {editContent.words.map((w, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
-                          <input
-                            value={w.word}
-                            onChange={(e) =>
-                              setEditContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, word: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="word"
-                            className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <input
-                            value={w.definition}
-                            onChange={(e) =>
-                              setEditContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, definition: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="definition"
-                            className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <input
-                            value={w.ipa || ""}
-                            onChange={(e) =>
-                              setEditContent((c) => ({
-                                ...c,
-                                words: c.words.map((x, i) =>
-                                  i === idx ? { ...x, ipa: e.target.value } : x,
-                                ),
-                              }))
-                            }
-                            placeholder="ipa"
-                            className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
-                          />
-                          <div className="sm:col-span-6 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditContent((c) => ({
-                                  ...c,
-                                  words:
-                                    c.words.length <= 1
-                                      ? c.words
-                                      : c.words.filter((_, i) => i !== idx),
-                                }))
-                              }
-                              className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                            >
-                              Xóa dòng
-                            </button>
+                    {editForm.type === "vocabulary" ? (
+                      <>
+                        <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                          <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                            Mô tả nội dung (tuỳ chọn)
                           </div>
+                          <Editor
+                            apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                            value={editContent.description}
+                            onEditorChange={(content) =>
+                              setEditContent((c) => ({
+                                ...c,
+                                description: normalizeIncomingHtml(content),
+                              }))
+                            }
+                            init={tinymceInit}
+                          />
                         </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditContent((c) => ({
-                            ...c,
-                            words: [...c.words, { word: "", definition: "", ipa: "" }],
-                          }))
-                        }
-                        className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
-                      >
-                        + Thêm từ
-                      </button>
-                    </div>
+                        <div className="mt-3 space-y-2">
+                          {editContent.words.map((w, idx) => (
+                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                              <input
+                                value={w.word}
+                                onChange={(e) =>
+                                  setEditContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, word: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Từ vựng"
+                                className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={w.definition}
+                                onChange={(e) =>
+                                  setEditContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, definition: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Nghĩa"
+                                className="sm:col-span-3 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                value={w.ipa || ""}
+                                onChange={(e) =>
+                                  setEditContent((c) => ({
+                                    ...c,
+                                    words: c.words.map((x, i) =>
+                                      i === idx ? { ...x, ipa: e.target.value } : x,
+                                    ),
+                                  }))
+                                }
+                                placeholder="Phiên âm (IPA)"
+                                className="sm:col-span-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <div className="sm:col-span-6 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditContent((c) => ({
+                                      ...c,
+                                      words:
+                                        c.words.length <= 1
+                                          ? c.words
+                                          : c.words.filter((_, i) => i !== idx),
+                                    }))
+                                  }
+                                  className="px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                >
+                                  Xóa dòng
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditContent((c) => ({
+                                ...c,
+                                words: [...c.words, { word: "", definition: "", ipa: "" }],
+                              }))
+                            }
+                            className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                          >
+                            + Thêm từ
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-500 mb-2">
+                          Chỉnh các trường nội dung theo dạng tên trường - giá trị. Bạn có thể thêm/bớt trường tùy loại bài.
+                        </p>
+                        <div className="space-y-2">
+                          {editContentFields.map((item, idx) => (
+                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                              <input
+                                value={item.key}
+                                onChange={(e) =>
+                                  setEditContentFields((prev) =>
+                                    prev.map((row, i) =>
+                                      i === idx ? { ...row, key: e.target.value } : row,
+                                    ),
+                                  )
+                                }
+                                placeholder="Tên trường"
+                                className="sm:col-span-4 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-indigo-400"
+                              />
+                              <div className="sm:col-span-7 rounded-lg border border-slate-200 overflow-hidden bg-white">
+                                <Editor
+                                  apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || "no-api-key"}
+                                  value={item.value}
+                                  onEditorChange={(content) =>
+                                    setEditContentFields((prev) =>
+                                      prev.map((row, i) =>
+                                        i === idx
+                                          ? { ...row, value: normalizeIncomingHtml(content) }
+                                          : row,
+                                      ),
+                                    )
+                                  }
+                                  init={{
+                                    ...tinymceInit,
+                                    height: 160,
+                                    toolbar:
+                                      "undo redo | bold italic underline | bullist numlist | link | removeformat | code",
+                                  }}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditContentFields((prev) =>
+                                    prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx),
+                                  )
+                                }
+                                className="sm:col-span-1 px-2 py-1 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                              >
+                                Xóa
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditContentFields((prev) => [...prev, { key: "", value: "" }])
+                            }
+                            className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                          >
+                            + Thêm trường
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <label className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm">
-                    <span className="text-xs font-semibold text-slate-600">
+                  <div className="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm space-y-2">
+                    <span className="text-xs font-semibold text-slate-600 block">
                       Cập nhật ảnh đại diện (tuỳ chọn)
                     </span>
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) =>
-                        setEditThumbnailFile(e.target.files?.[0] || null)
-                      }
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setEditThumbnailFile(file);
+                        if (file) setEditThumbnailUrl("");
+                      }}
                       className="mt-1 block w-full text-sm"
                     />
-                  </label>
+                    <input
+                      type="text"
+                      value={editThumbnailUrl}
+                      onChange={(e) => {
+                        setEditThumbnailUrl(e.target.value);
+                        if (e.target.value.trim()) setEditThumbnailFile(null);
+                      }}
+                      onPaste={(e) => {
+                        const pasted = getImageFromClipboardData(e.clipboardData);
+                        if (!pasted) return;
+                        e.preventDefault();
+                        setEditThumbnailFile(pasted);
+                        setEditThumbnailUrl("");
+                      }}
+                      placeholder="Dán link ảnh hoặc dán ảnh trực tiếp (Ctrl+V)"
+                      className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                    />
+                    {editThumbnailFile ? (
+                      <p className="text-xs text-emerald-700">Đang dùng file: {editThumbnailFile.name}</p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 

@@ -34,6 +34,438 @@ import { dictionaryService } from "@/services/dictionary.service";
 const SHARED_BG =
   "/images/3d-illustration-world-book-day-celebration/10444286.jpg";
 
+function decodeHtmlEntitiesDeep(value: string): string {
+  if (!value || typeof document === "undefined") return value;
+  let current = value;
+  for (let i = 0; i < 3; i += 1) {
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = current;
+    const next = textarea.value;
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+function sanitizeHtml(value: string): string {
+  if (!value || typeof document === "undefined") return value;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = decodeHtmlEntitiesDeep(value);
+
+  // Remove dangerous tags and attributes before rendering.
+  wrapper.querySelectorAll("script,style,iframe,object,embed").forEach((el) => el.remove());
+  wrapper.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const val = attr.value.toLowerCase();
+      if (name.startsWith("on")) el.removeAttribute(attr.name);
+      if (name === "style" || name === "class" || name === "id") {
+        el.removeAttribute(attr.name);
+      }
+      if (["border", "frame", "rules", "cellpadding", "cellspacing", "bgcolor", "align"].includes(name)) {
+        el.removeAttribute(attr.name);
+      }
+      if ((name === "src" || name === "href") && val.startsWith("javascript:")) {
+        el.removeAttribute(attr.name);
+      }
+    });
+
+    if (el.tagName === "IMG") {
+      el.removeAttribute("width");
+      el.removeAttribute("height");
+      el.removeAttribute("border");
+      el.setAttribute("loading", "lazy");
+    }
+  });
+
+  return wrapper.innerHTML;
+}
+
+function toPlainText(value: any): string {
+  const raw = String(value ?? "");
+  if (!raw) return "";
+  if (typeof document === "undefined") {
+    return raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = decodeHtmlEntitiesDeep(raw);
+  return (wrapper.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeLessonType(apiData: any): string {
+  const candidates = [
+    apiData?.type,
+    apiData?.skillFocus,
+    apiData?.content?.type,
+    apiData?.contentType,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = toPlainText(candidate).toLowerCase();
+    if (normalized) return normalized;
+  }
+
+  return "";
+}
+
+function normalizeContentType(rawType: any, fallbackLessonType = ""): string {
+  const normalized = toPlainText(rawType).toLowerCase();
+  const fallback = toPlainText(fallbackLessonType).toLowerCase();
+  const source = normalized || fallback;
+
+  if (["vocab", "vocabulary"].includes(source)) return "vocabulary";
+  if (source === "grammar") return "grammar";
+  if (source === "dialogue") return "dialogue";
+  if (source === "reading") return "reading";
+  if (["listening", "speaking", "writing", "exercise", "exercises"].includes(source)) {
+    return "exercises";
+  }
+  if (["quiz", "quizzes"].includes(source)) return "quizzes";
+  if (["review", "reviews"].includes(source)) return "reviews";
+  if (["summary", "summaries"].includes(source)) return "summaries";
+  if (["game", "games"].includes(source)) return "games";
+  if (["song", "songs"].includes(source)) return "songs";
+  return source;
+}
+
+function toYoutubeEmbedUrl(rawUrl: string): string {
+  const url = String(rawUrl || "")
+    .trim()
+    .replace(/[),.;!?]+$/g, "");
+  if (!url) return "";
+
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{6,})/);
+  if (watchMatch?.[1]) return `https://www.youtube.com/embed/${watchMatch[1]}`;
+
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/i);
+  if (shortMatch?.[1]) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+
+  const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/i);
+  if (shortsMatch?.[1]) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+
+  if (url.includes("youtube.com/embed/")) return url;
+  return "";
+}
+
+function extractFirstYoutubeUrl(...sources: any[]): string {
+  const text = sources
+    .map((s) => String(s ?? ""))
+    .join("\n");
+  if (!text.trim()) return "";
+
+  if (typeof document !== "undefined") {
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = decodeHtmlEntitiesDeep(text);
+
+    const iframeSrc = wrapper.querySelector("iframe")?.getAttribute("src") || "";
+    if (/youtube\.com|youtu\.be/i.test(iframeSrc)) return iframeSrc;
+
+    const anchorSrc = Array.from(wrapper.querySelectorAll("a"))
+      .map((a) => a.getAttribute("href") || "")
+      .find((href) => /youtube\.com|youtu\.be/i.test(href));
+    if (anchorSrc) return anchorSrc;
+  }
+
+  const match = text.match(/https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)[^\s<>"]+/i);
+  return match ? match[0] : "";
+}
+
+function extractYoutubeFromStep(step: any): string {
+  if (!step || typeof step !== "object") return "";
+  return extractFirstYoutubeUrl(
+    step.title,
+    step.subtitle,
+    step.question,
+    step.content,
+    step.prompt,
+    step.script,
+    Array.isArray(step.items) ? step.items.join("\n") : "",
+    Array.isArray(step.options)
+      ? step.options
+          .map((o: any) => (typeof o === "string" ? o : JSON.stringify(o)))
+          .join("\n")
+      : "",
+  );
+}
+
+function normalizeStepForDisplay(step: any): any {
+  if (!step || typeof step !== "object") return step;
+
+  const next: any = { ...step };
+  const textKeys = [
+    "title",
+    "question",
+    "word",
+    "meaning",
+    "ipa",
+    "content",
+    "instruction",
+    "prompt",
+    "task",
+    "script",
+    "translation",
+    "audio",
+  ];
+
+  textKeys.forEach((key) => {
+    if (typeof next[key] === "string") {
+      next[key] = toPlainText(next[key]);
+    }
+  });
+
+  if (Array.isArray(next.options)) {
+    next.options = next.options.map((opt: any) => {
+      if (typeof opt === "string") return toPlainText(opt);
+      if (opt && typeof opt === "object") {
+        const mapped: Record<string, any> = {};
+        Object.entries(opt).forEach(([k, v]) => {
+          mapped[k] = typeof v === "string" ? toPlainText(v) : v;
+        });
+        return mapped;
+      }
+      return opt;
+    });
+  }
+
+  if (Array.isArray(next.correctAnswers)) {
+    next.correctAnswers = next.correctAnswers.map((v: any) =>
+      typeof v === "string" ? toPlainText(v) : v,
+    );
+  }
+
+  if (Array.isArray(next.pairs)) {
+    next.pairs = next.pairs.map((pair: any) => {
+      if (!pair || typeof pair !== "object") return pair;
+      const mapped: Record<string, any> = {};
+      Object.entries(pair).forEach(([k, v]) => {
+        mapped[k] = typeof v === "string" ? toPlainText(v) : v;
+      });
+      return mapped;
+    });
+  }
+
+  if (Array.isArray(next.questionsAndAnswers)) {
+    next.questionsAndAnswers = next.questionsAndAnswers.map((qa: any) => {
+      if (!qa || typeof qa !== "object") {
+        return typeof qa === "string" ? toPlainText(qa) : qa;
+      }
+      const mapped: Record<string, any> = {};
+      Object.entries(qa).forEach(([k, v]) => {
+        mapped[k] = typeof v === "string" ? toPlainText(v) : v;
+      });
+      return mapped;
+    });
+  }
+
+  // reading giữ lại HTML trong subtitle/items để render qua sanitizeHtml + dangerouslySetInnerHTML.
+  if (next.type === "reading") return next;
+
+  if (typeof next.subtitle === "string") {
+    next.subtitle = toPlainText(next.subtitle);
+  }
+
+  if (Array.isArray(next.items)) {
+    next.items = next.items.map((it: any) =>
+      typeof it === "string" ? toPlainText(it) : it,
+    );
+  }
+
+  return next;
+}
+
+function normalizeContentBySchema(lessonType: string, rawContent: any, apiData: any): any {
+  const content = rawContent && typeof rawContent === "object" ? rawContent : {};
+  const contentType = normalizeContentType(content?.type, lessonType);
+  const tags = Array.isArray(content?.tags)
+    ? content.tags
+    : Array.isArray(apiData?.tags)
+      ? apiData.tags
+      : [];
+
+  if (contentType === "vocabulary") {
+    return {
+      ...(content || {}),
+      type: "vocabulary",
+      description: String(content?.description ?? apiData?.description ?? ""),
+      words: Array.isArray(content?.words) ? content.words : [],
+      tags,
+    };
+  }
+
+  if (contentType === "grammar") {
+    const examples = Array.isArray(content?.examples)
+      ? content.examples
+      : Array.isArray(content?.grammarExamples)
+        ? content.grammarExamples
+        : Array.isArray(content?.exampleSentences)
+          ? content.exampleSentences
+          : [];
+    const commonMistakes = Array.isArray(content?.commonMistakes)
+      ? content.commonMistakes
+      : Array.isArray(content?.mistakes)
+        ? content.mistakes
+        : Array.isArray(content?.common_mistakes)
+          ? content.common_mistakes
+          : [];
+    const grammarRules = Array.isArray(content?.grammarRules)
+      ? content.grammarRules
+      : [];
+    const practiceIdeas = Array.isArray(content?.practiceIdeas)
+      ? content.practiceIdeas
+      : [];
+    return {
+      ...(content || {}),
+      type: "grammar",
+      description: String(content?.description || content?.overview || apiData?.description || ""),
+      rule: String(content?.rule || ""),
+      explanation_vi: String(content?.explanation_vi || content?.explanationVi || content?.explain_vi || content?.explanation || ""),
+      explanation_en: String(content?.explanation_en || content?.explanationEn || content?.explain_en || ""),
+      examples,
+      commonMistakes,
+      grammarRules,
+      practiceIdeas,
+      tags,
+    };
+  }
+
+  if (contentType === "dialogue") {
+    return {
+      ...(content || {}),
+      type: "dialogue",
+      description: String(content?.description || ""),
+      script: String(content?.script || ""),
+      audio: String(content?.audio || ""),
+      translation: String(content?.translation || ""),
+      tags,
+    };
+  }
+
+  if (contentType === "reading") {
+    return {
+      ...(content || {}),
+      type: "reading",
+      description: String(content?.description || content?.overview || ""),
+      passage: String(content?.passage || content?.content || content?.text || ""),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+        : [],
+      tags,
+    };
+  }
+
+  if (contentType === "exercises") {
+    return {
+      ...(content || {}),
+      type: "exercises",
+      description: String(content?.description || ""),
+      exerciseType: String(content?.exerciseType || lessonType),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+        : [],
+      tags,
+    };
+  }
+
+  if (contentType === "quizzes") {
+    return {
+      ...(content || {}),
+      type: "quizzes",
+      description: String(content?.description || ""),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+        : [],
+      tags,
+    };
+  }
+
+  if (contentType === "reviews") {
+    return {
+      ...(content || {}),
+      type: "reviews",
+      description: String(content?.description || ""),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+        : [],
+      tags,
+    };
+  }
+
+  if (contentType === "summaries") {
+    return {
+      ...(content || {}),
+      type: "summaries",
+      description: String(content?.description || ""),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+            : [],
+      tags,
+    };
+  }
+
+  if (contentType === "games") {
+    return {
+      ...(content || {}),
+      type: "games",
+      description: String(content?.description || ""),
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+            : [],
+      tags,
+    };
+  }
+
+  if (contentType === "songs") {
+    return {
+      ...(content || {}),
+      type: "songs",
+      description: String(content?.description || ""),
+      lyrics: String(content?.lyrics || ""),
+      translation: String(content?.translation || ""),
+      audio: String(content?.audio || ""),
+      video: String(content?.video || ""),
+      vocabulary: Array.isArray(content?.vocabulary) ? content.vocabulary : [],
+      questionsAndAnswers: Array.isArray(content?.questionsAndAnswers)
+        ? content.questionsAndAnswers
+        : Array.isArray(content?.questionAnswers)
+          ? content.questionAnswers
+          : Array.isArray(content?.questions)
+            ? content.questions
+            : [],
+      tags,
+    };
+  }
+
+  return {
+    ...(content || {}),
+    type: contentType || toPlainText(content?.type) || "",
+    tags,
+  };
+}
+
 function getStepTheme(stepType: string) {
   switch (stepType) {
     case "video":
@@ -179,6 +611,7 @@ export default function LessonPage() {
     const bullets = normalizedItems.filter(
       (s) => !/^(remember:|note:|tip:)/i.test(s),
     );
+    const subtitleHtml = sanitizeHtml(String(subtitle || ""));
 
     return (
       <div className="w-full overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-[0_24px_80px_rgba(148,163,184,0.18)] backdrop-blur animate-in zoom-in">
@@ -195,9 +628,10 @@ export default function LessonPage() {
                 {title}
               </h3>
               {subtitle && (
-                <p className="mt-2 text-sm text-slate-700 leading-relaxed">
-                  {subtitle}
-                </p>
+                <div
+                  className="mt-2 text-sm text-slate-700 leading-relaxed [&_p]:m-0 [&_img]:block [&_img]:max-w-full [&_img]:w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:border-0 [&_img]:outline-none [&_img]:shadow-none [&_img]:ring-0 [&_img]:[clip-path:inset(0_0_0_1px)]"
+                  dangerouslySetInnerHTML={{ __html: subtitleHtml }}
+                />
               )}
             </div>
           </div>
@@ -219,7 +653,10 @@ export default function LessonPage() {
                     <span className="mt-1.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#EEF6FF] text-xs font-black text-[#2D79C7]">
                       {i + 1}
                     </span>
-                    <span>{text}</span>
+                    <div
+                      className="min-w-0 [&_p]:m-0 [&_img]:mt-2 [&_img]:block [&_img]:max-w-full [&_img]:w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:border-0 [&_img]:outline-none [&_img]:shadow-none [&_img]:ring-0 [&_img]:[clip-path:inset(0_0_0_1px)]"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(text) }}
+                    />
                   </div>
                 </li>
               ))}
@@ -234,7 +671,12 @@ export default function LessonPage() {
                   className="rounded-2xl border border-[#FFE1A6] bg-[#FFF9E8] px-4 py-3 text-sm text-slate-800"
                 >
                   <span className="font-extrabold text-[#C97A15]">Ghi nhớ:</span>{" "}
-                  {text.replace(/^(remember:|note:|tip:)\s*/i, "")}
+                  <span
+                    className="[&_img]:block [&_img]:max-w-full [&_img]:w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:border-0 [&_img]:outline-none [&_img]:shadow-none [&_img]:ring-0 [&_img]:[clip-path:inset(0_0_0_1px)]"
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeHtml(text.replace(/^(remember:|note:|tip:)\s*/i, "")),
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -365,7 +807,7 @@ export default function LessonPage() {
         console.log("LESSON DETAIL normalized:", apiData);
         if (!apiData) return;
 
-        setLessonTitle(apiData.title ?? apiData.name ?? "Bài học");
+        setLessonTitle(toPlainText(apiData.title ?? apiData.name ?? "Bài học"));
 
         if (apiData.backgroundImage) {
           setBgImage(apiData.backgroundImage);
@@ -376,14 +818,14 @@ export default function LessonPage() {
         }
 
         const newSteps: any[] = [];
-        const lessonType = String(
-          apiData.type ?? apiData.skillFocus ?? "",
-        ).toLowerCase();
-        const content = apiData.content ?? {};
+        const lessonType = normalizeLessonType(apiData);
+        const rawContent = apiData.content ?? {};
+        const content = normalizeContentBySchema(lessonType, rawContent, apiData);
+        const contentType = normalizeContentType(content?.type, lessonType);
 
         // Vocabulary dạng object: content.words = [{ word, definition, ipa, ... }]
         if (
-          ["vocabulary", "vocab"].includes(lessonType) &&
+          contentType === "vocabulary" &&
           Array.isArray(content?.words) &&
           content.words.length > 0 &&
           typeof content.words[0] === "object"
@@ -412,14 +854,20 @@ export default function LessonPage() {
         // A. VIDEO
         const videoUrl =
           apiData.videoUrl ?? apiData.videoURL ?? apiData.video?.url ?? apiData.video;
-        if (videoUrl) {
-          let embedUrl = String(videoUrl);
-          if (embedUrl.includes("watch?v="))
-            embedUrl = embedUrl.replace("watch?v=", "embed/");
-          if (embedUrl.includes("youtu.be/"))
-            embedUrl = embedUrl.replace("youtu.be/", "youtube.com/embed/");
-
-          newSteps.push({
+        const fallbackYoutubeUrl = extractFirstYoutubeUrl(
+          apiData.description,
+          rawContent?.description,
+          rawContent?.video,
+          rawContent?.lyrics,
+          rawContent?.script,
+          content?.description,
+          content?.lyrics,
+          content?.video,
+          content?.script,
+        );
+        const embedUrl = toYoutubeEmbedUrl(String(videoUrl || fallbackYoutubeUrl || ""));
+        if (embedUrl) {
+          newSteps.unshift({
             type: "video",
             title: "Video bài giảng",
             src: embedUrl,
@@ -443,7 +891,7 @@ export default function LessonPage() {
               .filter(Boolean);
 
             // Chỉ coi là vocab khi lesson thật sự là vocabulary
-            if (["vocabulary", "vocab"].includes(lessonType)) {
+            if (contentType === "vocabulary") {
               items.forEach((word, i) => {
                 newSteps.push({
                   type: "vocab",
@@ -544,9 +992,75 @@ export default function LessonPage() {
           return "";
         };
 
-        if (lessonType === "grammar") {
-          const overview =
-            content.overview ?? content.description ?? apiData.description ?? "";
+        const toQaItems = (arr: any[]): string[] => {
+          if (!Array.isArray(arr)) return [];
+          return arr
+            .map((x: any) => {
+              if (typeof x === "string") return x.trim();
+              if (!x || typeof x !== "object") return "";
+              const q =
+                x?.question ??
+                x?.prompt ??
+                x?.title ??
+                x?.content ??
+                x?.text ??
+                x?.ask;
+              const a =
+                x?.answer ??
+                x?.sampleAnswer ??
+                x?.expectedAnswer ??
+                x?.response ??
+                x?.result;
+              const qText = toText(q);
+              const aText = toText(a);
+              if (qText && aText) return `${qText} — ${aText}`;
+              if (qText) return qText;
+              if (aText) return aText;
+              return "";
+            })
+            .filter(Boolean);
+        };
+
+        const buildExerciseFallbackItems = (c: any): string[] => {
+          const scalarKeys = [
+            "instruction",
+            "instructions",
+            "prompt",
+            "topic",
+            "script",
+            "task",
+            "content",
+            "text",
+            "question",
+            "sampleAnswer",
+            "expectedAnswer",
+          ];
+
+          const collected = scalarKeys
+            .map((k) => toText(c?.[k]))
+            .filter(Boolean);
+
+          if (Array.isArray(c?.prompts)) {
+            collected.push(...c.prompts.map(toText).filter(Boolean));
+          }
+          if (Array.isArray(c?.instructions)) {
+            collected.push(...c.instructions.map(toText).filter(Boolean));
+          }
+
+          return [...new Set(collected)];
+        };
+
+        const toSectionTitle = (key: string) => {
+          const cleaned = String(key || "")
+            .replace(/[_-]+/g, " ")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .trim();
+          if (!cleaned) return "Nội dung";
+          return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        };
+
+        if (contentType === "grammar") {
+          const overview = content.description ?? apiData.description ?? "";
           if (overview) {
             newSteps.push({
               type: "reading",
@@ -557,14 +1071,10 @@ export default function LessonPage() {
           }
 
           // Một số lesson grammar trả về rule dạng string thay vì grammarRules[]
-          const ruleText = toText(content.rule);
-          const rules = Array.isArray(content.grammarRules)
+          const legacyRules = Array.isArray(content.grammarRules)
             ? content.grammarRules.map(toText).filter(Boolean)
             : [];
-          const mergedRules = [
-            ...(ruleText ? [ruleText] : []),
-            ...rules,
-          ].filter(Boolean);
+          const mergedRules = [toText(content.rule), ...legacyRules].filter(Boolean);
           if (mergedRules.length) {
             newSteps.push({
               type: "reading",
@@ -620,11 +1130,204 @@ export default function LessonPage() {
               items: mistakes,
             });
           }
+
+          // Fallback cho payload grammar cũ/tùy biến: hiển thị các field còn lại chưa map.
+          const usedGrammarKeys = new Set([
+            "type",
+            "description",
+            "overview",
+            "rule",
+            "grammarRules",
+            "explanation_vi",
+            "explanation_en",
+            "explanationVi",
+            "explanationEn",
+            "explain_vi",
+            "explain_en",
+            "explanation",
+            "examples",
+            "grammarExamples",
+            "exampleSentences",
+            "practiceIdeas",
+            "commonMistakes",
+            "mistakes",
+            "common_mistakes",
+            "tags",
+          ]);
+
+          Object.entries(content || {}).forEach(([key, rawValue]) => {
+            if (usedGrammarKeys.has(key)) return;
+            if (rawValue === undefined || rawValue === null) return;
+
+            const keyLower = key.toLowerCase();
+            if (keyLower === "id" || keyLower === "_id" || keyLower === "slug") return;
+
+            let subtitle = "";
+            let items: string[] = [];
+
+            if (typeof rawValue === "string") {
+              subtitle = toText(rawValue);
+            } else if (Array.isArray(rawValue)) {
+              items = rawValue.map(toText).filter(Boolean);
+            } else if (typeof rawValue === "object") {
+              const titleLike = toText((rawValue as any).title);
+              const subtitleLike =
+                toText((rawValue as any).subtitle) ||
+                toText((rawValue as any).description) ||
+                toText((rawValue as any).content) ||
+                toText((rawValue as any).text);
+              const listLike = Array.isArray((rawValue as any).items)
+                ? (rawValue as any).items.map(toText).filter(Boolean)
+                : [];
+
+              if (titleLike && !subtitleLike && !listLike.length) {
+                subtitle = titleLike;
+              } else {
+                subtitle = subtitleLike;
+                items = listLike;
+              }
+
+              if (!subtitle && !items.length) {
+                items = Object.entries(rawValue as Record<string, any>)
+                  .map(([k, v]) => {
+                    if (["title", "subtitle", "description", "content", "text", "items"].includes(k)) {
+                      return "";
+                    }
+                    const txt = toText(v);
+                    return txt ? `${toSectionTitle(k)}: ${txt}` : "";
+                  })
+                  .filter(Boolean);
+              }
+            }
+
+            if (!subtitle && !items.length) return;
+
+            newSteps.push({
+              type: "reading",
+              title: toSectionTitle(key),
+              subtitle,
+              items,
+            });
+          });
+        }
+
+        // E. DIRECT CONTENT TYPES theo schema (không cần activities)
+        if (newSteps.length === 0 && contentType === "dialogue") {
+          const items = [content.translation, content.audio ? `Audio: ${content.audio}` : ""]
+            .map((s: any) => String(s || "").trim())
+            .filter(Boolean);
+          newSteps.push({
+            type: "reading",
+            title: "Hội thoại",
+            subtitle: content.script || content.description || apiData.description || "",
+            items,
+          });
+        }
+
+        if (newSteps.length === 0 && contentType === "reading") {
+          const qaItems = Array.isArray(content.questionsAndAnswers)
+            ? content.questionsAndAnswers
+                .map((x: any) => {
+                  const q = String(x?.question || "").trim();
+                  const a = String(x?.answer || "").trim();
+                  return q && a ? `${q} — ${a}` : q || a;
+                })
+                .filter(Boolean)
+            : [];
+          newSteps.push({
+            type: "reading",
+            title: "Đọc hiểu",
+            subtitle: content.passage || content.description || apiData.description || "",
+            items: qaItems,
+          });
+        }
+
+        if (newSteps.length === 0 && ["exercises", "quizzes", "reviews", "summaries", "games"].includes(contentType)) {
+          const qaItems = toQaItems(content.questionsAndAnswers || []);
+          const fallbackItems = buildExerciseFallbackItems(content);
+          const mergedItems = qaItems.length ? qaItems : fallbackItems;
+          newSteps.push({
+            type: "reading",
+            title: "Nội dung",
+            subtitle:
+              content.description ||
+              toText(content.instruction) ||
+              toText(content.prompt) ||
+              apiData.description ||
+              "",
+            items: mergedItems,
+          });
+        }
+
+        if (newSteps.length === 0 && contentType === "songs") {
+          if (content.description) {
+            newSteps.push({
+              type: "reading",
+              title: "Giới thiệu bài hát",
+              subtitle: content.description,
+              items: [],
+            });
+          }
+
+          if (content.lyrics || content.translation) {
+            newSteps.push({
+              type: "reading",
+              title: "Lời bài hát",
+              subtitle: content.lyrics || "",
+              items: content.translation ? [String(content.translation)] : [],
+            });
+          }
+
+          if (Array.isArray(content.vocabulary) && content.vocabulary.length > 0) {
+            const vocabItems = content.vocabulary
+              .map((v: any) => {
+                const word = String(v?.word || "").trim();
+                const def = String(v?.definition || "").trim();
+                if (!word) return "";
+                return def ? `${word} — ${def}` : word;
+              })
+              .filter(Boolean);
+            if (vocabItems.length) {
+              newSteps.push({
+                type: "reading",
+                title: "Từ vựng trong bài",
+                subtitle: "",
+                items: vocabItems,
+              });
+            }
+          }
+
+          const qaItems = Array.isArray(content.questionsAndAnswers)
+            ? content.questionsAndAnswers
+                .map((x: any) => {
+                  const q = String(x?.question || "").trim();
+                  const a = String(x?.answer || "").trim();
+                  return q && a ? `${q} — ${a}` : q || a;
+                })
+                .filter(Boolean)
+            : [];
+          if (qaItems.length) {
+            newSteps.push({
+              type: "reading",
+              title: "Câu hỏi",
+              subtitle: "Trả lời câu hỏi theo bài hát",
+              items: qaItems,
+            });
+          }
+
+          const songEmbedUrl = toYoutubeEmbedUrl(String(content.video || ""));
+          if (songEmbedUrl) {
+            newSteps.push({
+              type: "video",
+              title: "Video bài hát",
+              src: songEmbedUrl,
+            });
+          }
         }
 
         // D. FALLBACK: lesson có content nhưng không có activities/video
         // Tránh fallback dạng "đọc bài" cho lesson vocabulary (đã có flow riêng)
-        if (newSteps.length === 0 && !["vocabulary", "vocab"].includes(lessonType)) {
+        if (newSteps.length === 0 && contentType !== "vocabulary") {
           const subtitle =
             content?.overview ?? apiData.description ?? "Nội dung bài học";
 
@@ -649,13 +1352,32 @@ export default function LessonPage() {
             items: collected,
           });
         }
-        const firstType = newSteps?.[0]?.type;
+        let normalizedSteps = newSteps.map((s) => normalizeStepForDisplay(s));
+
+        const hasVideoStep = normalizedSteps.some((s: any) => s?.type === "video" && s?.src);
+        if (!hasVideoStep) {
+          const linkFromSteps = normalizedSteps.map((s: any) => extractYoutubeFromStep(s)).find(Boolean) || "";
+          const linkFromPayload = extractFirstYoutubeUrl(JSON.stringify(apiData || {}));
+          const fallbackEmbed = toYoutubeEmbedUrl(linkFromSteps || linkFromPayload);
+          if (fallbackEmbed) {
+            normalizedSteps = [
+              {
+                type: "video",
+                title: "Video bài giảng",
+                src: fallbackEmbed,
+              },
+              ...normalizedSteps,
+            ];
+          }
+        }
+
+        const firstType = normalizedSteps?.[0]?.type;
         const autoDone =
           firstType === "reading" ||
           firstType === "vocab-intro" ||
           firstType === "vocab";
 
-        setSteps(newSteps);
+        setSteps(normalizedSteps);
         setCurrentStepIndex(0);
         setUnlockedStepIndex(0);
         setIsGameDone(autoDone);
