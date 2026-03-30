@@ -27,6 +27,8 @@ import { motion, type Variants } from "framer-motion";
 import { userService } from "@/services/user.service";
 import { mediaService } from "@/services/media.service";
 import { authService } from "@/services/auth.service";
+import ChangePasswordModal from "@/components/common/ChangePasswordModal";
+import UpdateProfileModal from "@/components/common/UpdateProfileModal";
 
 const FALLBACK_AVATAR =
   "https://api.dicebear.com/7.x/avataaars/svg?seed=Student";
@@ -52,8 +54,24 @@ const itemVariants: Variants = {
 function normalizeProfile(raw: any) {
   const u = raw?.data ?? raw;
   const id = String(u?._id ?? u?.id ?? "");
-  const fullName =
-    u?.fullName ?? u?.name ?? u?.displayName ?? "Học viên";
+  let fullName =
+    u?.fullName ?? u?.name ?? u?.displayName ?? "";
+  
+  // Nếu vẫn không có, thử ghép firstName + lastName
+  if (!fullName && (u?.firstName || u?.lastName)) {
+    fullName = `${u?.firstName || ""} ${u?.lastName || ""}`.trim();
+  }
+  
+  // Nếu vẫn không có, dùng username làm fallback
+  if (!fullName && u?.username) {
+    fullName = u.username;
+  }
+  
+  // Cuối cùng, dùng "Học viên" nếu toàn bộ không có
+  if (!fullName) {
+    fullName = "Học viên";
+  }
+  
   const username =
     (typeof u?.username === "string" && u.username.trim()) ||
     (typeof u?.userName === "string" && u.userName.trim()) ||
@@ -65,6 +83,8 @@ function normalizeProfile(raw: any) {
       : typeof u?.phoneNumber === "string"
         ? u.phoneNumber
         : "";
+  const address = typeof u?.address === "string" ? u.address : "";
+  const bio = typeof u?.bio === "string" ? u.bio : "";
   const avatar =
     typeof u?.avatar === "string" && u.avatar.trim()
       ? u.avatar
@@ -112,6 +132,8 @@ function normalizeProfile(raw: any) {
     username,
     email,
     phone,
+    address,
+    bio,
     avatar,
     level,
     xp,
@@ -171,6 +193,8 @@ export default function ProfilePage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [openChangePasswordModal, setOpenChangePasswordModal] = useState(false);
+  const [openUpdateProfileModal, setOpenUpdateProfileModal] = useState(false);
 
   useEffect(() => {
     if (editOpen && profile) {
@@ -793,14 +817,9 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEditTab("password");
-                  setFormError(null);
+                  setOpenChangePasswordModal(true);
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition inline-flex items-center justify-center gap-2 ${
-                  editTab === "password"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition inline-flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200`}
               >
                 <KeyRound size={16} />
                 Đổi mật khẩu
@@ -1091,6 +1110,29 @@ export default function ProfilePage() {
           </motion.div>
         </div>
       ) : null}
+
+      {/* Modal Components */}
+      <ChangePasswordModal
+        isOpen={openChangePasswordModal}
+        onClose={() => setOpenChangePasswordModal(false)}
+        onSuccess={() => {
+          // Refresh or show success
+        }}
+      />
+      <UpdateProfileModal
+        isOpen={openUpdateProfileModal}
+        onClose={() => setOpenUpdateProfileModal(false)}
+        initialData={{
+          fullName: profile?.fullName || "",
+          phone: profile?.phone || "",
+          address: profile?.address || "",
+          bio: profile?.bio || "",
+          avatar: profile?.avatar || "",
+        }}
+        onSuccess={() => {
+          // Refresh profile
+        }}
+      />
     </div>
   );
 }

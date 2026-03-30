@@ -37,7 +37,7 @@ interface TeacherClass {
   visibility: string;
   thumbnail?: string;
   description?: string;
-  type: "COURSE" | "EXAM_PREP";
+  type: "class" | "subject" | "custom";
   isActive: boolean;
   students?: any[];
   baseCourseId?: { title: string };
@@ -46,6 +46,15 @@ interface TeacherClass {
   endDate?: string;
   tutorId?: { _id: string; fullName: string; avatar?: string };
 }
+
+type GroupFormData = {
+  groupName: string;
+  type: "class" | "subject" | "custom";
+  visibility: "public" | "private" | "hidden";
+  description: string;
+  avatarFile: File | null;
+  backgroundFile: File | null;
+};
 
 // --- MODAL TẠO/SỬA LỚP HỌC ---
 const ClassModal = ({
@@ -56,43 +65,36 @@ const ClassModal = ({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: GroupFormData) => Promise<void> | void;
   initialData?: TeacherClass | null;
 }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    type: "COURSE",
+    groupName: "",
+    type: "class" as "class" | "subject" | "custom",
+    visibility: "private" as "public" | "private" | "hidden",
     description: "",
-    thumbnail: "",
-    startDate: "",
-    endDate: "",
-    scheduleDescription: "",
+    avatarFile: null as File | null,
+    backgroundFile: null as File | null,
   });
 
   useEffect(() => {
     if (initialData) {
       setFormData({
-        name: initialData.name || "",
-        type: initialData.type || "COURSE",
+        groupName: initialData.name || "",
+        type: (initialData.type || "class") as "class" | "subject" | "custom",
+        visibility: (String(initialData.visibility || "private").toLowerCase() as "public" | "private" | "hidden"),
         description: initialData.description || "",
-        thumbnail: initialData.thumbnail || "",
-        startDate: initialData.startDate
-          ? new Date(initialData.startDate).toISOString().split("T")[0]
-          : "",
-        endDate: initialData.endDate
-          ? new Date(initialData.endDate).toISOString().split("T")[0]
-          : "",
-        scheduleDescription: initialData.scheduleDescription || "",
+        avatarFile: null,
+        backgroundFile: null,
       });
     } else {
       setFormData({
-        name: "",
-        type: "COURSE",
+        groupName: "",
+        type: "class",
+        visibility: "private",
         description: "",
-        thumbnail: "",
-        startDate: "",
-        endDate: "",
-        scheduleDescription: "",
+        avatarFile: null,
+        backgroundFile: null,
       });
     }
   }, [initialData, isOpen]);
@@ -127,61 +129,75 @@ const ClassModal = ({
               <input
                 className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none transition"
                 placeholder="VD: Tiếng Anh Giao Tiếp K12"
-                value={formData.name}
+                value={formData.groupName}
                 onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
+                  setFormData({ ...formData, groupName: e.target.value })
                 }
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase">
-                Loại hình
+                Loại nhóm
               </label>
               <select
                 className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none bg-white cursor-pointer"
                 value={formData.type}
                 onChange={(e) =>
-                  setFormData({ ...formData, type: e.target.value as any })
+                  setFormData({ ...formData, type: e.target.value as "class" | "subject" | "custom" })
                 }
               >
-                <option value="COURSE">Lớp theo khóa (Course-based)</option>
-                <option value="EXAM_PREP">Luyện thi (Exam Prep)</option>
+                <option value="class">Nhóm lớp học</option>
+                <option value="subject">Nhóm môn học</option>
+                <option value="custom">Nhóm tùy chỉnh</option>
               </select>
             </div>
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-500 uppercase">
-              Ảnh đại diện (URL)
+              Quyền riêng tư
             </label>
-            <div className="flex gap-3 items-center">
-              <div className="relative flex-1">
-                <ImageIcon
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-                <input
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.thumbnail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, thumbnail: e.target.value })
-                  }
-                />
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                {formData.thumbnail ? (
-                  <img
-                    src={formData.thumbnail}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-300">
-                    <ImageIcon size={20} />
-                  </div>
-                )}
-              </div>
+            <select
+              className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none bg-white cursor-pointer"
+              value={formData.visibility}
+              onChange={(e) =>
+                setFormData({ ...formData, visibility: e.target.value as "public" | "private" | "hidden" })
+              }
+            >
+              <option value="public">Công khai</option>
+              <option value="private">Riêng tư</option>
+              <option value="hidden">Ẩn hoàn toàn</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase">
+                Ảnh đại diện
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none"
+                onChange={(e) => setFormData({ ...formData, avatarFile: e.target.files?.[0] || null })}
+              />
+              {formData.avatarFile ? (
+                <p className="text-xs text-slate-500">Đã chọn: {formData.avatarFile.name}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase">
+                Ảnh nền
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none"
+                onChange={(e) => setFormData({ ...formData, backgroundFile: e.target.files?.[0] || null })}
+              />
+              {formData.backgroundFile ? (
+                <p className="text-xs text-slate-500">Đã chọn: {formData.backgroundFile.name}</p>
+              ) : null}
             </div>
           </div>
 
@@ -199,51 +215,6 @@ const ClassModal = ({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">
-              Lịch học (Mô tả)
-            </label>
-            <input
-              className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:border-blue-500 outline-none transition"
-              placeholder="VD: Thứ 2 - 4 - 6 (19:30 - 21:00)"
-              value={formData.scheduleDescription}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  scheduleDescription: e.target.value,
-                })
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase">
-                Ngày bắt đầu
-              </label>
-              <input
-                type="date"
-                className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none"
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase">
-                Ngày kết thúc
-              </label>
-              <input
-                type="date"
-                className="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold focus:border-blue-500 outline-none"
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-              />
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
@@ -255,7 +226,9 @@ const ClassModal = ({
             Hủy bỏ
           </button>
           <button
-            onClick={() => onSubmit(formData)}
+            onClick={() => {
+              void onSubmit(formData);
+            }}
             className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition transform active:scale-95 text-sm flex items-center gap-2"
           >
             {isEditMode ? <Edit size={16} /> : <Plus size={16} />}
@@ -341,7 +314,9 @@ export default function TeacherClassesPage() {
           visibility: String(it?.visibility ?? "public").toLowerCase(),
           thumbnail: String(it?.thumbnail ?? it?.avatar ?? it?.background ?? it?.image ?? ""),
           description: String(it?.description ?? ""),
-          type: String(it?.type ?? "COURSE").toUpperCase() === "EXAM_PREP" ? "EXAM_PREP" : "COURSE",
+          type: (["class", "subject", "custom"].includes(String(it?.type || "").toLowerCase())
+            ? String(it?.type).toLowerCase()
+            : "class") as "class" | "subject" | "custom",
           isActive,
           students: Array(
             Math.max(
@@ -389,26 +364,45 @@ export default function TeacherClassesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSubmitClass = (formData: any) => {
-    if (editingClass) {
-      setClasses(
-        classes.map((c) =>
-          c._id === editingClass._id ? { ...c, ...formData } : c,
-        ),
-      );
-      alert("Đã cập nhật thông tin lớp học!");
-    } else {
-      const newClass = {
-        ...formData,
-        _id: `new_${Date.now()}`,
-        isActive: true,
-        students: [],
-        tutorId: { fullName: "Tôi (Admin)" },
-      };
-      setClasses([newClass, ...classes]);
-      alert("Đã tạo lớp học mới thành công!");
+  const handleSubmitClass = async (formData: GroupFormData) => {
+    if (!formData.groupName.trim()) {
+      alert("Vui lòng nhập tên nhóm.");
+      return;
     }
-    setIsModalOpen(false);
+
+    try {
+      if (editingClass) {
+        await groupsService.updateGroup(editingClass._id, {
+          groupName: formData.groupName.trim(),
+          description: formData.description.trim(),
+          type: formData.type,
+          visibility: formData.visibility,
+        });
+        alert("Đã cập nhật nhóm thành công!");
+      } else {
+        await groupsService.createGroup(
+          {
+            groupName: formData.groupName.trim(),
+            description: formData.description.trim(),
+            type: formData.type,
+            visibility: formData.visibility,
+            members: [],
+          },
+          {
+            avatar: formData.avatarFile,
+            background: formData.backgroundFile,
+          },
+        );
+        alert("Đã tạo nhóm mới thành công!");
+      }
+
+      setIsModalOpen(false);
+      setEditingClass(null);
+      await fetchData();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      alert(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể lưu nhóm.");
+    }
   };
 
   const handleDeleteClass = (e: React.MouseEvent, id: string) => {
@@ -667,9 +661,11 @@ export default function TeacherClassesPage() {
                       </h3>
                       <p className="text-slate-300 text-xs font-medium flex items-center gap-1">
                         <BookOpen size={12} />{" "}
-                        {cls.type === "COURSE"
-                          ? "Khóa học tiêu chuẩn"
-                          : "Luyện thi cấp tốc"}
+                        {cls.type === "class"
+                          ? "Nhóm lớp học"
+                          : cls.type === "subject"
+                            ? "Nhóm môn học"
+                            : "Nhóm tùy chỉnh"}
                       </p>
                     </div>
                   </div>

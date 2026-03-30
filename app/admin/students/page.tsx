@@ -86,14 +86,27 @@ export default function AdminStudentsPage() {
           const pkg: PackageType =
             rawPkg === "PREMIUM" ? "PREMIUM" : rawPkg === "BASIC" ? "BASIC" : "FREE";
           const active = Boolean(u?.isActive ?? true);
+          const firstName = String(u?.firstName || "").trim();
+          const lastName = String(u?.lastName || "").trim();
+          const mergedName = `${firstName} ${lastName}`.trim();
+          const resolvedName = String(
+            u?.fullName ||
+              u?.fullname ||
+              u?.name ||
+              u?.displayName ||
+              mergedName ||
+              u?.username ||
+              u?.email ||
+              `ID: ${String(u?._id || u?.id || "")}`,
+          );
           return {
             id: String(u?._id || u?.id || ""),
-            name: String(u?.fullName || u?.name || "Học viên"),
+            name: resolvedName,
             email: String(u?.email || ""),
             avatar:
               u?.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                String(u?.fullName || u?.name || "Student"),
+                  resolvedName,
               )}`,
             phone: u?.phone || "",
             package: pkg,
@@ -134,16 +147,29 @@ export default function AdminStudentsPage() {
         const pkg: PackageType =
           rawPkg === "PREMIUM" ? "PREMIUM" : rawPkg === "BASIC" ? "BASIC" : "FREE";
         const active = Boolean(u?.isActive ?? true);
+        const firstName = String(u?.firstName || "").trim();
+        const lastName = String(u?.lastName || "").trim();
+        const mergedName = `${firstName} ${lastName}`.trim();
+        const resolvedName = String(
+          u?.fullName ||
+            u?.fullname ||
+            u?.name ||
+            u?.displayName ||
+            mergedName ||
+            u?.username ||
+            u?.email ||
+            `ID: ${String(u?._id || u?.id || "")}`,
+        );
         return {
           id: String(u?._id || u?.id || ""),
-          name: String(u?.fullName || u?.name || "Học viên"),
+          name: resolvedName,
           email: String(u?.email || ""),
           avatar:
             u?.avatar ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              String(u?.fullName || u?.name || "Student"),
+                resolvedName,
             )}`,
-          phone: u?.phone || "",
+          phone: String(u?.phone || u?.phoneNumber || ""),
           package: pkg,
           level: String(u?.level || u?.currentLevel || "N/A"),
           joinedDate: u?.createdAt ? new Date(u.createdAt).toLocaleDateString("vi-VN") : "—",

@@ -103,6 +103,11 @@ function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           icon: MessageSquareText,
         },
         {
+          name: "Thông báo",
+          href: "/teacher/notifications",
+          icon: Bell,
+        },
+        {
           name: "Quản lý tài khoản",
           href: "/teacher/profile",
           icon: UserCog,

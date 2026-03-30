@@ -44,9 +44,15 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       try {
         const response = await competitionService.getCompetitionById(competitionId);
         const data = response.data || response;
+        console.log("Competition data loaded:", data);
+        
+        if (!data?.listQuestion || data.listQuestion.length === 0) {
+          console.warn("Không có câu hỏi trong cuộc thi");
+        }
+        
         setQuestions(data.listQuestion || []);
 
-        const end = new Date(data.endTime).getTime();
+        const end = new Date(data.endTime || data.endAt).getTime();
         const now = new Date().getTime();
         const diff = Math.max(0, Math.floor((end - now) / 1000));
 
@@ -58,7 +64,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
 
       } catch (error) {
         console.error("Lỗi tải bài thi:", error);
-        setTimeLeft(600);
+        setQuestions([]);
       } finally {
         setLoading(false);
       }
@@ -245,7 +251,16 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   if (!questions || questions.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-        <p className="text-red-500 font-medium">Không tìm thấy dữ liệu câu hỏi.</p>
+        <div className="text-center">
+          <p className="text-red-600 font-bold text-lg mb-2">Không thể tải bài thi</p>
+          <p className="text-slate-600 text-sm mb-6">Cuộc thi này chưa có câu hỏi hoặc đã hết thời gian làm bài.</p>
+          <button
+            onClick={() => router.back()}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+          >
+            Quay lại
+          </button>
+        </div>
       </div>
     );
   }

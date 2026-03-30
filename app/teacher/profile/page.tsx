@@ -3,12 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   User,
-  FileText,
-  CreditCard,
   Shield,
   Camera,
-  Upload,
-  CheckCircle2,
   AlertCircle,
   Save,
   MapPin,
@@ -16,11 +12,12 @@ import {
   Phone,
   Calendar,
   Briefcase,
-  Award,
   ChevronRight,
   PenLine,
 } from "lucide-react";
 import { userService } from "@/services/user.service";
+import ChangePasswordModal from "@/components/common/ChangePasswordModal";
+import UpdateProfileModal from "@/components/common/UpdateProfileModal";
 
 // --- TYPES ---
 interface TeacherProfile {
@@ -29,7 +26,6 @@ interface TeacherProfile {
   email: string;
   phone: string;
   avatar: string;
-  bio: string;
   address: string;
   joinDate: string;
   certificates: { name: string; url: string; status: "VERIFIED" | "PENDING" }[];
@@ -54,7 +50,6 @@ const DEFAULT_PROFILE: TeacherProfile = {
   email: "",
   phone: "",
   avatar: "https://ui-avatars.com/api/?name=Teacher",
-  bio: "",
   address: "",
   joinDate: "",
   certificates: [
@@ -79,12 +74,14 @@ const DEFAULT_PROFILE: TeacherProfile = {
 
 export default function TeacherProfilePage() {
   const [activeTab, setActiveTab] = useState<
-    "GENERAL" | "CONTRACT" | "SECURITY"
+    "GENERAL" | "SECURITY"
   >("GENERAL");
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<TeacherProfile>(DEFAULT_PROFILE);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [openChangePasswordModal, setOpenChangePasswordModal] = useState(false);
+  const [openUpdateProfileModal, setOpenUpdateProfileModal] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -105,7 +102,6 @@ export default function TeacherProfilePage() {
           email: String(res?.email || ""),
           phone: String(res?.phone || res?.phoneNumber || ""),
           avatar: String(avatar),
-          bio: String(res?.bio || prev.bio || ""),
           address: String(res?.address || ""),
           joinDate: joinDateSource
             ? new Date(joinDateSource).toLocaleDateString("vi-VN")
@@ -133,7 +129,6 @@ export default function TeacherProfilePage() {
         fullName: profile.fullName,
         phone: profile.phone,
         avatar: profile.avatar,
-        bio: profile.bio,
         address: profile.address,
       });
       setIsEditing(false);
@@ -235,33 +230,11 @@ export default function TeacherProfilePage() {
                 label="Thông tin chung"
               />
               <MenuButton
-                active={activeTab === "CONTRACT"}
-                onClick={() => setActiveTab("CONTRACT")}
-                icon={FileText}
-                label="Hợp đồng & Lương"
-              />
-              <MenuButton
                 active={activeTab === "SECURITY"}
                 onClick={() => setActiveTab("SECURITY")}
                 icon={Shield}
                 label="Bảo mật tài khoản"
               />
-            </div>
-
-            {/* Quick Stats (Optional) */}
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg shadow-blue-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Award size={20} />
-                </div>
-                <span className="font-bold text-sm opacity-90">
-                  Hiệu suất tháng này
-                </span>
-              </div>
-              <div className="text-3xl font-black mb-1">98%</div>
-              <div className="text-xs text-blue-200">
-                Đánh giá tích cực từ học sinh
-              </div>
             </div>
           </div>
 
@@ -318,203 +291,6 @@ export default function TeacherProfilePage() {
                         setProfile((prev) => ({ ...prev, address: v }))
                       }
                     />
-
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">
-                        Giới thiệu bản thân (Bio)
-                      </label>
-                      <textarea
-                        className={`w-full border rounded-xl p-4 text-sm font-medium outline-none transition-all resize-none shadow-sm
-                          ${
-                            !isEditing
-                              ? "bg-slate-50 border-slate-200 text-slate-500"
-                              : "bg-white border-blue-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-800"
-                          }`}
-                        rows={4}
-                        disabled={!isEditing}
-                        value={profile.bio}
-                        onChange={(e) =>
-                          setProfile((prev) => ({ ...prev, bio: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Certificates Card */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                      <Award size={20} className="text-orange-500" /> Chứng chỉ
-                      & Bằng cấp
-                    </h3>
-                    <button className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                      <Upload size={14} /> Upload mới
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {profile.certificates.map((cert, idx) => (
-                      <div
-                        key={idx}
-                        className="group flex items-start gap-4 p-4 border border-slate-200 rounded-2xl bg-slate-50/50 hover:border-blue-200 hover:bg-blue-50/30 transition-all"
-                      >
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm text-red-500 shrink-0">
-                          <FileText size={20} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start">
-                            <p className="font-bold text-sm text-slate-800 truncate pr-2">
-                              {cert.name}
-                            </p>
-                            {cert.status === "VERIFIED" ? (
-                              <CheckCircle2
-                                size={16}
-                                className="text-green-500 shrink-0"
-                              />
-                            ) : (
-                              <AlertCircle
-                                size={16}
-                                className="text-orange-500 shrink-0"
-                              />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            PDF • Đã tải lên 12/01/2023
-                          </p>
-                          <a
-                            href="#"
-                            className="text-[10px] font-bold text-blue-600 hover:underline mt-2 inline-block"
-                          >
-                            Xem tài liệu
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: CONTRACT */}
-            {activeTab === "CONTRACT" && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Contract Digital Card */}
-                <div className="relative bg-slate-900 text-white p-8 rounded-3xl overflow-hidden shadow-2xl shadow-slate-200">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/20 to-transparent"></div>
-
-                  <div className="relative z-10 flex justify-between items-start mb-8">
-                    <div>
-                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
-                        Hợp đồng lao động
-                      </p>
-                      <p className="text-2xl font-mono font-black tracking-tight">
-                        {profile.contract.code}
-                      </p>
-                    </div>
-                    <div
-                      className={`px-3 py-1 rounded-full text-xs font-black uppercase border
-                      ${profile.contract.status === "ACTIVE" ? "bg-green-500/20 border-green-500/50 text-green-400" : "bg-red-500/20 border-red-500/50 text-red-400"}`}
-                    >
-                      {profile.contract.status}
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-8">
-                    <div>
-                      <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">
-                        Loại hình
-                      </p>
-                      <p className="font-bold text-sm">
-                        {profile.contract.type === "FULL_TIME"
-                          ? "Toàn thời gian"
-                          : "Part-time"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">
-                        Ngày bắt đầu
-                      </p>
-                      <p className="font-bold text-sm">
-                        {profile.contract.startDate}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">
-                        Ngày kết thúc
-                      </p>
-                      <p className="font-bold text-sm">
-                        {profile.contract.endDate}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">
-                        Lương cơ bản
-                      </p>
-                      <p className="font-bold text-lg text-emerald-400">
-                        {profile.contract.baseRate.toLocaleString()} ₫
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Banking Info */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-                  <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
-                    <CreditCard size={20} className="text-purple-500" /> Tài
-                    khoản nhận lương
-                  </h3>
-
-                  <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-xl flex gap-3 mb-6">
-                    <AlertCircle
-                      size={20}
-                      className="text-yellow-600 shrink-0 mt-0.5"
-                    />
-                    <div className="text-sm text-yellow-800">
-                      <span className="font-bold">Lưu ý quan trọng:</span> Thông
-                      tin tài khoản ngân hàng cần trùng khớp với tên trên Hợp
-                      đồng. Mọi thay đổi sẽ cần 2-3 ngày làm việc để bộ phận Kế
-                      toán xác thực.
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputGroup
-                      label="Ngân hàng thụ hưởng"
-                      value={profile.banking.bankName}
-                      disabled={!isEditing}
-                      onChange={(v: string) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          banking: { ...prev.banking, bankName: v },
-                        }))
-                      }
-                    />
-                    <InputGroup
-                      label="Số tài khoản"
-                      value={profile.banking.accountNumber}
-                      disabled={!isEditing}
-                      onChange={(v: string) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          banking: { ...prev.banking, accountNumber: v },
-                        }))
-                      }
-                    />
-                    <div className="md:col-span-2">
-                      <InputGroup
-                        label="Tên chủ tài khoản (Viết hoa không dấu)"
-                        value={profile.banking.accountName}
-                        disabled={!isEditing}
-                        onChange={(v: string) =>
-                          setProfile((prev) => ({
-                            ...prev,
-                            banking: { ...prev.banking, accountName: v },
-                          }))
-                        }
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -524,29 +300,28 @@ export default function TeacherProfilePage() {
             {activeTab === "SECURITY" && (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
-                  <Shield size={20} className="text-slate-800" /> Đổi mật khẩu
+                  <Shield size={20} className="text-slate-800" /> Bảo mật tài khoản
                 </h3>
                 <div className="space-y-5">
-                  <InputGroup
-                    label="Mật khẩu hiện tại"
-                    type="password"
-                    placeholder="••••••••"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputGroup
-                      label="Mật khẩu mới"
-                      type="password"
-                      placeholder="••••••••"
-                    />
-                    <InputGroup
-                      label="Xác nhận mật khẩu"
-                      type="password"
-                      placeholder="••••••••"
-                    />
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-800 mb-2">Thay đổi mật khẩu</h4>
+                    <p className="text-sm text-slate-600 mb-4">Cập nhật mật khẩu của bạn thường xuyên để bảo đảm tài khoản an toàn.</p>
+                    <button
+                      onClick={() => setOpenChangePasswordModal(true)}
+                      className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-md active:scale-95"
+                    >
+                      Đổi mật khẩu
+                    </button>
                   </div>
-                  <div className="pt-2">
-                    <button className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-200">
-                      Cập nhật mật khẩu
+                  
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-800 mb-2">Cập nhật thông tin cá nhân</h4>
+                    <p className="text-sm text-slate-600 mb-4">Cập nhật họ tên, số điện thoại, địa chỉ và thông tin khác.</p>
+                    <button
+                      onClick={() => setOpenUpdateProfileModal(true)}
+                      className="bg-slate-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-700 transition shadow-md active:scale-95"
+                    >
+                      Cập nhật thông tin
                     </button>
                   </div>
                 </div>
@@ -555,9 +330,33 @@ export default function TeacherProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Components */}
+      <ChangePasswordModal
+        isOpen={openChangePasswordModal}
+        onClose={() => setOpenChangePasswordModal(false)}
+        onSuccess={() => {
+          // Refresh profile or show success message
+        }}
+      />
+      <UpdateProfileModal
+        isOpen={openUpdateProfileModal}
+        onClose={() => setOpenUpdateProfileModal(false)}
+        initialData={{
+          fullName: profile.fullName,
+          phone: profile.phone,
+          address: profile.address,
+          avatar: profile.avatar,
+        }}
+        onSuccess={() => {
+          // Refresh profile
+        }}
+      />
     </div>
   );
 }
+
+// --- SUB-COMPONENTS ---
 
 // --- SUB-COMPONENTS ---
 

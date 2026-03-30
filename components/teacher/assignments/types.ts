@@ -30,4 +30,15 @@ export interface AssignmentInfo {
   title: string;
   description: string;
   duration: number;
+  maxScore?: number;
+  fileUrl?: string;
+  fileName?: string;
+  assignmentMode?: "file" | "question";
+  assignmentType?: string;
+  classId?: string;
+  dueDate?: string;
+  isPublished?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  attachments?: Array<{ url: string; name?: string }>;
 }

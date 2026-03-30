@@ -62,7 +62,7 @@ export const userService = {
   },
 
   // Dùng chung hàm update user để sửa tên/email nếu cần
-  updateUser: async (id: string, data: any) => api.put(`/users/${id}`, data),
+  updateUser: async (id: string, data: any) => api.patch(`/users/${id}`, data),
 
   // Xóa
   deleteUser: async (id: string) => api.delete(`/users/${id}/delete`),
@@ -80,7 +80,7 @@ export const userService = {
 
   /**
    * Cập nhật thông tin cá nhân (user đang đăng nhập).
-   * Thử PATCH /auths/profile; nếu backend không có (404/405) thì PUT /users/:id.
+   * Thử PATCH /auths/profile; nếu backend không có (404/405) thì PATCH /users/:id.
    */
   updateMyProfile: async (userId: string, data: Record<string, unknown>) => {
     try {
@@ -89,7 +89,7 @@ export const userService = {
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 404 || status === 405) {
-        const res = await api.put(`/users/${userId}`, data);
+        const res = await api.patch(`/users/${userId}`, data);
         return res.data ?? res;
       }
       throw err;
@@ -119,5 +119,58 @@ export const userService = {
 
   equipItem: (itemId: string) => {
     return api.post("/users/equip", { itemId });
+  },
+
+  /**
+   * Thay đổi mật khẩu (dùng cho cả Admin, Teacher, Student).
+   * POST /auths/change-password hoặc /users/:id/change-password
+   */
+  changePassword: async (oldPassword: string, newPassword: string) => {
+    try {
+      const res = await api.post("/auths/change-password", {
+        oldPassword,
+        newPassword,
+      });
+      return res.data ?? res;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        // Fallback: thử endpoint khác
+        const res = await api.post("/users/change-password", {
+          oldPassword,
+          newPassword,
+        });
+        return res.data ?? res;
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Update thông tin cá nhân (fullName, avatar, phone, etc).
+   * PATCH /auths/profile hoặc PATCH /users/:id
+   */
+  updateProfile: async (data: {
+    fullName?: string;
+    avatar?: string;
+    phone?: string;
+    address?: string;
+    bio?: string;
+    [key: string]: any;
+  }) => {
+    try {
+      const res = await api.patch("/auths/profile", data);
+      return res.data ?? res;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        const profile = await userService.getProfile();
+        const userId = profile?._id ?? profile?.id;
+        if (!userId) throw new Error("Không lấy được userId");
+        const res = await api.patch(`/users/${userId}`, data);
+        return res.data ?? res;
+      }
+      throw err;
+    }
   },
 };

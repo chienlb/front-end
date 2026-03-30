@@ -54,6 +54,10 @@ export default function CompetitionRegisterPage({
     try {
       await competitionService.joinCompetition(competitionId);
       setIsRegistered(true);
+      // Tự động chuyển sang phòng thi sau 1.5s
+      setTimeout(() => {
+        router.push(`/competitions/${competitionId}/play`);
+      }, 1500);
     } catch (err) {
       console.error("Lỗi đăng ký cuộc thi:", err);
       await showAlert("Đăng ký thất bại. Vui lòng thử lại sau nhé.");

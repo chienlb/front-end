@@ -1,6 +1,37 @@
 import api from "@/utils/api";
 
+type CreateGroupPayload = {
+  groupName: string;
+  description?: string;
+  type: "class" | "subject" | "custom";
+  visibility: "public" | "private" | "hidden";
+  members?: string[];
+};
+
 export const groupsService = {
+  // POST /groups (multipart): payload + avatar/background file upload
+  createGroup: async (
+    payload: CreateGroupPayload,
+    files?: { avatar?: File | null; background?: File | null },
+  ) => {
+    const fd = new FormData();
+    fd.append("groupName", payload.groupName.trim());
+    fd.append("type", payload.type);
+    fd.append("visibility", payload.visibility);
+    if (payload.description?.trim()) {
+      fd.append("description", payload.description.trim());
+    }
+    if (Array.isArray(payload.members)) {
+      payload.members
+        .map((m) => String(m || "").trim())
+        .filter(Boolean)
+        .forEach((m) => fd.append("members", m));
+    }
+    if (files?.avatar) fd.append("avatar", files.avatar);
+    if (files?.background) fd.append("background", files.background);
+    return api.post("/groups", fd);
+  },
+
   // Admin endpoint:
   // - GET /groups
   getAllGroupsForAdmin: async (params?: { page?: number; limit?: number }) => {
@@ -123,9 +154,19 @@ export const groupsService = {
   // GET /groups/user  -> danh sách group của user hiện tại
   getMyGroups: async (params?: { page?: number; limit?: number }) => {
     const { page = 1, limit = 50 } = params ?? {};
-    return api.get("/groups/user", {
-      params: { page, limit },
-    });
+    try {
+      return await api.get("/groups/user", {
+        params: { page, limit },
+      });
+    } catch {
+      try {
+        return await api.get("/groups/user/get-all-groups");
+      } catch {
+        return api.get("/groups", {
+          params: { page, limit },
+        });
+      }
+    }
   },
 
   // Lấy toàn bộ group của user hiện tại (gom qua nhiều trang)
@@ -152,10 +193,18 @@ export const groupsService = {
 
     const all: any[] = [];
     let page = 1;
+    let pageRequestFailed = false;
 
     while (page <= maxPages) {
-      const res: any = await api.get("/groups/user", { params: { page, limit } });
-      const payload = res?.data ?? res;
+      let payload: any = null;
+      try {
+        const res: any = await api.get("/groups/user", { params: { page, limit } });
+        payload = res?.data ?? res;
+      } catch {
+        pageRequestFailed = true;
+        break;
+      }
+
       const items = collectItems(payload);
 
       if (!items.length) break;
@@ -175,6 +224,30 @@ export const groupsService = {
       }
 
       page += 1;
+    }
+
+    if (all.length === 0 || pageRequestFailed) {
+      try {
+        const r1: any = await api.get("/groups/user/get-all-groups");
+        const p1 = r1?.data ?? r1;
+        const i1 = collectItems(p1);
+        if (i1.length) {
+          return { data: { items: i1 } };
+        }
+      } catch {
+        // fallback tiếp
+      }
+
+      try {
+        const r2: any = await api.get("/groups/user", { params: { page: 1, limit } });
+        const p2 = r2?.data ?? r2;
+        const i2 = collectItems(p2);
+        if (i2.length) {
+          return { data: { items: i2 } };
+        }
+      } catch {
+        // fallback cuối
+      }
     }
 
     return { data: { items: all } };

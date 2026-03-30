@@ -150,6 +150,17 @@ export default function AssignmentEditor({
     return questions.reduce((sum, q) => sum + (q.points || 0), 0);
   }, [questions]);
 
+  const isFileAssignmentEditMode =
+    mode !== "create" &&
+    assignmentInfo.assignmentMode === "file";
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString("vi-VN");
+  };
+
   // --- HANDLERS ---
   const addQuestion = () => {
     const newId = Date.now();
@@ -244,7 +255,7 @@ export default function AssignmentEditor({
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm transition-all">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push("/teacher/assignments")}
             className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500"
             title="Quay lại"
           >
@@ -264,7 +275,9 @@ export default function AssignmentEditor({
             <span className="text-xs text-slate-400 font-medium mt-1">
               {mode === "create"
                 ? "Đang tạo mới • Bài tập dạng file"
-                : `Đang chỉnh sửa • ${questions.length} câu hỏi`}
+                : isFileAssignmentEditMode
+                  ? "Đang chỉnh sửa • Bài tập dạng file"
+                  : `Đang chỉnh sửa • ${questions.length} câu hỏi`}
             </span>
           </div>
         </div>
@@ -506,6 +519,71 @@ export default function AssignmentEditor({
               />
             </div>
 
+            {isFileAssignmentEditMode && assignmentInfo.fileUrl ? (
+              <div className="md:col-span-3">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                  File bài tập
+                </label>
+                <a
+                  href={assignmentInfo.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex max-w-full items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  <span className="truncate">
+                    {assignmentInfo.fileName || "Mở file đính kèm"}
+                  </span>
+                </a>
+              </div>
+            ) : null}
+
+            {mode !== "create" ? (
+              <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">
+                  Thông tin bài tập
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Loại:</span> <span className="font-semibold text-slate-800">{assignmentInfo.assignmentType || "—"}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Lớp:</span> <span className="font-semibold text-slate-800">{assignmentInfo.classId || "—"}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Hạn nộp:</span> <span className="font-semibold text-slate-800">{formatDateTime(assignmentInfo.dueDate)}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Xuất bản:</span> <span className="font-semibold text-slate-800">{assignmentInfo.isPublished ? "Đã xuất bản" : "Nháp"}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Tạo lúc:</span> <span className="font-semibold text-slate-800">{formatDateTime(assignmentInfo.createdAt)}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-slate-500">Cập nhật:</span> <span className="font-semibold text-slate-800">{formatDateTime(assignmentInfo.updatedAt)}</span>
+                  </div>
+                </div>
+
+                {Array.isArray(assignmentInfo.attachments) && assignmentInfo.attachments.length > 0 ? (
+                  <div className="mt-3">
+                    <div className="text-xs font-bold uppercase text-slate-500 mb-2">Attachments</div>
+                    <div className="space-y-2">
+                      {assignmentInfo.attachments.map((att, idx) => (
+                        <a
+                          key={`${att.url}-${idx}`}
+                          href={att.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block truncate rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                        >
+                          {att.name || att.url}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Duration */}
             {mode !== "create" && (
               <div>
@@ -534,7 +612,9 @@ export default function AssignmentEditor({
                 <Calculator size={14} /> Tổng điểm
               </label>
               <div className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm font-bold text-slate-500 cursor-not-allowed select-none">
-                {totalPoints} điểm
+                {isFileAssignmentEditMode
+                  ? Number(assignmentInfo.maxScore || 0)
+                  : totalPoints} điểm
               </div>
               </div>
             )}
@@ -555,7 +635,7 @@ export default function AssignmentEditor({
           </div>
         </div>
 
-        {mode !== "create" && (
+        {mode !== "create" && !isFileAssignmentEditMode && (
           <>
             {/* --- QUESTIONS LIST --- */}
             <div className="space-y-6">

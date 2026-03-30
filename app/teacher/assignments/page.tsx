@@ -7,9 +7,7 @@ import {
   Plus,
   Filter,
   FileText,
-  Eye,
   ClipboardCheck,
-  GraduationCap,
 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
 
@@ -209,24 +207,10 @@ export default function AssignmentLibraryPage() {
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => router.push(`/teacher/assignments/${item.id}`)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 transition"
-                    >
-                      <Eye size={14} /> Chi tiết
-                    </button>
-
-                    <button
                       onClick={() => router.push(`/teacher/assignments/${item.id}/submissions`)}
                       className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition"
                     >
                       <ClipboardCheck size={14} /> Học viên đã nộp
-                    </button>
-
-                    <button
-                      onClick={() => router.push(`/teacher/grading/${item.id}`)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
-                    >
-                      <GraduationCap size={14} /> Chấm điểm
                     </button>
                   </div>
                 </td>

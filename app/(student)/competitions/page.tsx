@@ -396,14 +396,14 @@ export default function StudentCompetitionsPage() {
                     ) : comp.status === "HAPPENING" ? (
                       <button
                         onClick={() => goToPlay(comp._id)}
-                        className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2 group-hover:scale-[1.02] active:scale-95"
+                        className="w-full py-3.5 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-2xl font-bold shadow-lg shadow-red-300 transition flex items-center justify-center gap-2 group-hover:scale-[1.02] active:scale-95 animate-pulse"
                       >
-                        Tham gia ngay <ArrowRight size={20} />
+                        <Zap size={20} fill="currentColor" /> Tham gia ngay <ArrowRight size={20} />
                       </button>
                     ) : (
                       <button
                         onClick={() => goToRegister(comp._id)}
-                        className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-bold transition flex items-center justify-center gap-2 active:scale-95"
+                        className="w-full py-3.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl font-bold transition flex items-center justify-center gap-2 active:scale-95"
                       >
                         <Lock size={18} /> Đăng ký trước
                       </button>

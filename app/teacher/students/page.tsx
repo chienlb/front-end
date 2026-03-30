@@ -80,11 +80,30 @@ function TeacherStudentsContent() {
         const id = String(
           it?._id ?? it?.id ?? profile?._id ?? profile?.id ?? `student-${idx}`,
         );
+        const firstName = String(profile?.firstName ?? it?.firstName ?? "").trim();
+        const lastName = String(profile?.lastName ?? it?.lastName ?? "").trim();
+        const mergedName = `${firstName} ${lastName}`.trim();
+        const email = String(profile?.email ?? it?.email ?? "").trim();
+        const phone = String(
+          profile?.phone ?? profile?.phoneNumber ?? it?.phone ?? it?.phoneNumber ?? "",
+        ).trim();
+        const primaryName =
+          profile?.fullName ??
+          profile?.fullname ??
+          profile?.name ??
+          profile?.displayName ??
+          it?.fullName ??
+          it?.fullname ??
+          it?.name ??
+          it?.displayName;
         const name = String(
-          profile?.fullName ?? profile?.name ?? it?.fullName ?? it?.name ?? "Học viên",
+          (typeof primaryName === "string" ? primaryName.trim() : "") ||
+            mergedName ||
+            profile?.username ||
+            it?.username ||
+            email ||
+            `ID: ${id}`,
         );
-        const email = String(profile?.email ?? it?.email ?? "");
-        const phone = String(profile?.phone ?? it?.phone ?? "");
         const groupId = String(
           it?.group?._id ?? it?.groupId ?? it?.group ?? "",
         );

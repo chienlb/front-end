@@ -46,11 +46,53 @@ export default function EditAssignmentPage({
       try {
         setIsLoading(true);
         const res: any = await assignmentsService.getAssignmentById(id);
-        const raw = res?.data ?? res;
-        if (!raw) {
+        const payload = res?.data ?? res;
+        const raw =
+          payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+            ? payload.data
+            : payload?.result && typeof payload.result === "object"
+              ? payload.result
+              : payload?.payload && typeof payload.payload === "object"
+                ? payload.payload
+                : payload;
+
+        if (!raw || typeof raw !== "object") {
           setError("Không tìm thấy bài tập này.");
         } else {
           const questionsRaw = Array.isArray(raw?.questions) ? raw.questions : [];
+          const attachmentsRaw = Array.isArray(raw?.attachments) ? raw.attachments : [];
+          const attachments = attachmentsRaw
+            .map((a: any) => {
+              if (typeof a === "string") {
+                return { url: a, name: "File đính kèm" };
+              }
+              const url = String(a?.url ?? a?.fileUrl ?? a?.path ?? "").trim();
+              const name = String(a?.name ?? a?.fileName ?? a?.originalName ?? "").trim();
+              return url ? { url, name: name || undefined } : null;
+            })
+            .filter(Boolean) as Array<{ url: string; name?: string }>;
+
+          const firstAttachment = attachments[0];
+          const fileUrl = String(
+            raw?.fileUrl ??
+              raw?.file?.url ??
+              raw?.file?.fileUrl ??
+              (Array.isArray(raw?.files) ? raw.files?.[0]?.url ?? raw.files?.[0]?.fileUrl : "") ??
+              firstAttachment?.url ??
+              "",
+          ).trim();
+          const fileName = String(
+            raw?.fileName ??
+              raw?.file?.name ??
+              raw?.file?.originalName ??
+              (Array.isArray(raw?.files) ? raw.files?.[0]?.name ?? raw.files?.[0]?.originalName : "") ??
+              firstAttachment?.name ??
+              "",
+          ).trim();
+
+          const assignmentMode: "file" | "question" =
+            questionsRaw.length > 0 ? "question" : fileUrl || attachments.length ? "file" : "question";
+
           const questions: Question[] = questionsRaw.map((q: any, idx: number) => ({
             id: Number(q?.id ?? idx + 1),
             type:
@@ -84,6 +126,17 @@ export default function EditAssignmentPage({
               title: String(raw?.title ?? raw?.name ?? "Bài tập"),
               description: String(raw?.description ?? ""),
               duration: Number(raw?.duration ?? raw?.estimatedDuration ?? 45) || 45,
+              maxScore: Number(raw?.maxScore ?? raw?.totalScore ?? 0) || 0,
+              fileUrl,
+              fileName,
+              assignmentMode,
+              assignmentType: String(raw?.type ?? ""),
+              classId: String(raw?.classId ?? raw?.class?._id ?? ""),
+              dueDate: String(raw?.dueDate ?? ""),
+              isPublished: Boolean(raw?.isPublished),
+              createdAt: String(raw?.createdAt ?? ""),
+              updatedAt: String(raw?.updatedAt ?? ""),
+              attachments,
             },
             questions,
           });
@@ -267,72 +320,6 @@ export default function EditAssignmentPage({
   // --- TRƯỜNG HỢP 3: TẢI XONG -> HIỂN THỊ EDITOR ---
   return (
     <div className="bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto p-4 md:p-6">
-        <div className="mb-4 bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="text-base font-black text-slate-800">
-              Danh sách học sinh đã nộp bài
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Assignment ID: {id}
-            </p>
-          </div>
-
-          {loadingSubmissions ? (
-            <div className="p-5 text-sm text-slate-500">Đang tải danh sách nộp bài...</div>
-          ) : submissionError ? (
-            <div className="p-5 text-sm text-red-600">{submissionError}</div>
-          ) : submissions.length === 0 ? (
-            <div className="p-5 text-sm text-slate-500">Chưa có học sinh nộp bài.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                  <tr>
-                    <th className="px-5 py-3">Học sinh</th>
-                    <th className="px-5 py-3">Trạng thái</th>
-                    <th className="px-5 py-3">Điểm</th>
-                    <th className="px-5 py-3">Thời gian nộp</th>
-                    <th className="px-5 py-3 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {submissions.map((s, idx) => {
-                    const student = s?.studentId ?? s?.student ?? {};
-                    const studentName = String(
-                      student?.fullName ?? student?.name ?? s?.studentName ?? "Học sinh",
-                    );
-                    const status = String(s?.status ?? "submitted");
-                    const score = s?.score;
-                    const submittedAt = s?.submittedAt
-                      ? new Date(s.submittedAt).toLocaleString("vi-VN")
-                      : "—";
-                    return (
-                      <tr key={String(s?._id ?? s?.id ?? idx)}>
-                        <td className="px-5 py-3">{studentName}</td>
-                        <td className="px-5 py-3">{status}</td>
-                        <td className="px-5 py-3">
-                          {typeof score === "number" ? score : "Chưa chấm"}
-                        </td>
-                        <td className="px-5 py-3">{submittedAt}</td>
-                        <td className="px-5 py-3 text-right">
-                          <button
-                            onClick={() => openSubmissionModal(s)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
-                          >
-                            <Eye size={14} /> Xem & chấm
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
       <AssignmentEditor
         mode="edit"
         initialData={data}

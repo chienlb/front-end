@@ -21,6 +21,7 @@ type GroupMessage = {
   senderId?: string;
   content?: string;
   createdAt?: string;
+  pending?: boolean;
 };
 
 export default function MyGroupsPage() {
@@ -35,6 +36,7 @@ export default function MyGroupsPage() {
   const [myGroupsError, setMyGroupsError] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string>("Bạn");
 
   const activeGroup = useMemo(
     () => myGroups.find((g) => g.id === activeGroupId) ?? null,
@@ -50,26 +52,113 @@ export default function MyGroupsPage() {
   const [sending, setSending] = useState(false);
 
   const endRef = useRef<HTMLDivElement | null>(null);
+  const senderNameMapRef = useRef<Record<string, string>>({});
+
+  const toTimeValue = (value?: string) => {
+    if (!value) return 0;
+    const t = new Date(value).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+
+  const getSenderNameFromRaw = (raw: any, isMe = false) => {
+    const senderId: string =
+      typeof raw?.senderId === "string"
+        ? raw.senderId
+        : typeof raw?.sender?._id === "string"
+          ? raw.sender._id
+          : "";
+
+    const candidates = [
+      raw?.senderName,
+      raw?.sender?.fullName,
+      raw?.sender?.name,
+      raw?.sender?.username,
+      raw?.senderId?.fullName,
+      raw?.senderId?.name,
+      raw?.senderId?.username,
+      senderId ? senderNameMapRef.current[senderId] : "",
+    ];
+
+    for (const c of candidates) {
+      const v = String(c ?? "").trim();
+      if (v) {
+        if (senderId) senderNameMapRef.current[senderId] = v;
+        return v;
+      }
+    }
+
+    if (isMe) return currentUserName || "Bạn";
+
+    if (senderId) return `User ${senderId.slice(-6)}`;
+    return "Người dùng";
+  };
+
+  const normalizeMessages = (items: any[]): GroupMessage[] => {
+    const list = Array.isArray(items) ? items : [];
+
+    return list
+      .map((raw, idx) => {
+        const senderId: string =
+          typeof raw?.senderId === "string"
+            ? raw.senderId
+            : typeof raw?.sender?._id === "string"
+              ? raw.sender._id
+              : "";
+        const isMe = Boolean(currentUserId && senderId && currentUserId === senderId);
+        return {
+          id: String(raw?.id ?? raw?._id ?? `msg-${idx}-${raw?.createdAt ?? ""}`),
+          senderId,
+          senderName: getSenderNameFromRaw(raw, isMe),
+          content: String(raw?.content ?? raw?.message ?? raw?.text ?? ""),
+          createdAt: String(raw?.createdAt ?? raw?.timestamp ?? raw?.time ?? ""),
+          pending: false,
+        } as GroupMessage;
+      })
+      .sort((a, b) => {
+        const ta = toTimeValue(a.createdAt);
+        const tb = toTimeValue(b.createdAt);
+        if (ta !== tb) return ta - tb;
+        return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+      });
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    setTimeout(() => endRef.current?.scrollIntoView({ behavior }), 0);
+  };
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoadingMyGroups(true);
         setMyGroupsError("");
+        const normalize = (source: any[]): Group[] =>
+          (source || [])
+            .map((g) => ({
+              id: g?.id ?? g?._id ?? "",
+              name: g?.groupName ?? g?.name ?? "",
+              topic: g?.topic,
+              description: g?.description,
+              membersCount: g?.membersCount ?? g?.members?.length,
+            }))
+            .filter((g) => Boolean(g.id) && Boolean(g.name));
+
         const res = await groupsService.getMyGroupsAll({ limit: 100, maxPages: 50 });
         const payload: any = (res as any)?.data ?? res;
         const raw = payload?.items ?? payload?.data ?? payload;
-        const items = (Array.isArray(raw) ? raw : raw ? [raw] : []) as any[];
+        let items = (Array.isArray(raw) ? raw : raw ? [raw] : []) as any[];
 
-        const normalized: Group[] = items
-          .map((g) => ({
-            id: g?.id ?? g?._id ?? "",
-            name: g?.groupName ?? g?.name ?? "",
-            topic: g?.topic,
-            description: g?.description,
-            membersCount: g?.membersCount ?? g?.members?.length,
-          }))
-          .filter((g) => Boolean(g.id) && Boolean(g.name));
+        if (!items.length) {
+          const fallbackRes = await groupsService.getMyGroups({ page: 1, limit: 100 });
+          const fallbackPayload: any = (fallbackRes as any)?.data ?? fallbackRes;
+          const fallbackRaw =
+            fallbackPayload?.items ??
+            fallbackPayload?.data ??
+            fallbackPayload?.groups ??
+            fallbackPayload;
+          items = (Array.isArray(fallbackRaw) ? fallbackRaw : fallbackRaw ? [fallbackRaw] : []) as any[];
+        }
+
+        const normalized: Group[] = normalize(items);
 
         setMyGroups(normalized);
         if (!activeGroupId && normalized.length) {
@@ -103,6 +192,14 @@ export default function MyGroupsPage() {
         parsed?.user?.userId ??
         null;
       if (typeof id === "string" && id.trim()) setCurrentUserId(id.trim());
+      const name =
+        parsed?.fullName ??
+        parsed?.name ??
+        parsed?.username ??
+        parsed?.user?.fullName ??
+        parsed?.user?.name ??
+        "Bạn";
+      setCurrentUserName(String(name));
     } catch {
       // ignore
     }
@@ -130,27 +227,33 @@ export default function MyGroupsPage() {
   useEffect(() => {
     if (!activeGroupId) return;
 
-    const loadMessages = async () => {
-      setLoadingMessages(true);
+    const loadMessages = async (silent = false) => {
+      if (!silent) setLoadingMessages(true);
       try {
         const res = await groupMessagesService.getMessagesByGroupId(activeGroupId, {
           page: 1,
-          limit: 50,
+          limit: 100,
         });
         const data = res?.data ?? res;
-        const items = (data?.items ?? data?.data ?? data ?? []) as GroupMessage[];
-        setMessages(items);
+        const items = (data?.items ?? data?.data ?? data ?? []) as any[];
+        setMessages(normalizeMessages(items));
       } catch {
-        setMessages([]);
+        if (!silent) setMessages([]);
       } finally {
-        setLoadingMessages(false);
-        // Scroll to bottom after render
-        setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+        if (!silent) {
+          setLoadingMessages(false);
+          scrollToBottom("auto");
+        }
       }
     };
 
-    loadMessages();
-  }, [activeGroupId]);
+    loadMessages(false);
+    const interval = window.setInterval(() => {
+      void loadMessages(true);
+    }, 3500);
+
+    return () => window.clearInterval(interval);
+  }, [activeGroupId, currentUserId, currentUserName]);
 
   const handleSearch = async () => {
     if (!keyword.trim()) return;
@@ -246,9 +349,22 @@ export default function MyGroupsPage() {
     const content = input.trim();
     if (!content) return;
 
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: GroupMessage = {
+      id: tempId,
+      senderId: currentUserId ?? undefined,
+      senderName: currentUserName || "Bạn",
+      content,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage].sort((a, b) => toTimeValue(a.createdAt) - toTimeValue(b.createdAt)));
+    setInput("");
+    scrollToBottom("smooth");
+
     setSending(true);
     try {
-      // DTO backend thường có: groupId, nội dung, type, attachments..., mentions..., replyTo...
       await groupMessagesService.sendMessage({
         groupId: activeGroupId,
         content,
@@ -260,17 +376,17 @@ export default function MyGroupsPage() {
 
       const res = await groupMessagesService.getMessagesByGroupId(activeGroupId, {
         page: 1,
-        limit: 50,
+        limit: 100,
       });
       const data = res?.data ?? res;
-      const items = (data?.items ?? data?.data ?? data ?? []) as GroupMessage[];
-      setMessages(items);
-      setInput("");
+      const items = (data?.items ?? data?.data ?? data ?? []) as any[];
+      setMessages(normalizeMessages(items));
     } catch {
-      // noop
+      // rollback optimistic message if send failed
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     } finally {
       setSending(false);
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+      scrollToBottom("smooth");
     }
   };
 
@@ -461,7 +577,7 @@ export default function MyGroupsPage() {
                         m.senderName ??
                         anyMsg?.sender?.name ??
                         anyMsg?.sender?.fullName ??
-                        (isMe ? "Bạn" : "Thành viên");
+                        (isMe ? currentUserName || "Bạn" : "Người dùng");
 
                       const timeLabel = formatTime(
                         anyMsg?.createdAt ?? anyMsg?.timestamp ?? anyMsg?.time,

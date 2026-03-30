@@ -106,9 +106,9 @@ export default function AdminCompetitionsPage() {
         title: String(c?.title || c?.name || "Cuộc thi chưa đặt tên"),
         type: String(c?.type || c?.category || "N/A"),
         status: String(c?.status || "unknown").toUpperCase(),
-        startDate: toDateText(c?.startDate || c?.startAt),
-        endDate: toDateText(c?.endDate || c?.endAt),
-        participants: Number(c?.participantsCount || c?.participants || 0),
+        startDate: toDateText(c?.startDate || c?.startTime || c?.startAt || c?.start),
+        endDate: toDateText(c?.endDate || c?.endTime || c?.endAt || c?.end),
+        participants: Number(c?.participantsCount || c?.participants || c?.participantCount || c?.totalParticipants || 0),
       }));
       setRows(mapped);
     } catch (error) {
@@ -176,8 +176,8 @@ export default function AdminCompetitionsPage() {
         name: String(data?.name || data?.title || ""),
         description: String(data?.description || ""),
         type: String(data?.type || "rank"),
-        startTime: toDatetimeLocalValue(String(data?.startTime || data?.startAt || "")),
-        endTime: toDatetimeLocalValue(String(data?.endTime || data?.endAt || "")),
+        startTime: toDatetimeLocalValue(String(data?.startTime || data?.startDate || data?.startAt || data?.start || "")),
+        endTime: toDatetimeLocalValue(String(data?.endTime || data?.endDate || data?.endAt || data?.end || "")),
         totalParticipants: Number(data?.totalParticipants || 0),
         status: String(data?.status || "upcoming"),
         isPublished: Boolean(data?.isPublished ?? true),
