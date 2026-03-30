@@ -11,6 +11,8 @@ export type PackageApiItem = {
   currency?: string;
   features?: string[];
   isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export const packagesService = {
@@ -20,6 +22,47 @@ export const packagesService = {
     isActive?: boolean;
   }) => {
     return api.get("/packages", { params });
+  },
+
+  getPackageById: async (id: string) => {
+    return api.get(`/packages/${encodeURIComponent(id)}`);
+  },
+
+  createPackage: async (payload: {
+    name: string;
+    description?: string;
+    type: string;
+    durationInDays: number;
+    price: number;
+    currency?: string;
+    features?: string[];
+    isActive?: boolean;
+  }) => {
+    return api.post("/packages", payload);
+  },
+
+  updatePackageById: async (
+    id: string,
+    payload: {
+      name?: string;
+      description?: string;
+      type?: string;
+      durationInDays?: number;
+      price?: number;
+      currency?: string;
+      features?: string[];
+      isActive?: boolean;
+    },
+  ) => {
+    return api.put(`/packages/${encodeURIComponent(id)}`, payload);
+  },
+
+  deletePackageById: async (id: string) => {
+    return api.delete(`/packages/${encodeURIComponent(id)}`);
+  },
+
+  restorePackageById: async (id: string) => {
+    return api.put(`/packages/${encodeURIComponent(id)}/restore`);
   },
 };
 
