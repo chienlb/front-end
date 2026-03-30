@@ -14,107 +14,22 @@ import {
   User,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { competitionService } from "@/services/competition.service";
 
 // --- TYPES ---
 interface RankUser {
-  id: string;
-  name: string;
-  avatar: string;
-  score: number;
-  time: string; // "mm:ss"
-  rank: number;
+  _id?: string;
+  id?: string;
+  fullname?: string;
+  username?: string;
+  name?: string;
+  avatar?: string;
+  score?: number;
+  rank?: number;
+  submittedAt?: string;
+  role?: string;
   isMe?: boolean;
 }
-
-// --- MOCK DATA GENERATOR ---
-const getMockData = (id: string) => {
-  // Dữ liệu mẫu
-  const baseData: RankUser[] = [
-    {
-      id: "u1",
-      name: "Thánh Tiếng Anh",
-      avatar: "https://i.pravatar.cc/150?img=33",
-      score: 1000,
-      time: "05:10",
-      rank: 1,
-    },
-    {
-      id: "u2",
-      name: "Nguyễn Văn An",
-      avatar: "https://i.pravatar.cc/150?img=12",
-      score: 980,
-      time: "06:05",
-      rank: 2,
-    },
-    {
-      id: "u3",
-      name: "Trần Bảo Ngọc",
-      avatar: "https://i.pravatar.cc/150?img=5",
-      score: 950,
-      time: "05:45",
-      rank: 3,
-    },
-    {
-      id: "u4",
-      name: "Lê Minh",
-      avatar: "https://i.pravatar.cc/150?img=3",
-      score: 900,
-      time: "07:00",
-      rank: 4,
-    },
-    {
-      id: "u5",
-      name: "Phạm Hùng",
-      avatar: "https://i.pravatar.cc/150?img=11",
-      score: 890,
-      time: "07:15",
-      rank: 5,
-    },
-    {
-      id: "u6",
-      name: "Sarah Miller",
-      avatar: "https://i.pravatar.cc/150?img=9",
-      score: 850,
-      time: "08:20",
-      rank: 6,
-    },
-    {
-      id: "u7",
-      name: "David Beck",
-      avatar: "https://i.pravatar.cc/150?img=8",
-      score: 800,
-      time: "09:00",
-      rank: 7,
-    },
-    {
-      id: "me",
-      name: "Bạn (Tôi)",
-      avatar: "https://i.pravatar.cc/150?img=60",
-      score: 750,
-      time: "09:30",
-      rank: 8,
-      isMe: true,
-    },
-    {
-      id: "u9",
-      name: "Tiến Đạt",
-      avatar: "https://i.pravatar.cc/150?img=50",
-      score: 700,
-      time: "10:00",
-      rank: 9,
-    },
-  ];
-
-  return {
-    competitionName:
-      id === "C01"
-        ? "Đấu Trường Từ Vựng: Unit 5"
-        : "Thử thách Speaking: Holiday",
-    totalParticipants: 142,
-    ranking: baseData,
-    myResult: baseData.find((u) => u.isMe) || baseData[7],
-  };
-};
 
 export default function CompetitionLeaderboardPage({
   params,
@@ -124,19 +39,96 @@ export default function CompetitionLeaderboardPage({
   const { id } = use(params);
   const router = useRouter();
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Giả lập loading
-    const loadedData = getMockData(id);
-    setData(loadedData);
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        const [leaderboardResponse, competitionResponse] = await Promise.all([
+          competitionService.getCompetitionLeaderboard(id, {
+            page: 1,
+            limit: 50,
+          }).catch(() => null),
+          competitionService.getCompetitionById(id).catch(() => null),
+        ]);
+
+        console.log("Leaderboard Response:", leaderboardResponse);
+        console.log("Competition Response:", competitionResponse);
+
+        if (!leaderboardResponse) throw new Error("No leaderboard response");
+
+        const leaderboardData = leaderboardResponse?.data || [];
+        const formattedData = leaderboardData.map((user: any) => ({
+          _id: user._id || user.id,
+          id: user._id || user.id,
+          name: user.fullname || user.name || user.username || "Ẩn danh",
+          avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullname || user.name || user.username || "User")}`,
+          score: user.score || 0,
+          rank: user.rank || 0,
+          submittedAt: user.submittedAt,
+          role: user.role,
+        }));
+
+        // Extract competition name from multiple possible locations
+        const getCmpName = () => {
+          // Try from leaderboard response
+          if (leaderboardResponse?.competitionName) return leaderboardResponse.competitionName;
+          if (leaderboardResponse?.title) return leaderboardResponse.title;
+          if (leaderboardResponse?.name) return leaderboardResponse.name;
+          
+          // Try from competition response (nested structures)
+          if (competitionResponse?.data?.title) return competitionResponse.data.title;
+          if (competitionResponse?.data?.name) return competitionResponse.data.name;
+          if (competitionResponse?.title) return competitionResponse.title;
+          if (competitionResponse?.name) return competitionResponse.name;
+          
+          // Try direct response
+          if (competitionResponse?.response?.title) return competitionResponse.response.title;
+          if (competitionResponse?.response?.name) return competitionResponse.response.name;
+          
+          return `Cuộc thi #${id}`;
+        };
+
+        setData({
+          competitionName: getCmpName(),
+          totalParticipants: leaderboardResponse?.total || formattedData.length,
+          ranking: formattedData,
+          myResult: formattedData[0],
+        });
+      } catch (error) {
+        console.error("Failed to fetch leaderboard:", error);
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchLeaderboard();
   }, [id]);
 
-  if (!data)
+  if (loading)
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        Loading...
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin">
+            <Trophy className="text-indigo-600" size={48} />
+          </div>
+          <p className="text-slate-600 font-bold">Đang tải bảng xếp hạng...</p>
+        </div>
       </div>
     );
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Trophy className="text-slate-400" size={48} />
+          <p className="text-slate-600 font-bold">Không thể tải dữ liệu</p>
+        </div>
+      </div>
+    );
+  }
 
   const top3 = data.ranking.slice(0, 3);
   const others = data.ranking.slice(3);
@@ -167,15 +159,15 @@ export default function CompetitionLeaderboardPage({
           </div>
 
           <div className="text-center">
-            <h1 className="text-2xl md:text-3xl font-black mb-2 leading-tight">
+            <h1 className="text-3xl md:text-4xl font-black mb-3 leading-tight text-white drop-shadow-2xl" style={{textShadow: '0 3px 8px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6)'}}>
               {data.competitionName}
             </h1>
-            <div className="flex items-center justify-center gap-4 text-xs font-medium text-slate-300">
+            <div className="flex items-center justify-center gap-4 text-sm font-semibold text-slate-100">
               <span className="flex items-center gap-1">
-                <User size={14} /> {data.totalParticipants} thí sinh
+                <User size={16} /> {data.totalParticipants} thí sinh
               </span>
-              <span className="w-1 h-1 bg-slate-500 rounded-full"></span>
-              <span className="text-green-400">Đã kết thúc</span>
+              <span className="w-1 h-1 bg-slate-400 rounded-full"></span>
+              <span className="text-emerald-300">Đã kết thúc</span>
             </div>
           </div>
         </div>
@@ -183,8 +175,10 @@ export default function CompetitionLeaderboardPage({
 
       <div className="max-w-xl mx-auto px-4 -mt-24 relative z-20">
         {/* 2. TOP 3 PODIUM */}
+        {data?.ranking && data.ranking.length > 0 && (
         <div className="flex justify-center items-end gap-3 mb-8">
           {/* Rank 2 */}
+          {top3[1] && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -200,9 +194,9 @@ export default function CompetitionLeaderboardPage({
                 #2
               </div>
             </div>
-            <div className="text-center text-white/90 mb-2">
+            <div className="text-center text-slate-900 mb-2">
               <p className="font-bold text-xs truncate w-20">{top3[1].name}</p>
-              <p className="text-[10px] font-mono text-slate-300">
+              <p className="text-[10px] font-mono text-slate-800">
                 {top3[1].score} pts
               </p>
             </div>
@@ -210,8 +204,10 @@ export default function CompetitionLeaderboardPage({
               <span className="text-4xl font-black text-slate-500/20">2</span>
             </div>
           </motion.div>
+          )}
 
           {/* Rank 1 */}
+          {top3[0] && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -231,9 +227,9 @@ export default function CompetitionLeaderboardPage({
                 #1
               </div>
             </div>
-            <div className="text-center text-white mb-2">
+            <div className="text-center text-slate-900 mb-2">
               <p className="font-bold text-sm truncate w-24">{top3[0].name}</p>
-              <p className="text-xs font-black text-yellow-400 font-mono">
+              <p className="text-xs font-black text-slate-900 font-mono">
                 {top3[0].score} pts
               </p>
             </div>
@@ -246,8 +242,10 @@ export default function CompetitionLeaderboardPage({
               />
             </div>
           </motion.div>
+          )}
 
           {/* Rank 3 */}
+          {top3[2] && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -263,9 +261,9 @@ export default function CompetitionLeaderboardPage({
                 #3
               </div>
             </div>
-            <div className="text-center text-white/90 mb-2">
+            <div className="text-center text-slate-900 mb-2">
               <p className="font-bold text-xs truncate w-20">{top3[2].name}</p>
-              <p className="text-[10px] font-mono text-slate-300">
+              <p className="text-[10px] font-mono text-slate-800">
                 {top3[2].score} pts
               </p>
             </div>
@@ -273,7 +271,9 @@ export default function CompetitionLeaderboardPage({
               <span className="text-3xl font-black text-orange-800/20">3</span>
             </div>
           </motion.div>
+          )}
         </div>
+        )}
 
         {/* 3. RANKING LIST */}
         <motion.div
@@ -285,10 +285,7 @@ export default function CompetitionLeaderboardPage({
           {/* List Header */}
           <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             <span>Hạng & Thí sinh</span>
-            <span className="flex items-center gap-6 mr-1">
-              <span>Thời gian</span>
-              <span>Điểm số</span>
-            </span>
+            <span className="mr-1 font-bold">Điểm số</span>
           </div>
 
           {/* List Body */}
@@ -322,9 +319,6 @@ export default function CompetitionLeaderboardPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-6 text-right">
-                  <span className="text-xs text-slate-400 font-mono flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
-                    <Timer size={10} /> {user.time}
-                  </span>
                   <span className="font-black text-indigo-600 w-10 text-sm">
                     {user.score}
                   </span>

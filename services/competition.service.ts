@@ -73,4 +73,11 @@ export const competitionService = {
 
     return res.data ?? res;
   },
+
+  getCompetitionLeaderboard: async (
+    competitionId: string,
+    params?: CompetitionQueryParams,
+  ) => {
+    return api.get(`/competitions/${competitionId}/leaderboard`, { params });
+  },
 };
