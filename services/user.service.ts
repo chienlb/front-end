@@ -103,14 +103,16 @@ export const userService = {
         limit: params?.limit ?? 10,
       },
     });
+    const payload = res?.data ?? {};
+
     // Return full response with pagination metadata
     return {
-      data: extractLeaderboardArray(res),
+      data: extractLeaderboardArray(payload),
       pagination: {
-        page: res?.page || res?.data?.page || 1,
-        limit: res?.limit || res?.data?.limit || 20,
-        total: res?.total || res?.data?.total || 0,
-        totalPages: res?.totalPages || res?.data?.totalPages || 1,
+        page: payload?.page || payload?.pagination?.page || 1,
+        limit: payload?.limit || payload?.pagination?.limit || 20,
+        total: payload?.total || payload?.pagination?.total || 0,
+        totalPages: payload?.totalPages || payload?.pagination?.totalPages || 1,
       },
     };
   },

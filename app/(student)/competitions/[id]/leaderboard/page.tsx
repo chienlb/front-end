@@ -58,7 +58,13 @@ export default function CompetitionLeaderboardPage({
 
         if (!leaderboardResponse) throw new Error("No leaderboard response");
 
-        const leaderboardData = leaderboardResponse?.data || [];
+        const leaderboardPayload = leaderboardResponse?.data ?? {};
+        const competitionPayload = competitionResponse?.data ?? {};
+        const leaderboardData = Array.isArray(leaderboardPayload?.data)
+          ? leaderboardPayload.data
+          : Array.isArray(leaderboardPayload)
+            ? leaderboardPayload
+            : [];
         const formattedData = leaderboardData.map((user: any) => ({
           _id: user._id || user.id,
           id: user._id || user.id,
@@ -72,27 +78,29 @@ export default function CompetitionLeaderboardPage({
 
         // Extract competition name from multiple possible locations
         const getCmpName = () => {
-          // Try from leaderboard response
-          if (leaderboardResponse?.competitionName) return leaderboardResponse.competitionName;
-          if (leaderboardResponse?.title) return leaderboardResponse.title;
-          if (leaderboardResponse?.name) return leaderboardResponse.name;
+          // Try from leaderboard payload
+          if (leaderboardPayload?.competitionName) return leaderboardPayload.competitionName;
+          if (leaderboardPayload?.title) return leaderboardPayload.title;
+          if (leaderboardPayload?.name) return leaderboardPayload.name;
           
-          // Try from competition response (nested structures)
-          if (competitionResponse?.data?.title) return competitionResponse.data.title;
-          if (competitionResponse?.data?.name) return competitionResponse.data.name;
-          if (competitionResponse?.title) return competitionResponse.title;
-          if (competitionResponse?.name) return competitionResponse.name;
+          // Try from competition payload
+          if (competitionPayload?.title) return competitionPayload.title;
+          if (competitionPayload?.name) return competitionPayload.name;
+          if (competitionPayload?.competitionName) return competitionPayload.competitionName;
           
-          // Try direct response
-          if (competitionResponse?.response?.title) return competitionResponse.response.title;
-          if (competitionResponse?.response?.name) return competitionResponse.response.name;
+          // Try nested wrappers
+          if (competitionPayload?.data?.title) return competitionPayload.data.title;
+          if (competitionPayload?.data?.name) return competitionPayload.data.name;
           
           return `Cuộc thi #${id}`;
         };
 
         setData({
           competitionName: getCmpName(),
-          totalParticipants: leaderboardResponse?.total || formattedData.length,
+          totalParticipants:
+            leaderboardPayload?.total ||
+            leaderboardPayload?.pagination?.total ||
+            formattedData.length,
           ranking: formattedData,
           myResult: formattedData[0],
         });
