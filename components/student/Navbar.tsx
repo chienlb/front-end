@@ -405,14 +405,14 @@ export default function Navbar() {
             href="/"
             className="flex items-center gap-3 mr-8 shrink-0 group"
           >
-            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-900/20 group-hover:bg-blue-800 transition-colors transform group-hover:scale-105 duration-300">
-              <GraduationCap size={22} strokeWidth={2.5} />
+            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-pink-500/20 group-hover:bg-orange-500 transition-colors transform group-hover:scale-105 duration-300">
+              <span className="text-lg">🐱</span>
             </div>
             <div className="hidden md:flex flex-col">
-              <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-blue-700 transition-colors">
+              <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none group-hover:text-orange-600 transition-colors">
                 Happy Cat
               </span>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-400 transition-colors">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-orange-500 transition-colors">
                 Education System
               </span>
             </div>

@@ -268,14 +268,14 @@ export default function RegisterPage() {
             href="/"
             className="flex items-center gap-3 mb-6 group w-fit"
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-pink-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-200 group-hover:scale-110 transition-transform">
-              <GraduationCap size={20} strokeWidth={2.5} />
+            <div className="w-10 h-10 md:w-11 md:h-11 bg-gradient-to-br from-pink-500 to-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-pink-300 group-hover:scale-110 transition-transform">
+              <span className="text-base md:text-lg">🐱</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-black text-slate-800 tracking-tighter leading-none">
+              <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter leading-none">
                 Happy Cat
               </span>
-              <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">
+              <span className="text-[9px] font-bold text-orange-600 uppercase tracking-widest">
                 Education System
               </span>
             </div>
