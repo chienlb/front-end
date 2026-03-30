@@ -5,10 +5,10 @@ export type FeedbackType = "general" | "lesson" | "feature" | "bug";
 export interface FeedbackItem {
   _id: string;
   userId: string;
-  type: FeedbackType;
-  title: string;
+  type?: FeedbackType;
+  title?: string;
   content: string;
-  rating?: number;
+  rating: number;
   relatedId?: string;
   isResolved?: boolean;
   resolvedBy?: string;
@@ -26,12 +26,9 @@ export interface FeedbackListResponse {
 }
 
 export interface CreateFeedbackPayload {
-  type: FeedbackType;
-  title: string;
+  userId: string;
   content: string;
-  rating?: number;
-  relatedId?: string;
-  isResolved?: boolean;
+  rating: number;
 }
 
 export interface UpdateFeedbackPayload {

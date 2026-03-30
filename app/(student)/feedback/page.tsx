@@ -1,23 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, MessageSquareText, Star } from "lucide-react";
 import {
   feedbackService,
   type FeedbackItem,
-  type FeedbackType,
 } from "@/services/feedback.service";
 
-const CATEGORIES: Array<{ value: FeedbackType; label: string; hint: string }> = [
-  { value: "bug", label: "Báo lỗi", hint: "Có lỗi hiển thị, không bấm được, sai dữ liệu..." },
-  { value: "general", label: "Góp ý chung", hint: "Gợi ý cải thiện trải nghiệm học tập, UI/UX..." },
-  { value: "lesson", label: "Bài học", hint: "Vấn đề liên quan nội dung bài học hoặc tài liệu." },
-  { value: "feature", label: "Tính năng", hint: "Đề xuất thêm hoặc chỉnh sửa tính năng." },
-];
-
 export default function StudentFeedbackPage() {
-  const [category, setCategory] = useState<FeedbackType>("general");
-  const [title, setTitle] = useState("");
   const [rating, setRating] = useState<number>(5);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -31,13 +21,31 @@ export default function StudentFeedbackPage() {
 
   const LIMIT = 5;
 
-  const categoryHint = useMemo(
-    () => CATEGORIES.find((c) => c.value === category)?.hint ?? "",
-    [category],
-  );
+  const typeLabel = (type?: string) => {
+    if (type === "bug") return "Báo lỗi";
+    if (type === "general") return "Góp ý chung";
+    if (type === "lesson") return "Bài học";
+    if (type === "feature") return "Tính năng";
+    return "Phản hồi";
+  };
 
-  const typeLabel = (type: FeedbackType) => {
-    return CATEGORIES.find((c) => c.value === type)?.label ?? type;
+  const getCurrentUserId = () => {
+    if (typeof window === "undefined") return "";
+    const rawUser = localStorage.getItem("currentUser");
+    if (!rawUser) return "";
+
+    try {
+      const parsed = JSON.parse(rawUser);
+      return (
+        parsed?._id ||
+        parsed?.id ||
+        parsed?.userId ||
+        parsed?.user?._id ||
+        ""
+      );
+    } catch {
+      return "";
+    }
   };
 
   const loadFeedbacks = async (page = 1) => {
@@ -78,13 +86,14 @@ export default function StudentFeedbackPage() {
   }, []);
 
   const submit = async () => {
-    if (!title.trim()) {
-      setError("Bạn hãy nhập tiêu đề phản hồi.");
+    if (!message.trim()) {
+      setError("Bạn hãy nhập nội dung phản hồi trước khi gửi.");
       return;
     }
 
-    if (!message.trim()) {
-      setError("Bạn hãy nhập nội dung phản hồi trước khi gửi.");
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setError("Không tìm thấy userId. Vui lòng đăng nhập lại.");
       return;
     }
 
@@ -93,22 +102,15 @@ export default function StudentFeedbackPage() {
       setError(null);
       setDone(false);
 
-      const pageUrl = typeof window !== "undefined" ? window.location.href : undefined;
-
       await feedbackService.create({
-        type: category,
-        title: title.trim(),
+        userId: String(userId),
         content: message.trim(),
         rating,
-        relatedId: pageUrl,
-        isResolved: false,
       });
 
       setDone(true);
-      setTitle("");
       setMessage("");
       setRating(5);
-      setCategory("general");
       await loadFeedbacks(1);
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || "Gửi nhận xét thất bại.");
@@ -135,25 +137,7 @@ export default function StudentFeedbackPage() {
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                Loại phản hồi
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as FeedbackType)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 font-semibold outline-none focus:border-blue-400"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-2">{categoryHint}</p>
-            </div>
-
+          <div className="mt-8 grid grid-cols-1 gap-4">
             <div className="md:col-span-1">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
                 Mức độ hài lòng
@@ -182,18 +166,6 @@ export default function StudentFeedbackPage() {
                   {rating}/5
                 </div>
               </div>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                Tiêu đề
-              </label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ví dụ: Không mở được bài luyện nghe Unit 3"
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 font-medium outline-none focus:border-blue-400"
-              />
             </div>
 
             <div className="md:col-span-2">

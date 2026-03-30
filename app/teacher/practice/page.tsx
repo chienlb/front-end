@@ -1,134 +1,210 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Plus,
-  Trash2,
-  Edit,
-  Search,
-  Filter,
-  Loader2,
-  FileQuestion,
-  MoreVertical,
-} from "lucide-react";
-import api from "@/utils/api";
-import QuestionFormModal from "@/components/teacher/practice/forms/QuestionFormModal";
+import { Search, Loader2, FileQuestion } from "lucide-react";
 import { practiceService } from "@/services/practice.service";
+import { groupsService } from "@/services/groups.service";
 
-export default function QuestionManager() {
-  const [questions, setQuestions] = useState<any[]>([]);
+type StudentOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export default function TeacherPracticeHistoryPage() {
+  const [studentId, setStudentId] = useState("");
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [practices, setPractices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // State tìm kiếm
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 1. Fetch dữ liệu
-  const fetchQuestions = async () => {
+  const toArray = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.data?.items)) return payload.data.items;
+    return [];
+  };
+
+  const getScore = (item: any): number | null => {
+    if (typeof item?.AIFeedback?.score === "number") return item.AIFeedback.score;
+    if (typeof item?.score === "number") return item.score;
+    return null;
+  };
+
+  const getTypeLabel = (type?: string) => {
+    if (type === "sentence") return "Viết câu";
+    if (type === "essay") return "Viết luận";
+    if (type === "letter") return "Viết thư";
+    if (type === "quiz") return "Quiz";
+    return type || "Không xác định";
+  };
+
+  const formatTime = (iso?: string) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleString("vi-VN");
+  };
+
+  const extractList = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+
+    const directKeys = ["data", "items", "results", "docs", "members", "users", "rows"];
+    for (const key of directKeys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+
+    for (const key of ["data", "result", "payload"]) {
+      const nested = payload[key];
+      if (!nested || typeof nested !== "object") continue;
+      for (const k of directKeys) {
+        if (Array.isArray(nested[k])) return nested[k];
+      }
+    }
+
+    return [];
+  };
+
+  const fetchStudents = async () => {
+    try {
+      setLoadingStudents(true);
+      const res: any = await groupsService.getAllMembersInTeacherGroups();
+      const payload = res?.data ?? res;
+      const list = extractList(payload);
+
+      const mapped: StudentOption[] = list.map((it: any, idx: number) => {
+        const profile = it?.user ?? it?.student ?? it?.member ?? it;
+        const id = String(
+          it?._id ?? it?.id ?? profile?._id ?? profile?.id ?? `student-${idx}`,
+        );
+        const name = String(
+          profile?.fullName ?? profile?.name ?? it?.fullName ?? it?.name ?? "Học viên",
+        );
+        const email = String(profile?.email ?? it?.email ?? "");
+        return { id, name, email };
+      });
+
+      const dedup = new Map<string, StudentOption>();
+      mapped.forEach((st) => {
+        if (!dedup.has(st.id)) dedup.set(st.id, st);
+      });
+
+      const normalized = Array.from(dedup.values());
+      setStudents(normalized);
+
+      if (normalized.length > 0) {
+        setStudentId(normalized[0].id);
+      }
+    } catch (e) {
+      console.error("Lỗi tải danh sách học viên:", e);
+      setStudents([]);
+      setError("Không tải được danh sách học viên của giáo viên.");
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const fetchPractices = async (id: string) => {
+    const normalizedId = id.trim();
+
+    if (!normalizedId) {
+      setPractices([]);
+      setError("Vui lòng chọn học viên để xem lịch sử luyện tập.");
+      setLoading(false);
+      return;
+    }
+
+    if (!students.some((st) => st.id === normalizedId)) {
+      setPractices([]);
+      setError("Học viên không thuộc danh sách học viên của giáo viên.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const res: any = await api.get("/practice/questions");
-      setQuestions(res);
+      setError(null);
+      const res: any = await practiceService.getAllByStudentId(normalizedId);
+      setPractices(toArray(res));
     } catch (e) {
-      console.error("Lỗi tải câu hỏi:", e);
+      setPractices([]);
+      setError("Không tải được lịch sử luyện tập của học sinh.");
+      console.error("Lỗi tải lịch sử luyện tập:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchQuestions();
+    void fetchStudents();
   }, []);
 
-  // Filter client-side
-  const filteredQuestions = questions.filter(
-    (q) =>
-      q.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.type.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  // 2. Xóa câu hỏi
-  const handleDelete = async (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này?")) {
-      try {
-        await api.delete(`/practice/questions/${id}`);
-        fetchQuestions();
-      } catch (e) {
-        alert("Xóa thất bại!");
-      }
+  useEffect(() => {
+    if (loadingStudents) return;
+    if (!studentId) {
+      setLoading(false);
+      return;
     }
-  };
 
-  // 3. Handlers
-  const handleCreate = () => {
-    setEditingQuestion(null);
-    setShowModal(true);
-  };
+    void fetchPractices(studentId);
+  }, [loadingStudents, studentId]);
 
-  const handleEdit = (question: any) => {
-    setEditingQuestion(question);
-    setShowModal(true);
-  };
-
-  const handleSubmit = async (formData: any) => {
-    try {
-      if (editingQuestion) {
-        await practiceService.update(formData._id, formData);
-      } else {
-        await practiceService.create(formData);
-      }
-      setShowModal(false);
-      fetchQuestions();
-    } catch (e) {
-      alert("Có lỗi xảy ra khi lưu!");
-      console.error(e);
-    }
-  };
-
-  // Helper: Màu sắc cho Badge loại câu hỏi
-  const getTypeBadgeStyle = (type: string) => {
-    switch (type) {
-      case "quiz":
-        return "bg-purple-50 text-purple-700 border-purple-200";
-      case "listening":
-        return "bg-red-50 text-red-700 border-red-200";
-      case "matching":
-        return "bg-green-50 text-green-700 border-green-200";
-      case "flashcard":
-        return "bg-teal-50 text-teal-700 border-teal-200";
-      case "spelling":
-        return "bg-orange-50 text-orange-700 border-orange-200";
-      case "speaking":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      default:
-        return "bg-gray-50 text-gray-600 border-gray-200";
-    }
-  };
+  const filteredPractices = practices.filter((item) => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return true;
+    const content = String(item?.studentWriting || item?.exercise?.items?.[0]?.instruction || "")
+      .toLowerCase();
+    const type = String(item?.type || "").toLowerCase();
+    return content.includes(q) || type.includes(q);
+  });
 
   return (
     <div className="min-h-screen bg-transparent p-4 md:p-6 font-sans rounded-[2rem]">
       <div className="w-full max-w-[1920px] mx-auto">
-        {/* HEADER SECTION */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-              Câu hỏi luyện tập
+              Lịch sử luyện tập học sinh
             </h1>
             <p className="text-slate-500 font-medium mt-1 ml-1">
-              Quản lý và biên soạn nội dung bài tập, kiểm tra.
+              Dữ liệu được lấy từ API `GET /practices/student/:studentId`.
             </p>
           </div>
-          <button
-            onClick={handleCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition transform hover:-translate-y-1"
-          >
-            <Plus size={20} /> Tạo Câu Hỏi Mới
-          </button>
         </div>
 
-        {/* TOOLBAR (Search & Actions) */}
         <div className="bg-white p-4 rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="w-full md:w-[460px] flex items-center gap-2">
+            <select
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              disabled={loadingStudents || students.length === 0}
+            >
+              {students.length === 0 ? (
+                <option value="">Không có học viên</option>
+              ) : (
+                students.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name} ({st.email || st.id})
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              onClick={() => void fetchPractices(studentId)}
+              disabled={loadingStudents || students.length === 0 || !studentId}
+              className="inline-flex items-center justify-center gap-2 min-w-[132px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold shadow-lg shadow-blue-300/40 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-200 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <Search size={16} />
+              {loadingStudents ? "Đang tải..." : "Tra cứu"}
+            </button>
+          </div>
+
           <div className="relative w-full md:w-96">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -136,19 +212,21 @@ export default function QuestionManager() {
             />
             <input
               type="text"
-              placeholder="Tìm kiếm nội dung, loại câu hỏi..."
+              placeholder="Tìm theo nội dung hoặc loại luyện tập..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-            <Filter size={16} /> <span>{questions.length} câu hỏi</span>
-          </div>
         </div>
 
-        {/* DATA TABLE */}
         <div className="bg-white rounded-2xl shadow-md shadow-slate-200/70 border border-slate-200 overflow-hidden">
+          {error && (
+            <div className="mx-4 mt-4 rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-semibold">
+              {error}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
               <Loader2 className="animate-spin text-blue-500" size={40} />
@@ -159,90 +237,43 @@ export default function QuestionManager() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
                   <tr>
-                    <th className="p-5 pl-6">Loại Game</th>
-                    <th className="p-5 min-w-[300px]">Nội dung / Đề bài</th>
-                    <th className="p-5">Đáp án / Chi tiết</th>
-                    <th className="p-5 text-right pr-6">Thao tác</th>
+                    <th className="p-5 pl-6">Thời gian</th>
+                    <th className="p-5">Loại luyện tập</th>
+                    <th className="p-5 min-w-[360px]">Bài làm học sinh</th>
+                    <th className="p-5">Điểm AI</th>
+                    <th className="p-5">Nhận xét AI</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredQuestions.map((q: any) => (
+                  {filteredPractices.map((item: any) => (
                     <tr
-                      key={q._id}
+                      key={item._id || `${item?.studentId}-${item?.createdAt}`}
                       className="hover:bg-blue-50/30 transition-colors group"
                     >
-                      {/* Cột 1: Loại */}
                       <td className="p-5 pl-6 align-top">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide border ${getTypeBadgeStyle(q.type)}`}
-                        >
-                          {q.type}
+                        <span className="text-sm font-semibold text-slate-700">
+                          {formatTime(item?.createdAt)}
                         </span>
                       </td>
 
-                      {/* Cột 2: Nội dung */}
                       <td className="p-5 align-top">
-                        <p
-                          className="font-bold text-slate-800 text-base line-clamp-2 max-w-2xl"
-                          title={q.content}
-                        >
-                          {q.content}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide border bg-blue-50 text-blue-700 border-blue-200">
+                          {getTypeLabel(item?.type)}
+                        </span>
+                      </td>
+
+                      <td className="p-5 align-top text-slate-700">
+                        <p className="font-medium whitespace-pre-wrap line-clamp-4">
+                          {item?.studentWriting || "(Chưa có bài làm)"}
                         </p>
-                        {q.mediaUrl && (
-                          <div className="mt-2 text-xs text-blue-500 font-medium flex items-center gap-1 bg-blue-50 w-fit px-2 py-1 rounded">
-                            📎 Có đính kèm Media
-                          </div>
-                        )}
                       </td>
 
-                      {/* Cột 3: Chi tiết */}
-                      <td className="p-5 align-top text-slate-600">
-                        {q.type === "quiz" && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-slate-400 uppercase">
-                              Đáp án đúng:
-                            </span>
-                            <span className="font-mono text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded w-fit">
-                              {q.correctAnswer}
-                            </span>
-                          </div>
-                        )}
-                        {(q.type === "matching" || q.type === "flashcard") && (
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800">
-                              {q.pairs?.length || 0}
-                            </span>
-                            <span>cặp từ vựng</span>
-                          </div>
-                        )}
-                        {(q.type === "spelling" || q.type === "speaking") && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-slate-400 uppercase">
-                              Mẫu câu:
-                            </span>
-                            <span className="italic">"{q.correctAnswer}"</span>
-                          </div>
-                        )}
+                      <td className="p-5 align-top text-slate-700 font-bold">
+                        {getScore(item) ?? "-"}
                       </td>
 
-                      {/* Cột 4: Hành động */}
-                      <td className="p-5 pr-6 align-top text-right">
-                        <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleEdit(q)}
-                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(q._id)}
-                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Xóa"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
+                      <td className="p-5 align-top text-slate-600 max-w-[360px]">
+                        {item?.AIFeedback?.comments || "-"}
                       </td>
                     </tr>
                   ))}
@@ -251,32 +282,21 @@ export default function QuestionManager() {
             </div>
           )}
 
-          {/* EMPTY STATE */}
-          {!loading && filteredQuestions.length === 0 && (
+          {!loading && filteredPractices.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                 <FileQuestion size={32} className="opacity-50" />
               </div>
               <p className="text-lg font-bold text-slate-600">
-                Chưa có câu hỏi nào
+                Chưa có dữ liệu luyện tập
               </p>
               <p className="text-sm">
-                Hãy bắt đầu bằng việc tạo câu hỏi mới nhé.
+                Thử nhập Student ID khác hoặc kiểm tra dữ liệu backend.
               </p>
             </div>
           )}
         </div>
       </div>
-
-      {/* MODAL */}
-      {showModal && (
-        <QuestionFormModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          initialData={editingQuestion}
-          onSubmit={handleSubmit}
-        />
-      )}
     </div>
   );
 }
