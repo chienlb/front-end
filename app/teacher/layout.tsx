@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
   Library,
@@ -268,9 +268,32 @@ export default function TeacherLayout({
 }) {
   // State quản lý mở/đóng sidebar
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
   const [teacherName, setTeacherName] = useState("Giáo viên");
   const [teacherAvatar, setTeacherAvatar] = useState("https://ui-avatars.com/api/?name=Teacher");
   const [unreadCount, setUnreadCount] = useState(0);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("currentUser");
+      if (!raw) {
+        router.replace("/login");
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const role = String(parsed?.role?.name || parsed?.role || "").trim().toLowerCase();
+      if (role !== "teacher" && role !== "admin") {
+        if (role === "student") router.replace("/");
+        else router.replace("/login");
+        return;
+      }
+      setAuthorized(true);
+    } catch {
+      router.replace("/login");
+    }
+  }, [router]);
 
   useEffect(() => {
     const loadTeacherProfile = async () => {
@@ -348,7 +371,7 @@ export default function TeacherLayout({
     void fetchUnreadCount();
   }, []);
 
-  return (
+  return authorized ? (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-neutral-200/60">
       {/* Sidebar Component */}
       <Sidebar
@@ -455,5 +478,5 @@ export default function TeacherLayout({
         </footer>
       </div>
     </div>
-  );
+  ) : null;
 }

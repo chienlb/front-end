@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { userService } from "@/services/user.service";
 import { authService } from "@/services/auth.service";
+import { adminService } from "@/services/admin.service";
 
 // --- TYPES ---
 type UserStatus = "ACTIVE" | "BLOCKED" | "INACTIVE";
@@ -60,6 +61,7 @@ export default function AdminStudentsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const passwordStrength = (pw: string) => {
     const s = String(pw || "");
     let score = 0;
@@ -292,6 +294,29 @@ export default function AdminStudentsPage() {
     }
   };
 
+  const handleExportStudents = async () => {
+    try {
+      setExporting(true);
+      const blob = await adminService.exportToExcel({
+        type: "users",
+        role: "student",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `admin-students-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Xuất Excel học viên thất bại:", error);
+      alert("Xuất Excel học viên thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Logic lọc dữ liệu
   const filteredStudents = students.filter((s) => {
     const matchSearch =
@@ -358,8 +383,12 @@ export default function AdminStudentsPage() {
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 shadow-sm transition">
             <ShieldAlert size={18} /> Báo cáo xấu
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg transition">
-            <GraduationCap size={18} /> Xuất Excel
+          <button
+            onClick={handleExportStudents}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg transition disabled:opacity-60"
+          >
+            <GraduationCap size={18} /> {exporting ? "Đang xuất..." : "Xuất Excel"}
           </button>
         </div>
       </div>

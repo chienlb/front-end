@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { supportsService } from "@/services/supports.service";
+import { userService } from "@/services/user.service";
 import {
   LifeBuoy,
   MessageCircle,
@@ -214,8 +215,30 @@ export default function ParentSupportPage() {
     try {
       setCreatingTicket(true);
       setCreateError(null);
+      let userId = "";
+      try {
+        const profile: any = await userService.getProfile();
+        const p = profile?.data ?? profile;
+        userId = String(p?._id || p?.id || p?.userId || "").trim();
+      } catch {
+        const currentUserRaw = localStorage.getItem("currentUser");
+        const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : null;
+        userId = String(
+          currentUser?._id ||
+            currentUser?.id ||
+            currentUser?.userId ||
+            currentUser?.data?._id ||
+            currentUser?.data?.id ||
+            "",
+        ).trim();
+      }
+      if (!userId) {
+        setCreateError("Không lấy được userId từ profile. Vui lòng đăng nhập lại.");
+        return;
+      }
 
       const created: any = await supportsService.createSupport({
+        userId,
         subject: createSubject.trim(),
         message: createMessage.trim(),
       });

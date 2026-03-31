@@ -277,21 +277,10 @@ export default function AdminDashboardPage() {
     };
 
     try {
-      const blob = await adminService.exportToExcel({ type: "statistics" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `admin-report-statistics-${date}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      try {
-        runClientExport();
-      } catch (e: any) {
-        setError(e?.message || "Xuất file thất bại");
-      }
+      // Ưu tiên xuất trực tiếp từ dữ liệu dashboard đang hiển thị để luôn có file.
+      runClientExport();
+    } catch (e: any) {
+      setError(e?.message || "Xuất file thất bại");
     } finally {
       setExporting(false);
     }

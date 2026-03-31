@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
   ArrowRight,
@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Sparkles,
   CheckCircle2,
-  PlayCircle,
   Zap,
   Award,
   Quote,
@@ -22,6 +21,7 @@ import {
   MapPin,
   X,
 } from "lucide-react";
+import { blogService } from "@/services/blogs.service";
 
 // --- ANIMATION CONFIG ---
 const fadeInUp: Variants = {
@@ -51,6 +51,43 @@ const floatAnim = {
 
 export default function HomePage() {
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
+  const [blogTips, setBlogTips] = useState<any[]>([]);
+  const [loadingBlogTips, setLoadingBlogTips] = useState(false);
+
+  useEffect(() => {
+    const extractList = (payload: any): any[] => {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== "object") return [];
+      const keys = ["data", "items", "results", "docs", "rows", "blogs"];
+      for (const key of keys) {
+        if (Array.isArray(payload[key])) return payload[key];
+      }
+      for (const key of ["data", "result", "payload"]) {
+        const nested = payload[key];
+        if (!nested || typeof nested !== "object") continue;
+        for (const k of keys) {
+          if (Array.isArray(nested[k])) return nested[k];
+        }
+      }
+      return [];
+    };
+
+    const loadBlogs = async () => {
+      try {
+        setLoadingBlogTips(true);
+        const res: any = await blogService.findAllBlogs({ page: 1, limit: 3, sort: "createdAt", order: "desc" });
+        const payload = res?.data ?? res;
+        const list = extractList(payload);
+        setBlogTips(Array.isArray(list) ? list.slice(0, 3) : []);
+      } catch {
+        setBlogTips([]);
+      } finally {
+        setLoadingBlogTips(false);
+      }
+    };
+
+    void loadBlogs();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 overflow-x-hidden font-sans selection:bg-blue-200 selection:text-blue-900 relative">
@@ -181,10 +218,6 @@ export default function HomePage() {
                 className="group-hover:translate-x-1 transition-transform"
               />
             </Link>
-            <button className="bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-200 hover:border-slate-300 px-8 py-4 rounded-2xl font-bold text-lg flex items-center gap-3 transition-all shadow-sm hover:shadow-md">
-              <PlayCircle size={22} className="text-red-500 fill-red-100" />{" "}
-              Video Giới Thiệu
-            </button>
           </motion.div>
 
           <motion.div
@@ -730,91 +763,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 6.5. LATEST BLOGS */}
-      < section className="py-24 bg-white relative z-10" >
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <span className="text-green-600 font-bold tracking-wider uppercase text-sm mb-2 block">
-              Góc cha mẹ thông thái
-            </span>
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-4">
-              Bí Quyết <span className="text-green-600">Nuôi Dạy Con</span>
-            </h2>
-            <p className="text-slate-600 max-w-2xl mx-auto text-lg">
-              Cập nhật những phương pháp giáo dục hiện đại và kinh nghiệm đồng
-              hành cùng con học tiếng Anh hiệu quả.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                title:
-                  "5 sai lầm khi dạy con học tiếng Anh tại nhà cha mẹ hay mắc phải",
-                cat: "Phương pháp",
-                date: "12/10/2023",
-                img: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=800&q=80",
-              },
-              {
-                title: "Làm sao để con tự giác học mà không cần nhắc nhở?",
-                cat: "Tâm lý",
-                date: "10/10/2023",
-                img: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&w=800&q=80",
-              },
-              {
-                title:
-                  "Top 10 phim hoạt hình giúp bé luyện nghe tiếng Anh cực đỉnh",
-                cat: "Giải trí",
-                date: "05/10/2023",
-                img: "https://images.unsplash.com/photo-1513258496098-dad22d5830b0?auto=format&fit=crop&w=800&q=80",
-              },
-            ].map((post, i) => (
-              <motion.div
-                key={i}
-                whileHover={{ y: -8 }}
-                viewport={{ once: true }}
-                className="group cursor-pointer bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/50 border border-slate-100"
-              >
-                <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={post.img}
-                    alt={post.title}
-                    className="w-full h-full object-cover transition duration-700 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                  <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-slate-800 shadow-md">
-                    {post.cat}
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 text-slate-400 text-xs mb-3 font-medium">
-                    <Calendar size={14} /> {post.date}
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-4 group-hover:text-green-600 transition-colors leading-tight line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <Link
-                    href="/blogs"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 transition-colors"
-                  >
-                    Đọc tiếp <ArrowUpRight size={16} />
-                  </Link>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-12 text-center">
-            <Link
-              href="/blogs"
-              className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-8 py-3 rounded-full font-bold transition-all border border-slate-200"
-            >
-              Xem Thư Viện Bài Viết <BookOpen size={18} />
-            </Link>
-          </div>
-        </div>
-      </ section>
-
       {/* 7. PARENTS FEEDBACK */}
       < section className="py-24 bg-slate-50 relative z-10 border-t border-slate-200/60" >
         <div className="container mx-auto px-6">
@@ -885,50 +833,6 @@ export default function HomePage() {
         </div>
       </ section>
 
-      {/* 8. CTA SECTION */}
-      <section className="py-24 container mx-auto px-6 relative z-10" >
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-[3rem] p-12 md:p-24 text-white relative overflow-hidden text-center shadow-2xl shadow-blue-500/30"
-        >
-          {/* Decorative Circles */}
-          <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-            <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-white rounded-full blur-[100px] opacity-20"></div>
-            <div className="absolute bottom-[-20%] left-[-10%] w-96 h-96 bg-purple-500 rounded-full blur-[100px] opacity-30"></div>
-          </div>
-
-          <div className="relative z-10 max-w-4xl mx-auto">
-            <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight drop-shadow-sm">
-              Đừng Để Bé Bỏ Lỡ <br />
-              <span className="text-yellow-300">Giai Đoạn Vàng!</span>
-            </h2>
-            <p className="text-xl text-blue-100 mb-10 leading-relaxed max-w-2xl mx-auto">
-              Độ tuổi 6-12 là thời điểm tốt nhất để não bộ tiếp thu ngôn ngữ.
-              Đăng ký ngay hôm nay để nhận gói quà tặng{" "}
-              <strong className="text-white border-b-2 border-yellow-300">
-                VIP Starter Pack
-              </strong>{" "}
-              trị giá 500.000đ.
-            </p>
-
-            <div className="flex flex-col sm:flex-row justify-center gap-5">
-              <button className="bg-yellow-400 text-yellow-900 px-10 py-5 rounded-2xl font-black text-xl shadow-xl shadow-yellow-500/30 hover:bg-yellow-300 transition transform hover:-translate-y-1">
-                Đăng Ký Học Thử Ngay
-              </button>
-              <button className="bg-white/10 backdrop-blur-md border-2 border-white/30 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:bg-white/20 transition">
-                Nhận Tư Vấn Miễn Phí
-              </button>
-            </div>
-
-            <p className="mt-10 text-sm text-blue-200/80 font-medium">
-              🎁 <strong>Ưu đãi bao gồm:</strong> 7 ngày học Full tính năng • Bộ
-              Ebook từ vựng • Kiểm tra trình độ 1:1
-            </p>
-          </div>
-        </motion.div>
-      </section>
     </div >
   );
 }

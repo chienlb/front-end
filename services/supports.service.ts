@@ -1,5 +1,22 @@
 import api from "@/utils/api";
 
+export type SupportStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export interface SupportItem {
+  _id?: string;
+  id?: string;
+  userId?: string;
+  subject?: string;
+  message?: string;
+  attachments?: string[];
+  status?: SupportStatus;
+  assignedTo?: string;
+  response?: string;
+  resolvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CreateSupportPayload {
   userId?: string;
   subject: string;
@@ -11,7 +28,10 @@ export interface UpdateSupportPayload {
   subject?: string;
   message?: string;
   attachments?: string[];
-  status?: string;
+  status?: SupportStatus;
+  assignedTo?: string;
+  response?: string;
+  resolvedAt?: string;
 }
 
 export const supportsService = {

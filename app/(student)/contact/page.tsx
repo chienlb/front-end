@@ -3,20 +3,74 @@
 import { useState } from "react";
 import { MapPin, Phone, Mail, Send, MessageSquare } from "lucide-react";
 import { showAlert } from "@/utils/dialog";
+import { supportsService } from "@/services/supports.service";
+import { userService } from "@/services/user.service";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
+    subject: "",
     message: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Xử lý logic gửi mail
-    await showAlert("Cảm ơn ba mẹ đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất.");
-    setFormData({ name: "", email: "", phone: "", message: "" });
+    let userId = "";
+    try {
+      const profile: any = await userService.getProfile();
+      const p = profile?.data ?? profile;
+      userId = String(p?._id || p?.id || p?.userId || "").trim();
+    } catch {
+      const rawUser = typeof window !== "undefined" ? localStorage.getItem("currentUser") : null;
+      let parsedUser: any = null;
+      try {
+        parsedUser = rawUser ? JSON.parse(rawUser) : null;
+      } catch {
+        parsedUser = null;
+      }
+      userId = String(
+        parsedUser?._id ||
+          parsedUser?.id ||
+          parsedUser?.userId ||
+          parsedUser?.user?._id ||
+          "",
+      ).trim();
+    }
+    const subject = String(formData.subject || "").trim();
+    const message = String(formData.message || "").trim();
+    if (!subject || !message) {
+      await showAlert("Vui lòng nhập tiêu đề và nội dung hỗ trợ.");
+      return;
+    }
+    if (!userId) {
+      await showAlert("Không lấy được userId từ profile. Vui lòng đăng nhập lại.");
+      return;
+    }
+
+    const contactMeta = [
+      formData.name ? `Họ tên: ${formData.name}` : "",
+      formData.phone ? `SĐT: ${formData.phone}` : "",
+      formData.email ? `Email: ${formData.email}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const finalMessage = contactMeta ? `${contactMeta}\n\n${message}` : message;
+
+    try {
+      await supportsService.createSupport({
+        userId,
+        subject,
+        message: finalMessage,
+      });
+      await showAlert("Đã gửi yêu cầu hỗ trợ. Chúng tôi sẽ phản hồi sớm nhất.");
+      setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      await showAlert(Array.isArray(msg) ? msg.join(", ") : msg || "Gửi hỗ trợ thất bại.");
+    }
   };
 
   return (
@@ -169,6 +223,22 @@ export default function ContactPage() {
             </div>
 
             {/* Message */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Tiêu đề hỗ trợ
+              </label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-200"
+                placeholder="Ví dụ: Không vào được bài tập Speaking"
+                required
+                value={formData.subject}
+                onChange={(e) =>
+                  setFormData({ ...formData, subject: e.target.value })
+                }
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Nội dung cần hỗ trợ

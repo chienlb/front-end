@@ -17,6 +17,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supportsService, type SupportItem, type SupportStatus } from "@/services/supports.service";
 
 // --- TYPES ---
 type TicketStatus = "PENDING" | "PROCESSING" | "RESOLVED" | "REJECTED";
@@ -43,75 +44,57 @@ interface Ticket {
   messages: Message[];
 }
 
-// --- MOCK DATA ---
-const MOCK_TICKETS: Ticket[] = [
-  {
-    id: "REQ-2023-001",
-    parentName: "Phụ huynh Bé Na",
-    studentName: "Nguyễn Thị Na (Lớp 2A)",
-    avatar: "https://i.pravatar.cc/150?img=32",
-    category: "Học vụ",
-    subject: "Xin nghỉ phép cho bé 2 ngày",
-    status: "PENDING",
+const mapStatus = (status?: SupportStatus): TicketStatus => {
+  if (status === "in_progress") return "PROCESSING";
+  if (status === "resolved") return "RESOLVED";
+  if (status === "closed") return "REJECTED";
+  return "PENDING";
+};
+
+const toTicket = (it: SupportItem, idx: number): Ticket => {
+  const id = String(it._id || it.id || `support-${idx}`);
+  const created = it.createdAt ? new Date(it.createdAt).toLocaleString("vi-VN") : "Vừa xong";
+  const messages: Message[] = [
+    {
+      id: `${id}-u`,
+      sender: "PARENT",
+      content: String(it.message || ""),
+      timestamp: created,
+    },
+  ];
+  if (it.response) {
+    messages.push({
+      id: `${id}-a`,
+      sender: "ADMIN",
+      content: String(it.response),
+      timestamp: it.updatedAt ? new Date(it.updatedAt).toLocaleString("vi-VN") : "Vừa xong",
+    });
+  }
+  return {
+    id,
+    parentName: `User ${String(it.userId || "").slice(-6) || "N/A"}`,
+    studentName: "—",
+    avatar: "",
+    category: "Support",
+    subject: String(it.subject || "Yêu cầu hỗ trợ"),
+    status: mapStatus(it.status),
     priority: "NORMAL",
-    createdAt: "10:30 AM",
-    messages: [
-      {
-        id: "m1",
-        sender: "PARENT",
-        content:
-          "Chào nhà trường, gia đình có việc bận nên xin phép cho bé Na nghỉ học ngày 25 và 26/10 ạ.",
-        timestamp: "10:30 AM",
-      },
-    ],
-  },
-  {
-    id: "REQ-2023-002",
-    parentName: "Anh Trần Văn Ba",
-    studentName: "Trần Minh Hiếu (Lớp 5B)",
-    avatar: "https://i.pravatar.cc/150?img=11",
-    category: "Kỹ thuật",
-    subject: "Lỗi không vào được bài thi Speaking",
-    status: "PROCESSING",
-    priority: "HIGH",
-    createdAt: "Yesterday",
-    messages: [
-      {
-        id: "m1",
-        sender: "PARENT",
-        content:
-          "Tôi vào phần thi Speaking nhưng micro không nhận. Đã thử đổi máy khác vẫn bị.",
-        timestamp: "Yesterday 14:00",
-      },
-      {
-        id: "m2",
-        sender: "ADMIN",
-        content:
-          "Chào anh, bộ phận kỹ thuật đã nhận được thông tin. Anh vui lòng cho em xin ảnh chụp màn hình lỗi được không ạ?",
-        timestamp: "Yesterday 14:15",
-      },
-    ],
-  },
-  {
-    id: "REQ-2023-003",
-    parentName: "Chị Lê Thu Thảo",
-    studentName: "Lê Gia Hân (Lớp 3C)",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    category: "Học phí",
-    subject: "Thắc mắc về gói học phí tháng 11",
-    status: "RESOLVED",
-    priority: "LOW",
-    createdAt: "2 days ago",
-    messages: [
-      {
-        id: "m1",
-        sender: "PARENT",
-        content: "Gói tháng 11 sao cao hơn tháng trước vậy ạ?",
-        timestamp: "2 days ago",
-      },
-    ],
-  },
-];
+    createdAt: created,
+    messages,
+  };
+};
+
+const extractSupportList = (payload: any): SupportItem[] => {
+  if (Array.isArray(payload)) return payload as SupportItem[];
+  if (!payload || typeof payload !== "object") return [];
+  if (Array.isArray(payload.data)) return payload.data as SupportItem[];
+  if (Array.isArray(payload.items)) return payload.items as SupportItem[];
+  if (Array.isArray(payload.results)) return payload.results as SupportItem[];
+  if (Array.isArray(payload.supports)) return payload.supports as SupportItem[];
+  const nested = payload.data ?? payload.result ?? payload.payload;
+  if (nested && typeof nested === "object") return extractSupportList(nested);
+  return [];
+};
 
 // --- COMPONENTS ---
 
@@ -140,10 +123,11 @@ const StatusBadge = ({ status }: { status: TicketStatus }) => {
 };
 
 export default function AdminSupportPage() {
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [replyText, setReplyText] = useState("");
+  const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const selectedTicket = tickets.find((t) => t.id === selectedId);
@@ -152,6 +136,26 @@ export default function AdminSupportPage() {
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [selectedTicket?.messages]);
+
+  useEffect(() => {
+    const loadSupports = async () => {
+      try {
+        setLoading(true);
+        const res: any = await supportsService.getSupports();
+        const payload = res?.data ?? res;
+        const list = extractSupportList(payload);
+        const mapped = list.map((it: SupportItem, idx: number) => toTicket(it, idx));
+        setTickets(mapped);
+        setSelectedId((prev) => prev || mapped[0]?.id || null);
+      } catch (error) {
+        console.error("Load supports failed:", error);
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void loadSupports();
+  }, []);
 
   const handleReply = () => {
     if (!replyText.trim() || !selectedId) return;
@@ -247,7 +251,11 @@ export default function AdminSupportPage() {
 
         {/* List Items */}
         <div className="flex-1 overflow-y-auto">
-          {filteredTickets.map((ticket) => (
+          {loading && <div className="p-4 text-sm text-slate-500">Đang tải dữ liệu...</div>}
+          {!loading && filteredTickets.length === 0 && (
+            <div className="p-4 text-sm text-slate-500">Chưa có yêu cầu hỗ trợ.</div>
+          )}
+          {!loading && filteredTickets.map((ticket) => (
             <div
               key={ticket.id}
               onClick={() => setSelectedId(ticket.id)}

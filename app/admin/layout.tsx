@@ -121,6 +121,7 @@ export default function AdminLayout({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [authorized, setAuthorized] = useState(false);
   const [openUserMenu, setOpenUserMenu] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -137,13 +138,25 @@ export default function AdminLayout({
     if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem("currentUser");
-      if (!raw) return;
+      if (!raw) {
+        router.replace("/login");
+        return;
+      }
       const parsed = JSON.parse(raw);
+      const role = String(parsed?.role?.name || parsed?.role || "").trim().toLowerCase();
+      if (role !== "admin") {
+        if (role === "teacher") router.replace("/teacher");
+        else if (role === "student") router.replace("/");
+        else router.replace("/login");
+        return;
+      }
       setUser(parsed);
+      setAuthorized(true);
     } catch {
       setUser(null);
+      router.replace("/login");
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -204,7 +217,7 @@ export default function AdminLayout({
     }
   };
 
-  return (
+  return authorized ? (
     <div className="min-h-screen bg-white font-sans text-slate-900">
       {/* Sidebar */}
       <AdminSidebar collapsed={collapsed} />
@@ -335,5 +348,5 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
-  );
+  ) : null;
 }

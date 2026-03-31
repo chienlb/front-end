@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { userService } from "@/services/user.service";
 import { authService } from "@/services/auth.service";
+import { adminService } from "@/services/admin.service";
 
 export default function TutorManager() {
   const [tutors, setTutors] = useState<any[]>([]);
@@ -39,6 +40,7 @@ export default function TutorManager() {
     return score; // 0..4
   };
   const [searchTerm, setSearchTerm] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -161,6 +163,29 @@ export default function TutorManager() {
     }
   };
 
+  const handleExportTutors = async () => {
+    try {
+      setExporting(true);
+      const blob = await adminService.exportToExcel({
+        type: "users",
+        role: "teacher",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `admin-teachers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Xuất Excel giáo viên thất bại:", error);
+      alert("Xuất Excel giáo viên thất bại.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Filter Logic
   const filteredTutors = tutors.filter(
     (t) =>
@@ -205,6 +230,13 @@ export default function TutorManager() {
           className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition transform hover:-translate-y-1"
         >
           <Plus size={20} /> Thêm Gia Sư
+        </button>
+        <button
+          onClick={handleExportTutors}
+          disabled={exporting}
+          className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition disabled:opacity-60"
+        >
+          {exporting ? "Đang xuất..." : "Xuất Excel"}
         </button>
       </div>
 

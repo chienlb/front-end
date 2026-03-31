@@ -44,30 +44,36 @@ export const adminService = {
     api.patch(`/admin/system-features/${id}/toggle`, { isEnabled }),
   getUserByMonth: () => api.get("/admin/user-by-month"),
   exportToExcel: async (filters: ExportFilter) => {
-    const params = new URLSearchParams();
+    const params: Record<string, string> = {};
     Object.entries(filters).forEach(([k, v]) => {
-      if (v != null && String(v).trim() !== "") params.append(k, String(v));
+      if (v != null && String(v).trim() !== "") params[k] = String(v);
     });
-    const base = String(api.defaults.baseURL || "").replace(/\/$/, "");
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("access_token") : "";
-    const url = `${base}/admin/export?${params.toString()}`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      credentials: "include",
-    });
-    if (!res.ok) {
+
+    try {
+      const res = await api.get("/admin/export", {
+        params,
+        responseType: "blob",
+      });
+      return res.data as Blob;
+    } catch (err: any) {
       let message = "Export thất bại";
-      try {
-        const body = await res.json();
-        if (body?.message) message = String(body.message);
-      } catch {
-        // ignore non-json response
+      const data = err?.response?.data;
+      if (typeof data === "string") {
+        message = data;
+      } else if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          if (text) message = text;
+        } catch {
+          // keep default message
+        }
+      } else if (data?.message) {
+        message = Array.isArray(data.message) ? data.message.join(", ") : String(data.message);
+      } else if (err?.message) {
+        message = String(err.message);
       }
       throw new Error(message);
     }
-    return res.blob();
   },
   async uploadDocument(groupId: string, file: File) {
     const formData = new FormData();
