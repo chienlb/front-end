@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ADMIN_MENU } from "@/components/admin/admin-constants";
 import { authService } from "@/services/auth.service";
+import { notificationService } from "@/services/notifications.service";
 
 function AdminSidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
@@ -121,6 +122,7 @@ export default function AdminLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [openUserMenu, setOpenUserMenu] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -142,6 +144,39 @@ export default function AdminLayout({
       setUser(null);
     }
   }, []);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (typeof window === "undefined") return;
+      try {
+        const raw = localStorage.getItem("currentUser");
+        if (!raw) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        const userId = String(parsed?._id || parsed?.id || parsed?.userId || "").trim();
+        if (!userId) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const res = await notificationService.getNotificationsByUserId(userId, {
+          page: 1,
+          limit: 100,
+        });
+        const unread = Array.isArray(res?.data)
+          ? res.data.filter((n) => !n?.isRead).length
+          : 0;
+        setUnreadCount(unread);
+      } catch {
+        setUnreadCount(0);
+      }
+    };
+
+    void fetchUnreadCount();
+  }, [pathname]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -220,11 +255,17 @@ export default function AdminLayout({
               </button>
 
               <button
+                onClick={() => router.push("/admin/notifications")}
                 className="p-2 rounded-xl relative border border-slate-200 bg-slate-100 text-slate-700 transition
                 shadow-sm hover:bg-blue-50 hover:text-blue-700"
+                title="Thông báo"
               >
                 <Bell size={20} />
-                <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-100 animate-pulse"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-slate-100">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </button>
             </div>
 

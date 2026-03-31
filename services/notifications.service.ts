@@ -46,6 +46,12 @@ export const notificationService = {
     return (res as any)?.data ?? (res as any);
   },
 
+  sendNotificationToTeachers: async (data: any): Promise<NotificationItem[]> => {
+    const res = await api.post("/notifications/send-to-teachers", data);
+    const payload = (res as any)?.data ?? (res as any);
+    return Array.isArray(payload) ? payload : [];
+  },
+
 
   getAllNotifications: async (params?: {
     page?: number;

@@ -2,31 +2,82 @@
 
 import { useState } from "react";
 import {
-  X,
-  Smartphone,
   Send,
   Clock,
   Image as ImageIcon,
   Link as LinkIcon,
 } from "lucide-react";
 
-export default function PushComposerModal({ isOpen, onClose }: any) {
-  const [step, setStep] = useState(1); // 1: Compose, 2: Schedule
+type ComposePayload = {
+  title: string;
+  body: string;
+  image?: string;
+  link?: string;
+  segment: "ALL_USERS" | "TEACHERS";
+  type:
+    | "system"
+    | "message"
+    | "reminder"
+    | "alert"
+    | "assignment"
+    | "competition";
+};
+
+interface PushComposerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit?: (payload: ComposePayload) => Promise<void> | void;
+  isSubmitting?: boolean;
+}
+
+export default function PushComposerModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  isSubmitting = false,
+}: PushComposerModalProps) {
   const [formData, setFormData] = useState({
     title: "",
     body: "",
     image: "",
     link: "",
-    segment: "ALL_USERS",
+    segment: "ALL_USERS" as "ALL_USERS" | "TEACHERS",
+    type: "system" as
+      | "system"
+      | "message"
+      | "reminder"
+      | "alert"
+      | "assignment"
+      | "competition",
   });
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    const title = formData.title.trim();
+    const body = formData.body.trim();
+
+    if (!title || !body) {
+      setError("Vui lòng nhập tiêu đề và nội dung thông báo.");
+      return;
+    }
+
+    setError("");
+    await onSubmit?.({
+      title,
+      body,
+      image: formData.image.trim() || undefined,
+      link: formData.link || undefined,
+      segment: formData.segment,
+      type: formData.type,
+    });
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex overflow-hidden">
-        {/* --- LEFT: FORM INPUT --- */}
-        <div className="w-1/2 p-6 border-r border-gray-200 overflow-y-auto flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden">
+        <div className="p-6 overflow-y-auto flex flex-col max-h-[85vh]">
           <div className="flex justify-between items-center mb-6">
             <h2 className="font-bold text-xl text-slate-800">
               Soạn tin nhắn mới
@@ -83,15 +134,43 @@ export default function PushComposerModal({ isOpen, onClose }: any) {
                 className="w-full border p-2 rounded-lg text-sm bg-white"
                 value={formData.segment}
                 onChange={(e) =>
-                  setFormData({ ...formData, segment: e.target.value })
+                  setFormData({
+                    ...formData,
+                    segment: e.target.value as "ALL_USERS" | "TEACHERS",
+                  })
                 }
               >
-                <option value="ALL_USERS">Tất cả người dùng (12.5k)</option>
-                <option value="FREE_USERS">Tài khoản miễn phí (10k)</option>
-                <option value="PAID_USERS">Tài khoản trả phí (2.5k)</option>
-                <option value="INACTIVE_3_DAYS">
-                  Vắng mặt trên 3 ngày (500)
-                </option>
+                <option value="ALL_USERS">Tất cả người dùng</option>
+                <option value="TEACHERS">Chỉ giáo viên</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1">
+                Loại thông báo
+              </label>
+              <select
+                className="w-full border p-2 rounded-lg text-sm bg-white"
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    type: e.target.value as
+                      | "system"
+                      | "message"
+                      | "reminder"
+                      | "alert"
+                      | "assignment"
+                      | "competition",
+                  })
+                }
+              >
+                <option value="system">system</option>
+                <option value="message">message</option>
+                <option value="reminder">reminder</option>
+                <option value="alert">alert</option>
+                <option value="assignment">assignment</option>
+                <option value="competition">competition</option>
               </select>
             </div>
 
@@ -132,87 +211,33 @@ export default function PushComposerModal({ isOpen, onClose }: any) {
             </div>
           </div>
 
+          {error ? (
+            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              {error}
+            </div>
+          ) : null}
+
           <div className="mt-6 flex gap-3">
             <button
               onClick={onClose}
+              disabled={isSubmitting}
               className="flex-1 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg"
             >
               Hủy
             </button>
-            <button className="flex-1 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 flex items-center justify-center gap-2">
+            <button
+              disabled
+              className="flex-1 py-2 bg-slate-300 text-white font-bold rounded-lg flex items-center justify-center gap-2 cursor-not-allowed"
+            >
               <Clock size={16} /> Hẹn giờ gửi
             </button>
-            <button className="flex-1 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg shadow-blue-200">
-              <Send size={16} /> Gửi ngay
+            <button
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting}
+              className="flex-1 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 disabled:opacity-60"
+            >
+              <Send size={16} /> {isSubmitting ? "Đang gửi..." : "Gửi ngay"}
             </button>
-          </div>
-        </div>
-
-        {/* --- RIGHT: PHONE PREVIEW --- */}
-        <div className="w-1/2 bg-gray-100 flex items-center justify-center p-8 relative overflow-hidden">
-          {/* Mockup Phone */}
-          <div className="w-[300px] h-[600px] bg-black rounded-[40px] border-8 border-gray-800 shadow-2xl relative overflow-hidden flex flex-col">
-            {/* Lock Screen Wallpaper */}
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-purple-800 opacity-80"></div>
-
-            {/* Status Bar */}
-            <div className="relative z-10 px-6 pt-3 flex justify-between text-white text-[10px] font-bold opacity-80">
-              <span>9:41</span>
-              <div className="flex gap-1">
-                <span>📶</span>
-                <span>🔋</span>
-              </div>
-            </div>
-
-            {/* Date */}
-            <div className="relative z-10 text-center mt-8 text-white">
-              <div className="text-5xl font-thin">09:41</div>
-              <div className="text-sm mt-1 opacity-80">Monday, January 11</div>
-            </div>
-
-            {/* NOTIFICATION CARD */}
-            <div className="relative z-10 mt-6 mx-3">
-              <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="flex justify-between items-center mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 bg-blue-600 rounded-md flex items-center justify-center text-white text-[10px]">
-                      🦁
-                    </div>
-                    <span className="text-[10px] font-bold text-gray-600 uppercase">
-                      SMARTKIDS
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-gray-500">now</span>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-sm text-black leading-tight mb-0.5">
-                    {formData.title || "Tiêu đề tin nhắn..."}
-                  </h4>
-                  <p className="text-xs text-gray-700 leading-normal line-clamp-2">
-                    {formData.body || "Nội dung tin nhắn sẽ hiện ở đây..."}
-                  </p>
-                </div>
-
-                {formData.image && (
-                  <div className="mt-2 rounded-lg overflow-hidden h-32 bg-gray-200">
-                    <img
-                      src={formData.image}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center pb-2">
-              <div className="w-32 h-1 bg-white rounded-full opacity-50"></div>
-            </div>
-          </div>
-
-          <div className="absolute bottom-4 text-xs text-gray-400 font-bold">
-            PREVIEW: iOS Lock Screen
           </div>
         </div>
       </div>

@@ -270,6 +270,7 @@ export default function TeacherLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [teacherName, setTeacherName] = useState("Giáo viên");
   const [teacherAvatar, setTeacherAvatar] = useState("https://ui-avatars.com/api/?name=Teacher");
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const loadTeacherProfile = async () => {
@@ -312,6 +313,39 @@ export default function TeacherLayout({
     };
 
     void loadTeacherProfile();
+  }, []);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (typeof window === "undefined") return;
+      try {
+        const raw = localStorage.getItem("currentUser");
+        if (!raw) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const user = JSON.parse(raw);
+        const userId = String(user?._id || user?.id || user?.userId || "").trim();
+        if (!userId) {
+          setUnreadCount(0);
+          return;
+        }
+
+        const res = await notificationService.getNotificationsByUserId(userId, {
+          page: 1,
+          limit: 100,
+        });
+        const unread = Array.isArray(res?.data)
+          ? res.data.filter((n) => !n?.isRead).length
+          : 0;
+        setUnreadCount(unread);
+      } catch {
+        setUnreadCount(0);
+      }
+    };
+
+    void fetchUnreadCount();
   }, []);
 
   return (
@@ -369,6 +403,19 @@ export default function TeacherLayout({
                 className="bg-transparent border-none outline-none text-xs font-medium text-slate-800 ml-2 w-full placeholder:text-slate-500"
               />
             </div>
+
+            <Link
+              href="/teacher/notifications"
+              className="relative p-2 rounded-xl border border-emerald-100 bg-emerald-50 text-slate-700 transition shadow-sm hover:bg-emerald-100 hover:text-emerald-700"
+              title="Thông báo"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
 
             {/* User Profile */}
             <div className="flex items-center gap-3 pl-5 border-l border-emerald-200 cursor-pointer group">
