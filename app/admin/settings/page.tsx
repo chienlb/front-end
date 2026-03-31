@@ -11,6 +11,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { authService } from "@/services/auth.service";
+import { userService } from "@/services/user.service";
 
 type SettingsTab = "ACCOUNT" | "SECURITY";
 
@@ -25,8 +26,17 @@ export default function SettingsPage() {
     phone: "",
     avatar: "",
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (profileForm.avatar.startsWith("blob:")) {
+        URL.revokeObjectURL(profileForm.avatar);
+      }
+    };
+  }, [profileForm.avatar]);
 
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
@@ -82,12 +92,19 @@ export default function SettingsPage() {
     try {
       setSavingProfile(true);
       setProfileMessage("");
-      await authService.updateProfile({
-        fullName: profileForm.fullName.trim(),
+      const payload: Record<string, unknown> = {
+        fullname: profileForm.fullName.trim(),
         email: profileForm.email.trim(),
         phone: profileForm.phone.trim(),
-        avatar: profileForm.avatar.trim(),
-      });
+      };
+      if (avatarFile) {
+        payload.avatar = avatarFile;
+      } else if (profileForm.avatar && !profileForm.avatar.startsWith("blob:")) {
+        payload.avatar = profileForm.avatar.trim();
+      }
+
+      if (!userId) throw new Error("Không tìm thấy userId");
+      await userService.updateMyProfile(userId, payload);
       setDisplayName(profileForm.fullName.trim());
       setProfileMessage("Đã cập nhật thông tin tài khoản.");
     } catch (error: any) {
@@ -96,6 +113,22 @@ export default function SettingsPage() {
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setProfileMessage("Vui lòng chọn file ảnh hợp lệ.");
+      e.target.value = "";
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarFile(file);
+    setProfileForm((p) => ({ ...p, avatar: previewUrl }));
+    setProfileMessage("");
+    e.target.value = "";
   };
 
   const handleChangePassword = async () => {
@@ -240,14 +273,18 @@ export default function SettingsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Avatar URL</label>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5">Avatar</label>
                       <input
-                        type="text"
+                        type="file"
+                        accept="image/*"
                         className="w-full border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                        placeholder="https://..."
-                        value={profileForm.avatar}
-                        onChange={(e) => setProfileForm((p) => ({ ...p, avatar: e.target.value }))}
+                        onChange={handleAvatarFile}
                       />
+                      {avatarFile ? (
+                        <p className="text-[11px] text-blue-600 font-semibold mt-1.5">
+                          Đã chọn ảnh: {avatarFile.name}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 

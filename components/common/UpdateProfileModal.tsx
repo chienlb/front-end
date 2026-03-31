@@ -30,10 +30,35 @@ export default function UpdateProfileModal({
   const [address, setAddress] = useState("");
   const [bio, setBio] = useState("");
   const [avatar, setAvatar] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Chỉ chấp nhận file ảnh");
+      e.target.value = "";
+      return;
+    }
+
+    setError("");
+    setAvatarFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setAvatar(previewUrl);
+    e.target.value = "";
+  };
+
+  useEffect(() => {
+    return () => {
+      if (avatar.startsWith("blob:")) {
+        URL.revokeObjectURL(avatar);
+      }
+    };
+  }, [avatar]);
 
   // Fetch profile từ API khi modal mở
   useEffect(() => {
@@ -68,6 +93,7 @@ export default function UpdateProfileModal({
           setAddress(data?.address || "");
           setBio(data?.bio || "");
           setAvatar(avatarFromApi);
+          setAvatarFile(null);
         } catch (err) {
           console.error("Lỗi fetch profile:", err);
         } finally {
@@ -81,6 +107,7 @@ export default function UpdateProfileModal({
       setAddress(initialData.address || "");
       setBio(initialData.bio || "");
       setAvatar(initialData.avatar || "");
+      setAvatarFile(null);
     }
   }, [isOpen, initialData, autoFetch]);
 
@@ -88,20 +115,22 @@ export default function UpdateProfileModal({
     e.preventDefault();
     setError("");
 
-    if (!fullName.trim()) {
-      setError("Vui lòng nhập họ tên");
-      return;
-    }
-
     try {
       setLoading(true);
-      const data: Record<string, any> = {
-        fullName: fullName.trim(),
-      };
+      const data: Record<string, any> = {};
+      if (fullName.trim()) data.fullname = fullName.trim();
       if (phone) data.phone = phone.trim();
-      if (address) data.address = address.trim();
       if (bio) data.bio = bio.trim();
-      if (avatar) data.avatar = avatar.trim();
+      if (avatarFile) {
+        data.avatar = avatarFile;
+      } else if (avatar && !avatar.startsWith("blob:")) {
+        data.avatar = avatar.trim();
+      }
+
+      if (Object.keys(data).length === 0) {
+        setError("Không có thông tin thay đổi để lưu");
+        return;
+      }
 
       await userService.updateProfile(data);
       setSuccess(true);
@@ -238,19 +267,29 @@ export default function UpdateProfileModal({
               />
             </div>
 
-            {/* Avatar URL */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                URL Avatar
+                Upload Avatar
               </label>
               <input
-                type="url"
-                value={avatar}
-                onChange={(e) => setAvatar(e.target.value)}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
                 disabled={loading}
-                placeholder="Nhập URL ảnh đại diện"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:text-slate-400"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white file:mr-3 file:px-3 file:py-1.5 file:border-0 file:rounded-lg file:bg-blue-50 file:text-blue-700 file:font-semibold"
               />
+              {avatarFile ? (
+                <p className="text-xs text-blue-600 font-medium mt-2">
+                  Đã chọn ảnh: {avatarFile.name}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Avatar Preview */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Avatar hiện tại
+              </label>
               {avatar && (
                 <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <img
@@ -263,6 +302,11 @@ export default function UpdateProfileModal({
                     }}
                   />
                 </div>
+              )}
+              {!avatar && (
+                <p className="text-xs text-slate-500">
+                  Chưa có avatar. Hãy chọn file ảnh ở mục Upload Avatar.
+                </p>
               )}
             </div>
 

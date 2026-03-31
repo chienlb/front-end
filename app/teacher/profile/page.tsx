@@ -126,10 +126,9 @@ export default function TeacherProfilePage() {
     try {
       setIsSaving(true);
       await userService.updateMyProfile(profile.id, {
-        fullName: profile.fullName,
+        fullname: profile.fullName,
         phone: profile.phone,
         avatar: profile.avatar,
-        address: profile.address,
       });
       setIsEditing(false);
       alert("Đã cập nhật hồ sơ thành công!");
