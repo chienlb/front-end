@@ -126,7 +126,7 @@ export default function PushNotificationPage() {
       if (payload.segment === "TEACHERS") {
         await notificationService.sendNotificationToTeachers(body);
       } else {
-        await notificationService.createNotification(body);
+        await notificationService.sendNotificationToAllUsers(body);
       }
 
       setIsComposerOpen(false);

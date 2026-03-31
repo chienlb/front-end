@@ -126,13 +126,12 @@ export default function StudentCompetitionsPage() {
           const startMs = start ? new Date(start).getTime() : NaN;
           const endMs = end ? new Date(end).getTime() : NaN;
 
-          let status: "UPCOMING" | "HAPPENING" | "ENDED" = c?.status;
-          if (!status) {
-            if (!Number.isNaN(startMs) && now < startMs) status = "UPCOMING";
-            else if (!Number.isNaN(endMs) && now > endMs) status = "ENDED";
-            else if (!Number.isNaN(startMs) || !Number.isNaN(endMs)) status = "HAPPENING";
-            else status = "UPCOMING";
-          }
+          // Luôn tính trạng thái theo mốc thời gian để tự mở khi đến giờ bắt đầu.
+          let status: "UPCOMING" | "HAPPENING" | "ENDED";
+          if (!Number.isNaN(startMs) && now < startMs) status = "UPCOMING";
+          else if (!Number.isNaN(endMs) && now > endMs) status = "ENDED";
+          else if (!Number.isNaN(startMs) || !Number.isNaN(endMs)) status = "HAPPENING";
+          else status = "UPCOMING";
 
           const compId = String(c?._id ?? c?.id ?? "");
           const my = ranksByCompetitionId[compId];
@@ -170,10 +169,6 @@ export default function StudentCompetitionsPage() {
   const activeList = competitions.filter((c) => c.status !== "ENDED");
   const historyList = competitions.filter((c) => c.status === "ENDED");
 
-
-  const goToRegister = (compId: string) => {
-    router.push(`/competitions/${compId}/register`);
-  };
 
   const goToPlay = (compId: string) => {
     router.push(`/competitions/${compId}/play`);
@@ -402,10 +397,11 @@ export default function StudentCompetitionsPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => goToRegister(comp._id)}
-                        className="w-full py-3.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-2xl font-bold transition flex items-center justify-center gap-2 active:scale-95"
+                        type="button"
+                        disabled
+                        className="w-full py-3.5 bg-slate-100 text-slate-400 rounded-2xl font-bold transition flex items-center justify-center gap-2 cursor-not-allowed opacity-80"
                       >
-                        <Lock size={18} /> Đăng ký trước
+                        <Lock size={18} /> Chưa đến giờ mở
                       </button>
                     )}
                   </div>

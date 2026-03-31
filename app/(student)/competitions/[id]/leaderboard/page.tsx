@@ -78,21 +78,54 @@ export default function CompetitionLeaderboardPage({
 
         // Extract competition name from multiple possible locations
         const getCmpName = () => {
-          // Try from leaderboard payload
-          if (leaderboardPayload?.competitionName) return leaderboardPayload.competitionName;
-          if (leaderboardPayload?.title) return leaderboardPayload.title;
-          if (leaderboardPayload?.name) return leaderboardPayload.name;
-          
-          // Try from competition payload
-          if (competitionPayload?.title) return competitionPayload.title;
-          if (competitionPayload?.name) return competitionPayload.name;
-          if (competitionPayload?.competitionName) return competitionPayload.competitionName;
-          
-          // Try nested wrappers
-          if (competitionPayload?.data?.title) return competitionPayload.data.title;
-          if (competitionPayload?.data?.name) return competitionPayload.data.name;
-          
-          return `Cuộc thi #${id}`;
+          const byPath = (obj: any, path: string) => {
+            const value = path.split(".").reduce((acc: any, key) => acc?.[key], obj);
+            return typeof value === "string" && value.trim() ? value.trim() : null;
+          };
+
+          const candidatePaths = [
+            // leaderboard payload
+            "competitionName",
+            "title",
+            "name",
+            "competition.title",
+            "competition.name",
+            "competition.competitionName",
+            "data.title",
+            "data.name",
+            "data.competitionName",
+            "data.competition.title",
+            "data.competition.name",
+            // competition payload
+            "title",
+            "name",
+            "competitionName",
+            "competition.title",
+            "competition.name",
+            "competition.competitionName",
+            "data.title",
+            "data.name",
+            "data.competitionName",
+            "data.competition.title",
+            "data.competition.name",
+          ];
+
+          for (const path of candidatePaths) {
+            const fromLeaderboard = byPath(leaderboardPayload, path);
+            if (fromLeaderboard) return fromLeaderboard;
+            const fromCompetition = byPath(competitionPayload, path);
+            if (fromCompetition) return fromCompetition;
+          }
+
+          const firstRowName =
+            typeof leaderboardData?.[0]?.competitionName === "string"
+              ? leaderboardData[0].competitionName.trim()
+              : typeof leaderboardData?.[0]?.competitionTitle === "string"
+                ? leaderboardData[0].competitionTitle.trim()
+                : "";
+          if (firstRowName) return firstRowName;
+
+          return "Bảng xếp hạng cuộc thi";
         };
 
         setData({
