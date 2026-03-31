@@ -1,5 +1,58 @@
 import api from "@/utils/api";
 
+const normalizeProfilePayload = (data: Record<string, unknown>) => {
+  const payload: Record<string, unknown> = { ...data };
+
+  // Backend DTO nhận `fullname`, không nhận `fullName`.
+  if (payload.fullName != null && payload.fullname == null) {
+    payload.fullname = payload.fullName;
+  }
+
+  // Loại các field backend không cho phép để tránh 400 (whitelistValidation).
+  delete payload.fullName;
+  delete payload.address;
+
+  return payload;
+};
+
+const isFileLike = (value: unknown): value is File => {
+  return typeof File !== "undefined" && value instanceof File;
+};
+
+const buildProfileBody = (data: Record<string, unknown>) => {
+  const normalized = normalizeProfilePayload(data);
+  const avatar = normalized.avatar;
+
+  if (!isFileLike(avatar)) {
+    return {
+      body: normalized,
+      isMultipart: false,
+    };
+  }
+
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value == null || value === "") continue;
+    if (key === "avatar") continue;
+
+    if (typeof value === "string") {
+      formData.append(key, value);
+      continue;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      formData.append(key, String(value));
+    }
+  }
+
+  formData.append("avatar", avatar);
+
+  return {
+    body: formData,
+    isMultipart: true,
+  };
+};
+
 const extractLeaderboardArray = (input: any): any[] => {
   if (Array.isArray(input)) return input;
   if (!input || typeof input !== "object") return [];
@@ -99,13 +152,23 @@ export const userService = {
    * Thử PATCH /auths/profile; nếu backend không có (404/405) thì PATCH /users/:id.
    */
   updateMyProfile: async (userId: string, data: Record<string, unknown>) => {
+    const { body, isMultipart } = buildProfileBody(data);
+
+    // Backend nhận file avatar qua PATCH /users/:id (multipart/form-data).
+    if (isMultipart) {
+      const res = await api.patch(`/users/${userId}`, body, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data ?? res;
+    }
+
     try {
-      const res = await api.patch("/auths/profile", data);
+      const res = await api.patch("/auths/profile", body);
       return res.data ?? res;
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 404 || status === 405) {
-        const res = await api.patch(`/users/${userId}`, data);
+        const res = await api.patch(`/users/${userId}`, body);
         return res.data ?? res;
       }
       throw err;
@@ -168,14 +231,27 @@ export const userService = {
    */
   updateProfile: async (data: {
     fullName?: string;
-    avatar?: string;
+    avatar?: string | File;
     phone?: string;
     address?: string;
     bio?: string;
     [key: string]: any;
   }) => {
+    const { body, isMultipart } = buildProfileBody(data);
+
+    if (isMultipart) {
+      const profile = await userService.getProfile();
+      const userId = profile?._id ?? profile?.id;
+      if (!userId) throw new Error("Không lấy được userId");
+
+      const res = await api.patch(`/users/${userId}`, body, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data ?? res;
+    }
+
     try {
-      const res = await api.patch("/auths/profile", data);
+      const res = await api.patch("/auths/profile", body);
       return res.data ?? res;
     } catch (err: any) {
       const status = err?.response?.status;
@@ -183,7 +259,7 @@ export const userService = {
         const profile = await userService.getProfile();
         const userId = profile?._id ?? profile?.id;
         if (!userId) throw new Error("Không lấy được userId");
-        const res = await api.patch(`/users/${userId}`, data);
+        const res = await api.patch(`/users/${userId}`, body);
         return res.data ?? res;
       }
       throw err;

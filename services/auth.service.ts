@@ -2,6 +2,16 @@ import api from "@/utils/api";
 const API_BASE_URL =
   "https://teach-english-3786e536fe68.herokuapp.com/api/v1";
 
+const normalizeProfilePayload = (data: Record<string, unknown>) => {
+  const payload: Record<string, unknown> = { ...data };
+  if (payload.fullName != null && payload.fullname == null) {
+    payload.fullname = payload.fullName;
+  }
+  delete payload.fullName;
+  delete payload.address;
+  return payload;
+};
+
 export const authService = {
   register: async (data: {
     fullname: string;
@@ -42,8 +52,12 @@ export const authService = {
     email?: string;
     phone?: string;
     avatar?: string;
+    address?: string;
+    fullname?: string;
+    [key: string]: any;
   }): Promise<any> => {
-    const res = await api.patch("/auths/profile", data);
+    const payload = normalizeProfilePayload(data);
+    const res = await api.patch("/auths/profile", payload);
     return res as any;
   },
 

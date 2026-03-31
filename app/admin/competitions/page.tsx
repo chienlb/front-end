@@ -16,6 +16,7 @@ type CompetitionRow = {
 
 type CompetitionQuestion = {
   question: string;
+  media?: string;
   options: string[];
   correctAnswer: string;
   score: number;
@@ -29,7 +30,9 @@ type CompetitionForm = {
   type: string;
   startTime: string;
   endTime: string;
-  totalParticipants: number;
+  maxParticipants: string;
+  prize: string;
+  totalParticipants: string;
   status: string;
   isPublished: boolean;
   visibility: string;
@@ -64,6 +67,7 @@ export default function AdminCompetitionsPage() {
   const [rows, setRows] = useState<CompetitionRow[]>([]);
   const [openForm, setOpenForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [questionMediaFiles, setQuestionMediaFiles] = useState<Record<number, File | null>>({});
   const [formError, setFormError] = useState("");
   const [editingId, setEditingId] = useState<string>("");
   const [form, setForm] = useState<CompetitionForm>({
@@ -72,7 +76,9 @@ export default function AdminCompetitionsPage() {
     type: "rank",
     startTime: "",
     endTime: "",
-    totalParticipants: 0,
+    maxParticipants: "",
+    prize: "",
+    totalParticipants: "",
     status: "upcoming",
     isPublished: true,
     visibility: "public",
@@ -83,6 +89,7 @@ export default function AdminCompetitionsPage() {
         correctAnswer: "",
         score: 10,
         type: "multiple_choice",
+        media: "",
         explanation: "",
       },
     ],
@@ -135,6 +142,7 @@ export default function AdminCompetitionsPage() {
 
   const resetForm = () => {
     setEditingId("");
+    setQuestionMediaFiles({});
     setFormError("");
     setForm({
       name: "",
@@ -142,7 +150,9 @@ export default function AdminCompetitionsPage() {
       type: "rank",
       startTime: "",
       endTime: "",
-      totalParticipants: 0,
+      maxParticipants: "",
+      prize: "",
+      totalParticipants: "",
       status: "upcoming",
       isPublished: true,
       visibility: "public",
@@ -153,6 +163,7 @@ export default function AdminCompetitionsPage() {
           correctAnswer: "",
           score: 10,
           type: "multiple_choice",
+          media: "",
           explanation: "",
         },
       ],
@@ -168,6 +179,7 @@ export default function AdminCompetitionsPage() {
     try {
       setFormError("");
       setEditingId(id);
+      setQuestionMediaFiles({});
       const res: any = await competitionService.getCompetitionById(id);
       const data = res?.data ?? res;
 
@@ -178,7 +190,9 @@ export default function AdminCompetitionsPage() {
         type: String(data?.type || "rank"),
         startTime: toDatetimeLocalValue(String(data?.startTime || data?.startDate || data?.startAt || data?.start || "")),
         endTime: toDatetimeLocalValue(String(data?.endTime || data?.endDate || data?.endAt || data?.end || "")),
-        totalParticipants: Number(data?.totalParticipants || 0),
+        maxParticipants: String(data?.maxParticipants ?? ""),
+        prize: String(data?.prize || ""),
+        totalParticipants: String(data?.totalParticipants ?? ""),
         status: String(data?.status || "upcoming"),
         isPublished: Boolean(data?.isPublished ?? true),
         visibility: String(data?.visibility || "public"),
@@ -192,6 +206,7 @@ export default function AdminCompetitionsPage() {
                   correctAnswer: "",
                   score: 10,
                   type: "multiple_choice",
+                  media: "",
                   explanation: "",
                 },
               ],
@@ -224,9 +239,12 @@ export default function AdminCompetitionsPage() {
       setFormError("Vui lòng thêm ít nhất 1 câu hỏi.");
       return;
     }
-    const hasInvalidQuestion = questions.some(
-      (q) => !q.question?.trim() || !q.correctAnswer?.trim() || !Array.isArray(q.options) || q.options.length === 0,
-    );
+    const hasInvalidQuestion = questions.some((q) => {
+      const options = Array.isArray(q.options)
+        ? q.options.map((opt) => String(opt).trim()).filter(Boolean)
+        : [];
+      return !q.question?.trim() || !q.correctAnswer?.trim() || options.length === 0;
+    });
     if (hasInvalidQuestion) {
       setFormError("Mỗi câu hỏi cần có đề bài, đáp án đúng và ít nhất 1 lựa chọn.");
       return;
@@ -241,27 +259,122 @@ export default function AdminCompetitionsPage() {
       return;
     }
 
+    const totalParticipantsRaw = form.totalParticipants.trim();
+    const totalParticipants = Number(totalParticipantsRaw);
+    if (!Number.isFinite(totalParticipants) || totalParticipants < 0) {
+      setFormError("totalParticipants phải là số và không nhỏ hơn 0.");
+      return;
+    }
+
+    const maxParticipantsRaw = form.maxParticipants.trim();
+    const maxParticipants = Number(maxParticipantsRaw);
+    if (!Number.isFinite(maxParticipants) || maxParticipants < 1) {
+      setFormError("maxParticipants phải là số và không nhỏ hơn 1.");
+      return;
+    }
+
     try {
       setSaving(true);
       setFormError("");
-      const payload = {
+      const normalizedQuestions = questions.map((q, idx) => ({
+        question: q.question.trim(),
+        media: questionMediaFiles[idx] ? undefined : q.media?.trim() || undefined,
+        options: (q.options || []).map((opt) => String(opt).trim()).filter(Boolean),
+        correctAnswer: q.correctAnswer.trim(),
+        score: Number(q.score || 0),
+        type: q.type,
+        explanation: q.explanation?.trim() || undefined,
+      }));
+      const basePayload = {
         name: form.name.trim(),
         description: form.description.trim(),
         type: form.type,
         startTime: datetimeLocalToIso(form.startTime),
         endTime: datetimeLocalToIso(form.endTime),
         createdBy,
-        totalParticipants: Number(form.totalParticipants || 0),
+        updatedBy: createdBy,
+        maxParticipants,
+        prize: form.prize.trim() || undefined,
+        totalParticipants,
         status: form.status,
         isPublished: Boolean(form.isPublished),
         visibility: form.visibility,
-        listQuestion: questions,
+        listQuestion: normalizedQuestions,
       };
+
+      const mediaFiles = Object.entries(questionMediaFiles)
+        .map(([idx, file]) => ({ idx: Number(idx), file }))
+        .filter((x): x is { idx: number; file: File } => Boolean(x.file));
+
+      const payload = mediaFiles.length
+        ? (() => {
+            const fd = new FormData();
+            fd.append("name", basePayload.name);
+            fd.append("description", basePayload.description);
+            fd.append("type", basePayload.type);
+            fd.append("startTime", basePayload.startTime);
+            fd.append("endTime", basePayload.endTime);
+            fd.append("createdBy", basePayload.createdBy);
+            fd.append("updatedBy", basePayload.updatedBy);
+            fd.append("totalParticipants", String(basePayload.totalParticipants));
+            fd.append("maxParticipants", String(basePayload.maxParticipants));
+            fd.append("isPublished", String(basePayload.isPublished));
+            fd.append("status", basePayload.status);
+            fd.append("visibility", basePayload.visibility);
+            if (basePayload.prize) {
+              fd.append("prize", basePayload.prize);
+            }
+
+            // Gửi nested fields để backend nhận đúng array object cho listQuestion.
+            basePayload.listQuestion.forEach((q, idx) => {
+              fd.append(`listQuestion[${idx}][question]`, q.question);
+              q.options.forEach((opt, optIdx) => {
+                fd.append(`listQuestion[${idx}][options][${optIdx}]`, opt);
+              });
+              fd.append(`listQuestion[${idx}][correctAnswer]`, q.correctAnswer);
+              fd.append(`listQuestion[${idx}][type]`, q.type);
+              if (q.explanation) {
+                fd.append(`listQuestion[${idx}][explanation]`, q.explanation);
+              }
+              if (q.media) {
+                fd.append(`listQuestion[${idx}][media]`, q.media);
+              }
+            });
+
+            mediaFiles.forEach(({ idx, file }) => {
+              // Backend map media bằng fieldname: media-{index}
+              fd.append(`media-${idx}`, file);
+            });
+            return fd;
+          })()
+        : basePayload;
 
       if (editingId) {
         await competitionService.updateCompetition(editingId, payload);
       } else {
-        await competitionService.createCompetition(payload);
+        const createdRes: any = await competitionService.createCompetition(payload);
+
+        // Multipart sẽ làm number/boolean thành string. Patch lại bằng JSON để pass DTO validation.
+        if (mediaFiles.length) {
+          const created = createdRes?.data ?? createdRes;
+          const competitionId = String(created?._id || created?.id || "").trim();
+          if (competitionId) {
+            const createdQuestions = Array.isArray(created?.listQuestion)
+              ? created.listQuestion
+              : [];
+            const mergedQuestions = normalizedQuestions.map((q, idx) => ({
+              ...q,
+              media: createdQuestions[idx]?.media || q.media,
+            }));
+
+            await competitionService.updateCompetition(competitionId, {
+              totalParticipants,
+              maxParticipants,
+              isPublished: Boolean(basePayload.isPublished),
+              listQuestion: mergedQuestions,
+            });
+          }
+        }
       }
       setOpenForm(false);
       resetForm();
@@ -296,6 +409,7 @@ export default function AdminCompetitionsPage() {
           correctAnswer: "",
           score: 10,
           type: "multiple_choice",
+          media: "",
           explanation: "",
         },
       ],
@@ -303,6 +417,15 @@ export default function AdminCompetitionsPage() {
   };
 
   const removeQuestion = (index: number) => {
+    setQuestionMediaFiles((prev) => {
+      const next: Record<number, File | null> = {};
+      Object.entries(prev).forEach(([k, file]) => {
+        const i = Number(k);
+        if (i < index) next[i] = file;
+        if (i > index) next[i - 1] = file;
+      });
+      return next;
+    });
     setForm((p) => ({
       ...p,
       listQuestion: p.listQuestion.filter((_, i) => i !== index),
@@ -348,6 +471,17 @@ export default function AdminCompetitionsPage() {
     }));
   };
 
+  const setQuestionMediaFile = (qIndex: number, file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("audio/") && !file.type.startsWith("video/")) {
+      setFormError("Media chỉ hỗ trợ file ảnh, audio hoặc video.");
+      return;
+    }
+
+    setFormError("");
+    setQuestionMediaFiles((prev) => ({ ...prev, [qIndex]: file }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -386,13 +520,13 @@ export default function AdminCompetitionsPage() {
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <p className="text-xs uppercase text-slate-500 font-bold">Đang mở</p>
             <p className="text-2xl font-black text-green-600 mt-1">
-              {rows.filter((x) => x.status.includes("OPEN") || x.status.includes("ACTIVE")).length}
+              {rows.filter((x) => x.status.includes("ONGOING")).length}
             </p>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <p className="text-xs uppercase text-slate-500 font-bold">Đã kết thúc</p>
             <p className="text-2xl font-black text-slate-600 mt-1">
-              {rows.filter((x) => x.status.includes("ENDED") || x.status.includes("CLOSED")).length}
+              {rows.filter((x) => x.status.includes("ENDED") || x.status.includes("CANCELLED")).length}
             </p>
           </div>
         </div>
@@ -511,7 +645,7 @@ export default function AdminCompetitionsPage() {
                     className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400 bg-white"
                   >
                     <option value="rank">Rank</option>
-                    <option value="practice">Practice</option>
+                    <option value="review">Review</option>
                     <option value="tournament">Tournament</option>
                   </select>
                   <textarea
@@ -539,10 +673,29 @@ export default function AdminCompetitionsPage() {
                     />
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={form.maxParticipants}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, maxParticipants: e.target.value }))
+                    }
+                    placeholder="Số người tham gia tối đa"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
+                  />
+                  <input
+                    value={form.prize}
+                    onChange={(e) => setForm((p) => ({ ...p, prize: e.target.value }))}
+                    placeholder="Giải thưởng"
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={form.totalParticipants}
                     onChange={(e) =>
-                      setForm((p) => ({ ...p, totalParticipants: Number(e.target.value || 0) }))
+                      setForm((p) => ({ ...p, totalParticipants: e.target.value }))
                     }
                     placeholder="Tổng người tham gia"
                     className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
@@ -555,6 +708,7 @@ export default function AdminCompetitionsPage() {
                     <option value="upcoming">Upcoming</option>
                     <option value="ongoing">Ongoing</option>
                     <option value="ended">Ended</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                   <select
                     value={form.visibility}
@@ -604,6 +758,23 @@ export default function AdminCompetitionsPage() {
                         placeholder="Nội dung câu hỏi"
                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
                       />
+                      <input
+                        type="file"
+                        accept="image/*,audio/*,video/*"
+                        onChange={(e) => setQuestionMediaFile(qIndex, e.target.files?.[0])}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
+                      />
+                      {questionMediaFiles[qIndex] ? (
+                        <p className="text-xs font-semibold text-blue-600">
+                          Đã chọn file: {questionMediaFiles[qIndex]?.name}
+                        </p>
+                      ) : null}
+                      <input
+                        value={q.media || ""}
+                        onChange={(e) => updateQuestion(qIndex, { media: e.target.value })}
+                        placeholder="Media URL (hoặc để trống nếu dùng upload file)"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"
+                      />
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <input
                           value={q.correctAnswer}
@@ -625,7 +796,8 @@ export default function AdminCompetitionsPage() {
                         >
                           <option value="multiple_choice">Trắc nghiệm (multiple_choice)</option>
                           <option value="true_false">Đúng / Sai (true_false)</option>
-                          <option value="short_answer">Trả lời ngắn (short_answer)</option>
+                          <option value="fill_in_the_blank">Điền vào chỗ trống (fill_in_the_blank)</option>
+                          <option value="essay">Tự luận (essay)</option>
                         </select>
                       </div>
                       <textarea

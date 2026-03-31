@@ -45,6 +45,14 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         const response = await competitionService.getCompetitionById(competitionId);
         const data = response.data || response;
         console.log("Competition data loaded:", data);
+
+        const start = new Date(data.startTime || data.startAt || data.startDate).getTime();
+        const now = Date.now();
+        if (!Number.isNaN(start) && now < start) {
+          await showAlert("Chưa đến thời gian bắt đầu cuộc thi.");
+          router.back();
+          return;
+        }
         
         if (!data?.listQuestion || data.listQuestion.length === 0) {
           console.warn("Không có câu hỏi trong cuộc thi");
@@ -53,8 +61,8 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         setQuestions(data.listQuestion || []);
 
         const end = new Date(data.endTime || data.endAt).getTime();
-        const now = new Date().getTime();
-        const diff = Math.max(0, Math.floor((end - now) / 1000));
+        const nowMs = new Date().getTime();
+        const diff = Math.max(0, Math.floor((end - nowMs) / 1000));
 
         if (diff > 0) {
           setTimeLeft(diff);
@@ -72,7 +80,8 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     fetchExam();
   }, [competitionId]);
 
-  // Nếu user đã có rank trong kỳ thi => khóa thi lại.
+  // Không auto-khóa từ rank API vì một số backend tạo rank record từ lúc tham gia,
+  // dẫn tới false-positive "đã nộp" trước khi user thực sự nộp bài.
   useEffect(() => {
     let alive = true;
 
@@ -92,15 +101,36 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
 
         if (!alive) return;
 
-        const score =
-          typeof rankRes?.score === "number"
-            ? rankRes.score
-            : typeof rankRes?.points === "number"
-              ? rankRes.points
-              : 0;
+        const rankPayload = rankRes?.data ?? rankRes;
+        const payloadCompetitionId = String(
+          rankPayload?.competitionId?._id ??
+            rankPayload?.competitionId ??
+            rankPayload?.competition?._id ??
+            rankPayload?.competition ??
+            "",
+        );
+        const sameCompetition = !payloadCompetitionId || payloadCompetitionId === String(competitionId);
 
-        setUserResult({ score, correctCount: null });
-        setIsSubmitted(true);
+        const hasValidRank = Boolean(
+          sameCompetition &&
+            rankPayload &&
+            (
+              rankPayload?.submittedAt ||
+              rankPayload?.isSubmitted === true ||
+              rankPayload?.status === "submitted" ||
+              rankPayload?.status === "completed" ||
+              typeof rankPayload?.rank === "number" ||
+              typeof rankPayload?.position === "number"
+            ),
+        );
+
+        // Một số backend trả 200 + object rỗng khi chưa có rank.
+        if (!hasValidRank) {
+          return;
+        }
+
+        // Chỉ dùng để tham khảo log/debug, không khóa UI ở đây.
+        console.log("Detected rank record from API, skip auto-lock to avoid false submitted state", rankPayload);
       } catch (e: any) {
         const status = e?.response?.status ?? e?.status;
         if (status !== 404) {
@@ -158,7 +188,9 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     let correctCount = 0;
 
     questions.forEach((q, idx) => {
-      if (answers[idx] === q.correctAnswer) {
+      const picked = String(answers[idx] ?? "").trim().toLowerCase();
+      const correct = String(q?.correctAnswer ?? "").trim().toLowerCase();
+      if (picked && picked === correct) {
         score += q.score || 0;
         correctCount++;
       }

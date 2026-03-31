@@ -5,7 +5,6 @@ import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   Loader2,
-  Award,
   Zap,
   Coins,
   Gem,
@@ -25,7 +24,6 @@ import {
 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import { userService } from "@/services/user.service";
-import { mediaService } from "@/services/media.service";
 import { authService } from "@/services/auth.service";
 import ChangePasswordModal from "@/components/common/ChangePasswordModal";
 import UpdateProfileModal from "@/components/common/UpdateProfileModal";
@@ -54,22 +52,36 @@ const itemVariants: Variants = {
 function normalizeProfile(raw: any) {
   const u = raw?.data ?? raw;
   const id = String(u?._id ?? u?.id ?? "");
-  let fullName =
-    u?.fullName ?? u?.name ?? u?.displayName ?? "";
+  let fullname =
+    u?.fullname ?? u?.fullName ?? u?.name ?? u?.displayName ?? "";
+
+  // API đôi khi trả literal "undefined"/"null" dạng chuỗi.
+  if (typeof fullname === "string") {
+    const normalized = fullname.trim();
+    if (
+      !normalized ||
+      normalized.toLowerCase() === "undefined" ||
+      normalized.toLowerCase() === "null"
+    ) {
+      fullname = "";
+    } else {
+      fullname = normalized;
+    }
+  }
   
   // Nếu vẫn không có, thử ghép firstName + lastName
-  if (!fullName && (u?.firstName || u?.lastName)) {
-    fullName = `${u?.firstName || ""} ${u?.lastName || ""}`.trim();
+  if (!fullname && (u?.firstName || u?.lastName)) {
+    fullname = `${u?.firstName || ""} ${u?.lastName || ""}`.trim();
   }
   
   // Nếu vẫn không có, dùng username làm fallback
-  if (!fullName && u?.username) {
-    fullName = u.username;
+  if (!fullname && u?.username) {
+    fullname  = u.username;
   }
   
   // Cuối cùng, dùng "Học viên" nếu toàn bộ không có
-  if (!fullName) {
-    fullName = "Học viên";
+  if (!fullname) {
+    fullname = "Học viên";
   }
   
   const username =
@@ -123,12 +135,11 @@ function normalizeProfile(raw: any) {
     typeof u?.title === "string" && u.title.trim()
       ? u.title
       : "Học viên";
-  const badges = Array.isArray(u?.badges) ? u.badges : [];
 
   return {
     raw: u,
     id,
-    fullName,
+    fullname, 
     username,
     email,
     phone,
@@ -144,20 +155,7 @@ function normalizeProfile(raw: any) {
     streak: streakDays,
     streakDays,
     title,
-    badges,
   };
-}
-
-function extractUploadUrl(res: any): string | null {
-  const d = res?.data ?? res;
-  if (typeof d === "string" && /^https?:\/\//.test(d)) return d;
-  const url =
-    d?.url ??
-    d?.fileUrl ??
-    d?.data?.url ??
-    d?.path ??
-    (typeof d?.location === "string" ? d.location : null);
-  return typeof url === "string" && url.length > 0 ? url : null;
 }
 
 export default function ProfilePage() {
@@ -169,13 +167,13 @@ export default function ProfilePage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    fullName: "",
+    fullname: "",
     email: "",
     phone: "",
     avatar: "",
   });
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   type EditTab = "profile" | "password";
@@ -199,7 +197,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (editOpen && profile) {
       setEditForm({
-        fullName: profile.fullName,
+        fullname: profile.fullname,
         email: profile.email,
         phone: profile.phone,
         avatar:
@@ -207,6 +205,7 @@ export default function ProfilePage() {
             ? profile.avatar
             : "",
       });
+          setAvatarFile(null);
       setFormError(null);
     }
     if (!editOpen) {
@@ -223,15 +222,11 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     if (!profile?.id) return;
-    const name = editForm.fullName.trim();
+    const name = editForm.fullname.trim();
     const email = editForm.email.trim();
     const phone = editForm.phone.trim();
     const avatar = editForm.avatar.trim();
 
-    if (!name) {
-      setFormError("Vui lòng nhập họ tên.");
-      return;
-    }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setFormError("Email không hợp lệ.");
       return;
@@ -240,12 +235,20 @@ export default function ProfilePage() {
     setSaving(true);
     setFormError(null);
     try {
-      const payload: Record<string, unknown> = {
-        fullName: name,
-        email: email || undefined,
-        phone,
-      };
-      if (avatar) payload.avatar = avatar;
+      const payload: Record<string, unknown> = {};
+      if (name) payload.fullname = name;
+      if (email) payload.email = email;
+      if (phone) payload.phone = phone;
+      if (avatarFile) {
+        payload.avatar = avatarFile;
+      } else if (avatar && !avatar.startsWith("blob:")) {
+        payload.avatar = avatar;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setFormError("Không có thông tin thay đổi để lưu.");
+        return;
+      }
 
       await userService.updateMyProfile(profile.id, payload);
       const fresh = await userService.getProfile();
@@ -333,25 +336,24 @@ export default function ProfilePage() {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setFormError("Chỉ chấp nhận file ảnh.");
+      e.target.value = "";
       return;
     }
-    setUploading(true);
     setFormError(null);
-    try {
-      const res = await mediaService.uploadFile(file);
-      const url = extractUploadUrl(res);
-      if (url) {
-        setEditForm((f) => ({ ...f, avatar: url }));
-      } else {
-        setFormError("Không nhận được URL ảnh từ server.");
-      }
-    } catch {
-      setFormError("Tải ảnh lên thất bại.");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarFile(file);
+    setEditForm((f) => ({ ...f, avatar: previewUrl }));
+    e.target.value = "";
   };
+
+  useEffect(() => {
+    return () => {
+      if (editForm.avatar.startsWith("blob:")) {
+        URL.revokeObjectURL(editForm.avatar);
+      }
+    };
+  }, [editForm.avatar]);
 
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -411,8 +413,8 @@ export default function ProfilePage() {
 
   const displayName = profile
     ? profile.username
-      ? `${profile.fullName} (@${profile.username})`
-      : profile.fullName
+      ? `${profile.fullname} (@${profile.username})`
+      : profile.fullname
     : "";
 
   if (loading) {
@@ -638,7 +640,7 @@ export default function ProfilePage() {
           ) : null}
         </motion.div>
 
-        {/* Cột phải: lịch + huy hiệu */}
+        {/* Cột phải: lịch */}
         <motion.div className="lg:col-span-2 space-y-6" variants={itemVariants}>
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
@@ -731,38 +733,6 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 max-w-2xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <Award size={20} className="text-amber-500" /> Huy hiệu
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {profile.badges.slice(0, 6).map((badge: any, i: number) => (
-                  <div
-                    key={badge._id ?? badge.id ?? i}
-                    className={`aspect-square rounded-2xl flex items-center justify-center text-3xl border-2 transition-all ${
-                      badge.unlocked !== false
-                        ? "bg-amber-50 border-amber-200"
-                        : "bg-slate-50 border-slate-100 grayscale opacity-60"
-                    }`}
-                    title={badge.name ?? ""}
-                  >
-                    {badge.icon ?? "🏅"}
-                  </div>
-                ))}
-                {profile.badges.length === 0 &&
-                  [1, 2, 3, 4, 5, 6].map((i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center"
-                    >
-                      <span className="text-slate-300 text-xs">?</span>
-                    </div>
-                  ))}
-              </div>
-          </div>
         </motion.div>
       </motion.div>
 
@@ -842,11 +812,11 @@ export default function ProfilePage() {
                       </label>
                       <input
                         className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
-                        value={editForm.fullName}
+                        value={editForm.fullname}
                         onChange={(e) =>
                           setEditForm((f) => ({
                             ...f,
-                            fullName: e.target.value,
+                            fullname: e.target.value,
                           }))
                         }
                         disabled={saving}
@@ -901,13 +871,13 @@ export default function ProfilePage() {
                         </div>
                         <label className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold cursor-pointer hover:bg-indigo-700 transition shadow">
                           <ImageIcon size={16} />
-                          {uploading ? "Đang tải ảnh…" : "Chọn ảnh từ máy"}
+                          Chọn ảnh từ máy
                           <input
                             type="file"
                             accept="image/*"
                             className="hidden"
                             onChange={handleAvatarFile}
-                            disabled={uploading || saving}
+                            disabled={saving}
                           />
                         </label>
                       </div>
@@ -956,7 +926,7 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => void handleSaveProfile()}
-                      disabled={saving || uploading}
+                      disabled={saving}
                       className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                     >
                       {saving ? (
@@ -1123,7 +1093,7 @@ export default function ProfilePage() {
         isOpen={openUpdateProfileModal}
         onClose={() => setOpenUpdateProfileModal(false)}
         initialData={{
-          fullName: profile?.fullName || "",
+          fullName: profile?.fullname || "Học viên",
           phone: profile?.phone || "",
           address: profile?.address || "",
           bio: profile?.bio || "",

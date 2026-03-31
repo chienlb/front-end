@@ -138,7 +138,7 @@ export default function AdminSettingsPage() {
       if (!userId) throw new Error("Thiếu userId");
 
       await userService.updateMyProfile(userId, {
-        fullName: account.fullName,
+        fullname: account.fullName,
         email: account.email,
         phone: account.phone,
         avatar: account.avatar,
