@@ -27,6 +27,7 @@ export default function TutorManager() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [selectedTutor, setSelectedTutor] = useState<any | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const passwordStrength = (pw: string) => {
     const s = String(pw || "");
@@ -163,11 +164,29 @@ export default function TutorManager() {
   // Filter Logic
   const filteredTutors = tutors.filter(
     (t) =>
-      String(t.fullName || t.name || "")
+      String(t.fullname || t.fullName || t.name || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       String(t.email || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
+  const getTutorFullName = (tutor: any) => {
+    return String(tutor?.fullname || tutor?.fullName || tutor?.name || "").trim();
+  };
+
+  const getTutorUsername = (tutor: any) => {
+    return String(
+      tutor?.username || tutor?.userName || tutor?.account?.username || "",
+    ).trim();
+  };
+
+  const getGenderVi = (value: any) => {
+    const g = String(value || "").trim().toLowerCase();
+    if (["male", "m", "nam"].includes(g)) return "Nam";
+    if (["female", "f", "nu", "nữ"].includes(g)) return "Nữ";
+    if (["other", "khac", "khác"].includes(g)) return "Khác";
+    return "—";
+  };
 
   return (
     <div className="p-6 md:p-10 bg-slate-50/50 min-h-screen font-sans text-slate-800">
@@ -249,16 +268,16 @@ export default function TutorManager() {
                             src={
                               t.avatar ||
                               `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                String(t.fullName || t.name || "Tutor"),
+                                getTutorFullName(t) || "Tutor",
                               )}`
                             }
                             className="w-full h-full object-cover"
-                            alt={t.fullName || t.name}
+                            alt={getTutorFullName(t) || "Tutor"}
                           />
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 text-base">
-                            {t.fullName || t.name}
+                            {getTutorFullName(t) || "—"}
                           </div>
                           <div className="text-xs text-slate-400 font-mono">
                             ID: {String(t._id || t.id || "").slice(-6).toUpperCase()}
@@ -293,6 +312,13 @@ export default function TutorManager() {
                     </td>
                     <td className="p-5 pr-6 text-right">
                       <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => setSelectedTutor(t)}
+                          className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={18} />
+                        </button>
                         <button
                           onClick={() => handleOpenEdit(t)}
                           className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition"
@@ -501,6 +527,112 @@ export default function TutorManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedTutor && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="min-h-full w-full flex items-start md:items-center justify-center py-8">
+            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-[linear-gradient(135deg,#EFF6FF_0%,#FFFFFF_55%,#F5F3FF_100%)]">
+                <div>
+                  <h2 className="font-black text-lg text-slate-900">Chi tiết giáo viên</h2>
+                  <p className="text-xs text-slate-500 font-semibold">
+                    Thông tin tài khoản và liên hệ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedTutor(null)}
+                  className="text-slate-400 hover:text-red-500 transition p-1 hover:bg-white rounded-full"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-3">
+                  <img
+                    src={
+                      selectedTutor.avatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        getTutorFullName(selectedTutor) || "Tutor",
+                      )}`
+                    }
+                    className="w-14 h-14 rounded-full border border-slate-200 object-cover"
+                    alt={getTutorFullName(selectedTutor) || "Tutor"}
+                  />
+                  <div>
+                    <p className="text-lg font-black text-slate-900">
+                      {getTutorFullName(selectedTutor) || "—"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      ID: {String(selectedTutor._id || selectedTutor.id || "—")}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Username: {getTutorUsername(selectedTutor) || "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Email</p>
+                    <p className="text-sm font-semibold text-slate-800 break-all flex items-center gap-2">
+                      <Mail size={14} className="text-slate-400" />
+                      {selectedTutor.email || "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Số điện thoại</p>
+                    <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                      <Phone size={14} className="text-slate-400" />
+                      {selectedTutor.phone || selectedTutor.phoneNumber || "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Username</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {getTutorUsername(selectedTutor) || "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Trạng thái</p>
+                    {selectedTutor.isActive === false ? (
+                      <span className="inline-flex items-center gap-1.5 bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold border border-red-200">
+                        <ShieldCheck size={12} strokeWidth={3} /> Inactive
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200">
+                        <ShieldCheck size={12} strokeWidth={3} /> Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Vai trò</p>
+                    <p className="text-sm font-semibold text-slate-800 uppercase">
+                      {selectedTutor.role || "TEACHER"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-[11px] font-bold uppercase text-slate-500 mb-1">Giới tính</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {getGenderVi(selectedTutor.gender)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-slate-100 flex justify-end bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTutor(null)}
+                  className="px-5 py-2.5 text-slate-700 font-bold hover:bg-white rounded-2xl transition text-sm border border-slate-200"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

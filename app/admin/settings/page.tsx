@@ -9,10 +9,12 @@ import {
   Save,
   Eye,
   EyeOff,
+  SlidersHorizontal,
 } from "lucide-react";
 import { authService } from "@/services/auth.service";
+import { adminService, type SystemFeature } from "@/services/admin.service";
 
-type SettingsTab = "ACCOUNT" | "SECURITY";
+type SettingsTab = "ACCOUNT" | "SECURITY" | "SYSTEM";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("ACCOUNT");
@@ -38,6 +40,11 @@ export default function SettingsPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
+
+  const [systemFeatures, setSystemFeatures] = useState<SystemFeature[]>([]);
+  const [loadingSystemFeatures, setLoadingSystemFeatures] = useState(false);
+  const [togglingFeatureId, setTogglingFeatureId] = useState("");
+  const [systemMessage, setSystemMessage] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -76,6 +83,42 @@ export default function SettingsPage() {
     };
 
     void fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    const fetchSystemFeatures = async () => {
+      try {
+        setLoadingSystemFeatures(true);
+        const res: any = await adminService.getSystemFeatures();
+        const payload = res?.data ?? res;
+        const list: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.items)
+              ? payload.items
+              : [];
+
+        const mapped: SystemFeature[] = list.map((item) => ({
+          _id: String(item?._id || item?.id || ""),
+          id: String(item?.id || item?._id || ""),
+          key: String(item?.key || item?.code || item?.name || ""),
+          name: String(item?.name || item?.title || item?.key || "Tính năng"),
+          description: String(item?.description || item?.desc || ""),
+          isEnabled: Boolean(item?.isEnabled),
+          flagName: String(item?.flagName || ""),
+        }));
+
+        setSystemFeatures(mapped);
+      } catch (error: any) {
+        const msg = error?.response?.data?.message ?? error?.message;
+        setSystemMessage(Array.isArray(msg) ? msg.join(", ") : msg || "Không tải được danh sách tính năng.");
+      } finally {
+        setLoadingSystemFeatures(false);
+      }
+    };
+
+    void fetchSystemFeatures();
   }, []);
 
   const handleSaveProfile = async () => {
@@ -129,6 +172,33 @@ export default function SettingsPage() {
     }
   };
 
+  const handleToggleSystemFeature = async (feature: SystemFeature) => {
+    const featureId = String(feature._id || feature.id || "");
+    if (!featureId) return;
+
+    try {
+      setSystemMessage("");
+      setTogglingFeatureId(featureId);
+      const nextEnabled = !Boolean(feature.isEnabled);
+      const res: any = await adminService.toggleSystemFeature(featureId, nextEnabled);
+      const payload = res?.data ?? res;
+      const updatedEnabled = Boolean(payload?.isEnabled ?? nextEnabled);
+
+      setSystemFeatures((prev) =>
+        prev.map((f) => {
+          const id = String(f._id || f.id || "");
+          return id === featureId ? { ...f, isEnabled: updatedEnabled } : f;
+        }),
+      );
+      setSystemMessage("Đã cập nhật trạng thái tính năng hệ thống.");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setSystemMessage(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể cập nhật tính năng.");
+    } finally {
+      setTogglingFeatureId("");
+    }
+  };
+
   const tabs = [
     {
       id: "ACCOUNT",
@@ -141,6 +211,12 @@ export default function SettingsPage() {
       label: "Đổi mật khẩu",
       icon: <Lock size={18} />,
       desc: "Bảo mật tài khoản",
+    },
+    {
+      id: "SYSTEM",
+      label: "Hệ thống",
+      icon: <SlidersHorizontal size={18} />,
+      desc: "Bật/tắt tính năng",
     },
   ] as const;
 
@@ -368,6 +444,78 @@ export default function SettingsPage() {
                       <Lock size={16} /> {changingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "SYSTEM" && (
+              <div className="space-y-6 max-w-3xl animate-fade-in">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+                  <h3 className="text-lg font-black text-slate-800 border-b border-slate-200 pb-2 mb-4">
+                    Bật/tắt chức năng hệ thống
+                  </h3>
+
+                  <div className="space-y-3">
+                    {loadingSystemFeatures && (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                        Đang tải danh sách tính năng...
+                      </div>
+                    )}
+
+                    {!loadingSystemFeatures && systemFeatures.length === 0 && (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                        Chưa có dữ liệu tính năng từ hệ thống.
+                      </div>
+                    )}
+
+                    {systemFeatures.map((item) => {
+                      const enabled = Boolean(item.isEnabled);
+                      const featureId = String(item._id || item.id || "");
+                      const toggling = togglingFeatureId === featureId;
+                      return (
+                        <div
+                          key={featureId || String(item.key || item.name)}
+                          className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <p className="text-sm font-extrabold text-slate-800">
+                              {item.name || item.key || "Tính năng"}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {item.description || "Không có mô tả"}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              Flag: {item.flagName || "Không có flagName"}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSystemFeature(item)}
+                            disabled={toggling}
+                            className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                              enabled ? "bg-emerald-500" : "bg-slate-300"
+                            } ${toggling ? "opacity-60" : ""}`}
+                            aria-pressed={enabled}
+                            title={enabled ? "Đang bật" : "Đang tắt"}
+                          >
+                            <span
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                                enabled ? "translate-x-8" : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {systemMessage && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-green-600" />
+                      {systemMessage}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

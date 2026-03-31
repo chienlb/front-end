@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { userService } from "@/services/user.service";
 import { notificationService } from "@/services/notifications.service";
+import { adminService, type SystemFeature } from "@/services/admin.service";
 
 // Components
 import InventoryModal from "@/components/student/course/InventoryModal";
@@ -388,6 +389,40 @@ export default function Navbar() {
         return "bg-blue-500 shadow-blue-200";
     }
   };
+
+  const [systemFeatures, setSystemFeatures] = useState<SystemFeature[]>([]);
+
+  useEffect(() => {
+    const fetchSystemFeatures = async () => {
+      try {
+        const res: any = await adminService.getSystemFeatures();
+        const payload = res?.data ?? res;
+        const list: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.items)
+          ? payload.items
+          : [];
+
+        const mapped: SystemFeature[] = list.map((item) => ({
+          _id: String(item?._id || item?.id || ""),
+          id: String(item?.id || item?._id || ""),
+          key: String(item?.key || item?.code || item?.name || ""),
+          name: String(item?.name || item?.title || item?.key || "Tính năng"),
+          description: String(item?.description || item?.desc || ""),
+          isEnabled: Boolean(item?.isEnabled),
+          flagName: String(item?.flagName || ""),
+        }));
+
+        setSystemFeatures(mapped);
+      } catch (error) {
+        console.error("Failed to fetch system features", error);
+      }
+    };
+
+    fetchSystemFeatures();
+  }, []);
 
   return (
     <>
@@ -848,7 +883,13 @@ export default function Navbar() {
         currentPetId={user?.equippedPet?._id || user?.equippedPet}
         onEquipSuccess={handlePetChange}
       />
-      {user && <AITutorWidget />}
+      {user && (
+        <AITutorWidget
+          chatbotEnabled={
+            systemFeatures.find((f) => f.flagName === "chatbot_enabled")?.isEnabled ?? false
+          }
+        />
+      )}
     </>
   );
 }

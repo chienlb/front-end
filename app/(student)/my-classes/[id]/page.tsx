@@ -169,7 +169,7 @@ export default function StudentClassDetailPage({
 
       {/* 3. CONTENT AREA */}
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-        {activeTab === "STREAM" && <StudentStream />}
+        {activeTab === "STREAM" && <StudentStream commentsEnabled={true} />}
         {activeTab === "CLASSWORK" && <StudentClasswork />}
 
         {activeTab === "ASSIGNMENTS" && <StudentAssignmentsTab classId={id} />}

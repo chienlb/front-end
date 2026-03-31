@@ -5,31 +5,51 @@ type CreateGroupPayload = {
   description?: string;
   type: "class" | "subject" | "custom";
   visibility: "public" | "private" | "hidden";
+  owner?: string;
   members?: string[];
 };
 
 export const groupsService = {
-  // POST /groups (multipart): payload + avatar/background file upload
+  // POST /groups/admin/create (multipart): payload + avatar/background file upload
+  // Fallback: POST /groups
   createGroup: async (
     payload: CreateGroupPayload,
     files?: { avatar?: File | null; background?: File | null },
   ) => {
-    const fd = new FormData();
-    fd.append("groupName", payload.groupName.trim());
-    fd.append("type", payload.type);
-    fd.append("visibility", payload.visibility);
-    if (payload.description?.trim()) {
-      fd.append("description", payload.description.trim());
-    }
+    const hasFiles = Boolean(files?.avatar || files?.background);
+    const normalizedPayload: Record<string, any> = {
+      groupName: String(payload.groupName || "").trim(),
+      type: payload.type,
+      visibility: payload.visibility,
+    };
+    if (payload.description?.trim()) normalizedPayload.description = payload.description.trim();
+    if (payload.owner?.trim()) normalizedPayload.owner = payload.owner.trim();
     if (Array.isArray(payload.members)) {
-      payload.members
+      normalizedPayload.members = payload.members
         .map((m) => String(m || "").trim())
-        .filter(Boolean)
-        .forEach((m) => fd.append("members", m));
+        .filter(Boolean);
     }
-    if (files?.avatar) fd.append("avatar", files.avatar);
-    if (files?.background) fd.append("background", files.background);
-    return api.post("/groups", fd);
+
+    let body: any = normalizedPayload;
+    if (hasFiles) {
+      const fd = new FormData();
+      Object.entries(normalizedPayload).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((v) => fd.append(key, String(v)));
+        } else {
+          fd.append(key, String(value));
+        }
+      });
+      if (files?.avatar) fd.append("avatar", files.avatar);
+      if (files?.background) fd.append("background", files.background);
+      body = fd;
+    }
+
+    try {
+      return await api.post("/groups/admin/create", body);
+    } catch {
+      return api.post("/groups", body);
+    }
   },
 
   // Admin endpoint:

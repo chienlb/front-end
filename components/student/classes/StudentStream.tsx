@@ -74,7 +74,7 @@ const INITIAL_POSTS: Post[] = [
   },
 ];
 
-export default function StudentStream() {
+export default function StudentStream({ commentsEnabled }: { commentsEnabled: boolean }) {
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
 
   // State cho bài đăng mới
@@ -256,62 +256,25 @@ export default function StudentStream() {
                 </div>
 
                 {/* Comment Section (Collapsible) */}
-                {post.showComments && (
-                  <div className="mt-4 pt-4 border-t border-slate-50 animate-in slide-in-from-top-2 fade-in duration-200">
-                    {/* List Comments */}
-                    <div className="space-y-3 mb-4">
-                      {post.comments.map((comment) => (
-                        <div key={comment.id} className="flex gap-3">
-                          <img
-                            src={comment.avatar}
-                            className="w-8 h-8 rounded-full border border-slate-100 object-cover mt-1"
-                          />
-                          <div className="bg-slate-50 p-3 rounded-2xl rounded-tl-none flex-1">
-                            <div className="flex justify-between items-baseline mb-1">
-                              <span className="font-bold text-xs text-slate-700">
-                                {comment.author}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {comment.date}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600">
-                              {comment.content}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Input Comment */}
-                    <div className="flex gap-2 items-center">
-                      <img
-                        src="https://i.pravatar.cc/150?img=50"
-                        className="w-8 h-8 rounded-full border border-slate-100 object-cover"
-                      />
-                      <div className="flex-1 relative">
-                        <input
-                          className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-full text-xs focus:outline-none focus:border-blue-300 transition"
-                          placeholder="Viết bình luận..."
-                          value={commentInputs[post.id] || ""}
-                          onChange={(e) =>
-                            setCommentInputs({
-                              ...commentInputs,
-                              [post.id]: e.target.value,
-                            })
-                          }
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && handleSendComment(post.id)
-                          }
+                {commentsEnabled && post.showComments && (
+                  <div className="mt-4">
+                    {post.comments.map((comment) => (
+                      <div key={comment.id} className="flex gap-3 mb-3">
+                        <img
+                          src={comment.avatar}
+                          className="w-8 h-8 rounded-full border border-slate-100 object-cover"
+                          alt={comment.author}
                         />
-                        <button
-                          onClick={() => handleSendComment(post.id)}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition"
-                        >
-                          <Send size={14} />
-                        </button>
+                        <div>
+                          <h5 className="font-bold text-slate-800 text-sm">
+                            {comment.author}
+                          </h5>
+                          <p className="text-slate-600 text-sm">
+                            {comment.content}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>

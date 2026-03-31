@@ -20,6 +20,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { groupsService } from "@/services/groups.service";
+import { userService } from "@/services/user.service";
 import { showAlert, showConfirm } from "@/utils/dialog";
 
 // --- TYPES ---
@@ -36,6 +37,7 @@ interface ClassSession {
   name: string; // VD: Tiếng Anh Giao Tiếp K12
   code: string; // Mã lớp
   teacher: Teacher;
+  hasOwner: boolean;
   schedule: string;
   studentsCount: number;
   maxStudents: number;
@@ -48,9 +50,20 @@ interface ClassSession {
 export default function AdminClassesPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | ClassStatus>("ALL");
   const [classes, setClasses] = useState<ClassSession[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [showAssignModal, setShowAssignModal] = useState<string | null>(null); // ID lớp đang cần gán GV
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createForm, setCreateForm] = useState({
+    groupName: "",
+    description: "",
+    type: "class" as "class" | "subject" | "custom",
+    visibility: "public" as "public" | "private" | "hidden",
+    owner: "",
+  });
 
   const extractList = (payload: any): any[] => {
     if (Array.isArray(payload)) return payload;
@@ -76,6 +89,31 @@ export default function AdminClassesPage() {
     return "ACTIVE";
   };
 
+  const extractOwnerDisplayName = (payload: any): string => {
+    const root = payload?.data ?? payload;
+    const candidates = [
+      root,
+      root?.data,
+      root?.user,
+      root?.profile,
+      root?.data?.user,
+      root?.data?.profile,
+    ];
+
+    for (const item of candidates) {
+      const name = String(
+        item?.fullName ??
+          item?.fullname ??
+          item?.name ??
+          item?.displayName ??
+          item?.username ??
+          "",
+      ).trim();
+      if (name) return name;
+    }
+    return "";
+  };
+
   const fetchClasses = async () => {
     try {
       setLoading(true);
@@ -85,11 +123,28 @@ export default function AdminClassesPage() {
       const list = extractList(payload);
 
       const mapped: ClassSession[] = list.map((it: any, idx: number) => {
-        const teacherObj = it?.owner || it?.teacher || it?.tutor || it?.teacherId || {};
-        const teacherName =
-          teacherObj?.fullName || teacherObj?.name || it?.ownerName || it?.teacherName || "Chưa phân công";
+        const ownerRaw = it?.owner;
+        const ownerId =
+          typeof ownerRaw === "string"
+            ? ownerRaw
+            : String(ownerRaw?._id ?? ownerRaw?.id ?? "").trim();
+        const teacherObj =
+          (ownerRaw && typeof ownerRaw === "object" ? ownerRaw : null) ||
+          it?.teacher ||
+          it?.tutor ||
+          it?.teacherId ||
+          {};
+        const teacherNameRaw =
+          teacherObj?.fullName || teacherObj?.name || it?.ownerName || it?.teacherName || "";
+        const hasOwner = Boolean(
+          ownerId ||
+            String(teacherObj?._id || teacherObj?.id || "").trim() ||
+            String(teacherNameRaw || "").trim(),
+        );
+        const teacherName = hasOwner
+          ? String(teacherNameRaw || ownerId || "Owner").trim()
+          : "Chưa phân nhóm";
         const teacherAvatar = String(teacherObj?.avatar || "");
-        const hasTeacher = teacherName !== "Chưa phân công";
 
         const studentsCount = Number(
           it?.studentsCount ??
@@ -110,21 +165,66 @@ export default function AdminClassesPage() {
           name: String(it?.groupName ?? it?.name ?? it?.title ?? "Nhóm chưa đặt tên"),
           code: String(it?.joinCode ?? it?.code ?? it?.slug ?? `GRP-${idx}`),
           teacher: {
-            id: String(teacherObj?._id ?? teacherObj?.id ?? ""),
+            id: String(ownerId || (teacherObj?._id ?? teacherObj?.id ?? "")),
             name: String(teacherName),
             avatar: teacherAvatar,
           },
+          hasOwner,
           schedule: String(it?.subject ?? it?.type ?? "Chưa có chủ đề"),
           studentsCount,
           maxStudents,
           startDate,
           status: mapStatus(it?.isActive ?? it?.status),
           type: "ONLINE",
-          issue: hasTeacher ? undefined : "Thiếu giảng viên đứng lớp",
+          issue: hasOwner ? undefined : "Thiếu giảng viên đứng lớp",
         };
       });
 
-      setClasses(mapped);
+      const ownerIdsNeedResolve = Array.from(
+        new Set(
+          mapped
+            .filter(
+              (c) =>
+                c.hasOwner &&
+                c.teacher.id &&
+                c.teacher.name === c.teacher.id,
+            )
+            .map((c) => c.teacher.id),
+        ),
+      );
+
+      if (ownerIdsNeedResolve.length === 0) {
+        setClasses(mapped);
+        return;
+      }
+
+      const ownerNameMap: Record<string, string> = {};
+      await Promise.all(
+        ownerIdsNeedResolve.map(async (ownerId) => {
+          try {
+            const profile = await userService.getUserById(ownerId);
+            const resolvedName = extractOwnerDisplayName(profile);
+            if (resolvedName) ownerNameMap[ownerId] = resolvedName;
+          } catch {
+            // Ignore single owner lookup failure, keep fallback value.
+          }
+        }),
+      );
+
+      const resolvedMapped = mapped.map((c) => {
+        if (!c.hasOwner) return c;
+        const resolvedName = ownerNameMap[c.teacher.id];
+        if (!resolvedName) return c;
+        return {
+          ...c,
+          teacher: {
+            ...c.teacher,
+            name: resolvedName,
+          },
+        };
+      });
+
+      setClasses(resolvedMapped);
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
       setClasses([]);
@@ -134,9 +234,93 @@ export default function AdminClassesPage() {
     }
   };
 
+  const fetchTeachers = async () => {
+    try {
+      const res: any = await userService.getUsersByRole("teacher");
+      const payload = res?.data ?? res;
+      const list: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.users)
+            ? payload.users
+            : [];
+
+      const mapped: Teacher[] = list
+        .map((u: any) => {
+          const id = String(u?._id ?? u?.id ?? "").trim();
+          const name = String(
+            u?.fullName ??
+              u?.fullname ??
+              u?.name ??
+              u?.displayName ??
+              `${String(u?.firstName ?? "").trim()} ${String(u?.lastName ?? "").trim()}`.trim() ??
+              u?.username ??
+              u?.email ??
+              "",
+          ).trim();
+          if (!id) return null;
+          return {
+            id,
+            name: name || `Teacher ${id.slice(-6)}`,
+            avatar: String(u?.avatar ?? ""),
+          };
+        })
+        .filter(Boolean) as Teacher[];
+
+      setTeachers(mapped);
+    } catch {
+      setTeachers([]);
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
+    fetchTeachers();
   }, []);
+
+  const openCreateModal = () => {
+    setCreateError("");
+    setCreateForm({
+      groupName: "",
+      description: "",
+      type: "class",
+      visibility: "public",
+      owner: "",
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleCreateGroup = async () => {
+    if (!createForm.groupName.trim()) {
+      setCreateError("Vui lòng nhập tên nhóm.");
+      return;
+    }
+    if (!createForm.owner.trim()) {
+      setCreateError("Vui lòng chọn owner (teacher).");
+      return;
+    }
+
+    try {
+      setCreatingGroup(true);
+      setCreateError("");
+      await groupsService.createGroup({
+        groupName: createForm.groupName.trim(),
+        description: createForm.description.trim() || undefined,
+        type: createForm.type,
+        visibility: createForm.visibility,
+        owner: createForm.owner,
+      });
+      setShowCreateModal(false);
+      await fetchClasses();
+      await showAlert("Tạo nhóm thành công.", "Thành công");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      setCreateError(Array.isArray(msg) ? msg.join(", ") : msg || "Không thể tạo nhóm.");
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
 
   // Filter Logic
   const filteredClasses = useMemo(
@@ -145,7 +329,7 @@ export default function AdminClassesPage() {
   );
 
   const activeCount = classes.filter((c) => c.status === "ACTIVE").length;
-  const missingTeacherCount = classes.filter((c) => !c.teacher.avatar && c.teacher.name === "Chưa phân công").length;
+  const missingTeacherCount = classes.filter((c) => !c.hasOwner).length;
 
   const getStatusBadge = (status: ClassStatus) => {
     switch (status) {
@@ -211,7 +395,10 @@ export default function AdminClassesPage() {
             Theo dõi danh sách nhóm, chủ sở hữu và thành viên.
           </p>
         </div>
-        <button className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition">
+        <button
+          onClick={openCreateModal}
+          className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition"
+        >
           <Plus size={20} /> Tạo nhóm mới
         </button>
       </div>
@@ -339,12 +526,18 @@ export default function AdminClassesPage() {
                   </div>
                 </td>
                 <td className="p-4">
-                  {cls.teacher.avatar ? (
+                  {cls.hasOwner ? (
                     <div className="flex items-center gap-2">
-                      <img
-                        src={cls.teacher.avatar}
-                        className="w-8 h-8 rounded-full border border-slate-200"
-                      />
+                      {cls.teacher.avatar ? (
+                        <img
+                          src={cls.teacher.avatar}
+                          className="w-8 h-8 rounded-full border border-slate-200"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full border border-slate-200 bg-slate-100 grid place-items-center text-slate-500 text-xs font-bold">
+                          OW
+                        </div>
+                      )}
                       <span className="text-sm font-medium text-slate-700">
                         {cls.teacher.name}
                       </span>
@@ -486,6 +679,114 @@ export default function AdminClassesPage() {
                 className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg"
               >
                 Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl p-6 animate-in zoom-in-95">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-black text-lg text-slate-800">Tạo nhóm mới</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {createError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 font-semibold">
+                  {createError}
+                </div>
+              ) : null}
+
+              <label className="block text-xs font-bold text-slate-600">
+                Tên nhóm *
+                <input
+                  value={createForm.groupName}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, groupName: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500"
+                  placeholder="Nhập tên nhóm"
+                />
+              </label>
+
+              <label className="block text-xs font-bold text-slate-600">
+                Mô tả
+                <textarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 min-h-[90px]"
+                  placeholder="Nhập mô tả nhóm"
+                />
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block text-xs font-bold text-slate-600">
+                  Loại nhóm
+                  <select
+                    value={createForm.type}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, type: e.target.value as any }))
+                    }
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 bg-white"
+                  >
+                    <option value="class">Class</option>
+                    <option value="subject">Subject</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+
+                <label className="block text-xs font-bold text-slate-600">
+                  Visibility
+                  <select
+                    value={createForm.visibility}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, visibility: e.target.value as any }))
+                    }
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 bg-white"
+                  >
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                    <option value="hidden">Hidden</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="block text-xs font-bold text-slate-600">
+                Owner (Teacher) *
+                <select
+                  value={createForm.owner}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, owner: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="">-- Chọn giáo viên --</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={creatingGroup}
+                onClick={handleCreateGroup}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60"
+              >
+                {creatingGroup ? "Đang tạo..." : "Tạo nhóm"}
               </button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, Users, ArrowLeft, Send } from "lucide-react";
+import { Search, Plus, Users, ArrowLeft, Send, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { groupsService } from "@/services/groups.service";
@@ -22,6 +22,12 @@ type GroupMessage = {
   content?: string;
   createdAt?: string;
   pending?: boolean;
+};
+type GroupDocument = {
+  id: string;
+  name: string;
+  url: string;
+  createdAt?: string;
 };
 
 export default function MyGroupsPage() {
@@ -50,8 +56,11 @@ export default function MyGroupsPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [groupDocuments, setGroupDocuments] = useState<GroupDocument[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   const endRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const senderNameMapRef = useRef<Record<string, string>>({});
 
   const toTimeValue = (value?: string) => {
@@ -123,7 +132,15 @@ export default function MyGroupsPage() {
   };
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
-    setTimeout(() => endRef.current?.scrollIntoView({ behavior }), 0);
+    requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (!container) return;
+      if (behavior === "smooth") {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
   };
 
   useEffect(() => {
@@ -254,6 +271,57 @@ export default function MyGroupsPage() {
 
     return () => window.clearInterval(interval);
   }, [activeGroupId, currentUserId, currentUserName]);
+
+  useEffect(() => {
+    if (!activeGroupId) {
+      setGroupDocuments([]);
+      return;
+    }
+
+    const loadDocuments = async () => {
+      try {
+        setLoadingDocs(true);
+        const res: any = await groupsService.getGroupById(activeGroupId);
+        const payload = res?.data ?? res;
+        const detail = payload?.data ?? payload?.result ?? payload;
+        const docs = Array.isArray(detail?.documents)
+          ? detail.documents
+          : Array.isArray(detail?.data?.documents)
+            ? detail.data.documents
+            : [];
+
+        const mapped: GroupDocument[] = docs
+          .map((d: any, idx: number) => {
+            const url =
+              d?.url ??
+              d?.fileUrl ??
+              d?.path ??
+              d?.link ??
+              (typeof d === "string" ? d : "");
+            const name =
+              d?.name ??
+              d?.fileName ??
+              (typeof url === "string" ? url.split("/").pop() : "") ??
+              `Tài liệu ${idx + 1}`;
+            return {
+              id: String(d?._id ?? d?.id ?? `${activeGroupId}-doc-${idx}`),
+              name: String(name || `Tài liệu ${idx + 1}`),
+              url: String(url || ""),
+              createdAt: d?.createdAt ? String(d.createdAt) : undefined,
+            };
+          })
+          .filter((x: GroupDocument) => x.url);
+
+        setGroupDocuments(mapped);
+      } catch {
+        setGroupDocuments([]);
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+
+    void loadDocuments();
+  }, [activeGroupId]);
 
   const handleSearch = async () => {
     if (!keyword.trim()) return;
@@ -528,8 +596,8 @@ export default function MyGroupsPage() {
             </div>
           </div>
 
-          {/* Right: chat */}
-          <div className="bg-white/95 backdrop-blur border border-slate-200 rounded-3xl shadow-primary-card overflow-hidden flex flex-col">
+          {/* Right: chat + documents */}
+          <div className="bg-white/95 backdrop-blur border border-slate-200 rounded-3xl shadow-primary-card overflow-hidden flex flex-col min-h-0">
             {!activeGroup ? (
               <div className="p-8 text-center">
                 <div className="mx-auto w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-black text-xl">
@@ -552,11 +620,16 @@ export default function MyGroupsPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[320px] custom-scrollbar">
-                  {loadingMessages ? (
-                    <div className="text-slate-500 text-sm">Đang tải tin nhắn...</div>
-                  ) : messages?.length ? (
-                    messages.map((m, idx) => {
+                <div className="flex-1 min-h-0 flex">
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <div
+                      ref={messagesContainerRef}
+                      className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[320px] custom-scrollbar"
+                    >
+                      {loadingMessages ? (
+                        <div className="text-slate-500 text-sm">Đang tải tin nhắn...</div>
+                      ) : messages?.length ? (
+                        messages.map((m, idx) => {
                       const anyMsg = m as any;
                       const content =
                         m.content ?? anyMsg?.message ?? anyMsg?.text ?? "";
@@ -634,33 +707,67 @@ export default function MyGroupsPage() {
                           )}
                         </div>
                       );
-                    })
-                  ) : (
-                    <div className="text-center text-slate-500 text-sm mt-6">Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</div>
-                  )}
-                  <div ref={endRef} />
-                </div>
+                        })
+                      ) : (
+                        <div className="text-center text-slate-500 text-sm mt-6">Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</div>
+                      )}
+                      <div ref={endRef} />
+                    </div>
 
-                <div className="p-4 border-t border-slate-100 bg-white">
-                  <div className="flex gap-2 items-center">
-                    <input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSend();
-                      }}
-                      placeholder="Nhập tin nhắn..."
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-blue-400"
-                    />
-                    <button
-                      onClick={handleSend}
-                      disabled={sending || !input.trim()}
-                      className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
-                      aria-label="Send message"
-                    >
-                      <Send size={18} />
-                    </button>
+                    <div className="p-4 border-t border-slate-100 bg-white">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSend();
+                          }}
+                          placeholder="Nhập tin nhắn..."
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+                        />
+                        <button
+                          onClick={handleSend}
+                          disabled={sending || !input.trim()}
+                          className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
+                          aria-label="Send message"
+                        >
+                          <Send size={18} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
+                  <aside className="hidden lg:flex lg:flex-col w-[300px] border-l border-slate-100 bg-slate-50/70">
+                    <div className="p-4 border-b border-slate-100">
+                      <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">
+                        Tài liệu nhóm
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {activeGroup ? activeGroup.name : "Chưa chọn nhóm"}
+                      </p>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                      {loadingDocs ? (
+                        <p className="text-xs text-slate-500">Đang tải tài liệu...</p>
+                      ) : groupDocuments.length === 0 ? (
+                        <p className="text-xs text-slate-500">Nhóm chưa có tài liệu.</p>
+                      ) : (
+                        groupDocuments.map((doc) => (
+                          <a
+                            key={doc.id}
+                            href={doc.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            <span className="max-w-[190px] truncate">{doc.name}</span>
+                            <Download size={14} className="shrink-0 text-slate-500" />
+                          </a>
+                        ))
+                      )}
+                    </div>
+                  </aside>
                 </div>
               </>
             )}

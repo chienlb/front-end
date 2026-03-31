@@ -1,5 +1,5 @@
 "use client";
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import {
   MessageSquare,
   BookOpen,
@@ -11,6 +11,7 @@ import {
   CalendarIcon,
   ClipboardList,
 } from "lucide-react";
+import axios from "axios";
 
 import Header from "@/components/teacher/classes/Header";
 import TabStream from "@/components/teacher/classes/TabStream";
@@ -23,6 +24,7 @@ import TabSettings from "@/components/teacher/classes/TabSettings";
 import TabSchedule from "@/components/teacher/classes/TabSchedule";
 import TabGroups from "@/components/teacher/classes/TabGroups";
 import TabHomework from "@/components/teacher/classes/TabHomework/TabHomework";
+
 // --- DỮ LIỆU MẪU ---
 const CLASS_DATA = {
   id: "class_123",
@@ -68,6 +70,11 @@ const CLASS_DATA = {
   ],
 };
 
+interface UploadedFile {
+  url: string;
+  name: string;
+}
+
 export default function TeacherClassPage({
   params,
 }: {
@@ -87,6 +94,44 @@ export default function TeacherClassPage({
     | "SCHEDULE"
     | "GROUPS"
   >("CLASSWORK");
+
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (activeTab === "GROUPS") {
+      fetchUploadedFiles();
+    }
+  }, [activeTab]);
+
+  const fetchUploadedFiles = async () => {
+    try {
+      const response = await axios.get(`/api/groups/${id}/files`);
+      setUploadedFiles(response.data);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("groupId", id);
+    formData.append("file", file);
+
+    try {
+      await axios.post(`/api/groups/upload-document`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      fetchUploadedFiles();
+      setFile(null);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
@@ -139,7 +184,33 @@ export default function TeacherClassPage({
         {activeTab === "ANALYTICS" && <TabAnalytics />}
         {activeTab === "SETTINGS" && <TabSettings />}
         {activeTab === "SCHEDULE" && <TabSchedule />}
-        {activeTab === "GROUPS" && <TabGroups />}
+        {activeTab === "GROUPS" && (
+          <div>
+            <h2 className="text-xl font-bold mb-4">Manage Group Files</h2>
+            <div className="mb-4">
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+              <button
+                onClick={handleFileUpload}
+                className="bg-blue-500 text-white px-4 py-2 rounded ml-2"
+              >
+                Upload File
+              </button>
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Uploaded Files</h3>
+            <ul className="list-disc pl-5">
+              {uploadedFiles.map((file, index) => (
+                <li key={index}>
+                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                    {file.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

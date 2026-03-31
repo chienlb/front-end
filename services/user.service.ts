@@ -79,6 +79,22 @@ export const userService = {
   },
 
   /**
+   * Lấy profile theo senderId (ưu tiên profile endpoint, fallback users/:id).
+   * Dùng cho chat/group-message khi chỉ có senderId.
+   */
+  getProfileBySenderId: async (senderId: string) => {
+    const id = encodeURIComponent(String(senderId || "").trim());
+    try {
+      const res = await api.get(`/auths/profile/${id}`);
+      return res.data ?? res;
+    } catch {
+      // Always fallback to /users/:id regardless of profile-route error type.
+      const res = await api.get(`/users/${id}`);
+      return res.data ?? res;
+    }
+  },
+
+  /**
    * Cập nhật thông tin cá nhân (user đang đăng nhập).
    * Thử PATCH /auths/profile; nếu backend không có (404/405) thì PATCH /users/:id.
    */

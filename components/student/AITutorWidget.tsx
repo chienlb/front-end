@@ -51,7 +51,9 @@ function formatMessageText(text: string): React.ReactNode {
 }
 const ICON_BG = "#FFFFFF";
 
-export default function AITutorWidget() {
+export default function AITutorWidget({ chatbotEnabled }: { chatbotEnabled: boolean }) {
+  if (!chatbotEnabled) return null;
+
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [mode, setMode] = useState<"TEXT">("TEXT");

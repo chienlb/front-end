@@ -20,6 +20,16 @@ export type ExportFilter = {
   paymentStatus?: string;
 };
 
+export type SystemFeature = {
+  _id?: string;
+  id?: string;
+  key?: string;
+  name?: string;
+  flagName?: string;
+  description?: string;
+  isEnabled: boolean;
+};
+
 export const adminService = {
   getDashboardData: () => api.get("/admin/dashboard"),
   getRevenueData: () => api.get("/admin/revenue"),
@@ -29,6 +39,9 @@ export const adminService = {
   getRecentPayments: () => api.get("/payments/get-list-payment"),
   getRecentUsers: () => api.get("/admin/recent-users"),
   getRevenueByMonth: () => api.get("/admin/revenue-by-month"),
+  getSystemFeatures: () => api.get("/admin/system-features"),
+  toggleSystemFeature: (id: string, isEnabled: boolean) =>
+    api.patch(`/admin/system-features/${id}/toggle`, { isEnabled }),
   getUserByMonth: () => api.get("/admin/user-by-month"),
   exportToExcel: async (filters: ExportFilter) => {
     const params = new URLSearchParams();
@@ -55,5 +68,14 @@ export const adminService = {
       throw new Error(message);
     }
     return res.blob();
+  },
+  async uploadDocument(groupId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("groupId", groupId);
+
+    return api.post("/admin/upload-document", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
 };
