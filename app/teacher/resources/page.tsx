@@ -344,7 +344,9 @@ export default function MediaLibraryPage() {
                             </a>
                           ) : (
                             <button
-                              onClick={() => window.open(item.url, "_blank")}
+                              onClick={() =>
+                                window.open(item.url, "_blank")
+                              }
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                               title="Xem"
                             >

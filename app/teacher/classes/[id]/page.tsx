@@ -203,7 +203,11 @@ export default function TeacherClassPage({
             <ul className="list-disc pl-5">
               {uploadedFiles.map((file, index) => (
                 <li key={index}>
-                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={file.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {file.name}
                   </a>
                 </li>
