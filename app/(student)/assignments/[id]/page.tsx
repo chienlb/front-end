@@ -15,6 +15,13 @@ import {
   Loader2,
 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
+import {
+  deadlineDisplayLabel,
+  isAssignmentOverdue,
+  isAssignmentSubmitLocked,
+  parseAssignmentDeadline,
+} from "@/utils/assignmentDeadline";
+import type { AssignmentStatus } from "../data";
 
 type DetailAssignment = {
   id: string;
@@ -23,6 +30,9 @@ type DetailAssignment = {
   source: string;
   teacher?: string;
   deadline: string;
+  deadlineAt: number | null;
+  /** Trạng thái từ API (để biết đã nộp / đã chấm) */
+  status?: AssignmentStatus;
   duration?: string;
   content?: string;
   requirements?: string[];
@@ -83,13 +93,25 @@ export default function AssignmentDetailPage() {
           (Array.isArray(payload?.attachments) && payload.attachments[0]?.fileName) ||
           undefined;
 
+        const rawDl = payload?.deadline ?? payload?.dueDate;
+        const deadlineAt = parseAssignmentDeadline(rawDl);
+
+        const rawSt = String(payload?.status ?? payload?.submissionStatus ?? "").toUpperCase();
+        let status: AssignmentStatus = "PENDING";
+        if (["GRADED", "DONE", "COMPLETED"].includes(rawSt)) status = "GRADED";
+        else if (["SUBMITTED", "WAITING", "PENDING_REVIEW"].includes(rawSt))
+          status = "SUBMITTED";
+        else if (["LATE", "OVERDUE"].includes(rawSt)) status = "LATE";
+
         setAssignment({
           id: String(payload?._id || payload?.id || id),
           title: payload?.title || payload?.name || "Bài tập chưa đặt tên",
           subject: payload?.subject || payload?.type || "Bài tập",
           source: payload?.classId ? "NHÓM HỌC" : payload?.lessonId ? "LESSON" : "HỆ THỐNG",
           teacher: payload?.teacherId?.fullName || payload?.teacherName || undefined,
-          deadline: payload?.deadline || payload?.dueDate || "Chưa có hạn nộp",
+          deadline: deadlineDisplayLabel(rawDl, deadlineAt),
+          deadlineAt,
+          status,
           duration: payload?.duration || payload?.timeLimit || undefined,
           content: payload?.description || payload?.content || undefined,
           requirements: Array.isArray(payload?.requirements)
@@ -132,6 +154,19 @@ export default function AssignmentDetailPage() {
       </div>
     );
   }
+
+  const submittedLocal = !!submittedFile?.fileUrl;
+  const doneFromApi =
+    assignment?.status === "SUBMITTED" || assignment?.status === "GRADED";
+  const done = submittedLocal || doneFromApi;
+  const statusForDeadline: AssignmentStatus = done ? "GRADED" : assignment?.status ?? "PENDING";
+
+  const submitLocked = Boolean(
+    assignment && isAssignmentSubmitLocked(assignment.deadlineAt, statusForDeadline),
+  );
+  const overdueDetail = Boolean(
+    assignment && isAssignmentOverdue(assignment.deadlineAt, statusForDeadline),
+  );
 
   if (!assignment) {
     return (
@@ -178,10 +213,24 @@ export default function AssignmentDetailPage() {
           <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-200 p-3 bg-slate-50">
               <p className="text-xs text-slate-500 font-bold uppercase">Hạn nộp</p>
-              <p className="text-sm text-slate-800 font-semibold mt-1 flex items-center gap-2">
-                <Clock size={14} />
-                {assignment.deadline}
-              </p>
+              {overdueDetail ? (
+                <div className="mt-1">
+                  <p className="text-sm font-black text-red-600 flex items-center gap-2">
+                    <Clock size={14} />
+                    Hết hạn
+                  </p>
+                  {assignment.deadlineAt != null && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Đã qua: {assignment.deadline}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-800 font-semibold mt-1 flex items-center gap-2">
+                  <Clock size={14} />
+                  {assignment.deadline}
+                </p>
+              )}
             </div>
             <div className="rounded-2xl border border-slate-200 p-3 bg-slate-50">
               <p className="text-xs text-slate-500 font-bold uppercase">Giáo viên</p>
@@ -277,13 +326,22 @@ export default function AssignmentDetailPage() {
           )}
 
           <div className="mt-6 flex justify-end">
-            <Link
-              href={`/assignments/${assignment.id}/submit`}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold"
-            >
-              Nộp file
-              <ArrowUpRight size={16} />
-            </Link>
+            {done ? null : submitLocked ? (
+              <span
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-200 text-slate-500 font-extrabold cursor-not-allowed"
+                title="Đã quá hạn nộp bài"
+              >
+                Hết hạn nộp
+              </span>
+            ) : (
+              <Link
+                href={`/assignments/${assignment.id}/submit`}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold"
+              >
+                Nộp file
+                <ArrowUpRight size={16} />
+              </Link>
+            )}
           </div>
         </div>
       </div>

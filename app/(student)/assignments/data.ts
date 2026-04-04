@@ -9,6 +9,8 @@ export interface Assignment {
   sourceName?: string;
   teacher?: string;
   deadline: string;
+  /** Timestamp hạn nộp (nếu parse được từ API) — dùng so sánh với thời gian thực */
+  deadlineAt?: number | null;
   status: AssignmentStatus;
   score?: number;
   duration?: string;

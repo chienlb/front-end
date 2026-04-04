@@ -128,9 +128,31 @@ export const communitesService = {
     return api.post("/communites", formData);
   },
 
-  /** PATCH /communites/:id */
+  /** PATCH /communites/:id — JSON (chỉ đổi nội dung) */
   update: async (id: string, data: Record<string, unknown>) => {
     return api.patch(`/communites/${id}`, data);
+  },
+
+  /**
+   * Cập nhật bài: có file mới → multipart giống create; không → JSON { content }.
+   */
+  updatePost: async (
+    id: string,
+    payload: { content: string; file?: File | null },
+  ) => {
+    if (payload.file) {
+      const formData = new FormData();
+      appendMultipartCommuniteBody(formData, payload.content, payload.file);
+      return api.patch(`/communites/${id}`, formData);
+    }
+    return api.patch(`/communites/${id}`, {
+      content: String((payload.content ?? "").trim() || " "),
+    });
+  },
+
+  /** DELETE /communites/:id */
+  remove: async (id: string) => {
+    return api.delete(`/communites/${id}`);
   },
 
   /**

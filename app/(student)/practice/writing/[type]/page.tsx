@@ -59,6 +59,118 @@ const WRITING_DETAIL_CONFIG = {
 
 type WritingType = keyof typeof WRITING_DETAIL_CONFIG;
 
+/** Axios đã trả `response.data`; backend có thể bọc thêm `{ data: ... }`. */
+function unwrapCreatedPracticeResponse(raw: unknown): any {
+  let o: any = raw;
+  for (let i = 0; i < 4; i++) {
+    if (o && typeof o === "object" && "data" in o && o.data != null) o = o.data;
+    else break;
+  }
+  return o;
+}
+
+function pickPracticeId(doc: any): string {
+  if (!doc || typeof doc !== "object") return "";
+  return String(
+    doc._id ??
+      doc.id ??
+      doc.practiceId ??
+      doc.practice?._id ??
+      doc.practice?.id ??
+      "",
+  ).trim();
+}
+
+/** Gom text đề từ nhiều kiểu document practice (Nest / AI khác nhau). */
+function collectTopicLinesFromPracticeDoc(doc: any): string[] {
+  if (!doc || typeof doc !== "object") return [];
+  const lines: string[] = [];
+  const add = (label: string, val: unknown) => {
+    if (val == null) return;
+    const s = typeof val === "string" ? val.trim() : String(val).trim();
+    if (s) lines.push(`${label}: ${s}`);
+  };
+
+  add("Đề bài", doc.prompt ?? doc.topic ?? doc.question);
+  add("Tiêu đề", doc.title);
+  add("Tình huống", doc.situation);
+  add("Yêu cầu", doc.instruction);
+  if (typeof doc.content === "string" && doc.content.trim()) {
+    add("Nội dung", doc.content);
+  }
+  add("Mô tả", doc.description);
+
+  /** API `type: sentences` — `exercise.items[]` có `sentence_vi` / `sentence_en`. */
+  const listItems =
+    (Array.isArray(doc.exercise?.items) && doc.exercise.items) ||
+    (Array.isArray(doc.items) ? doc.items : null);
+  if (listItems && listItems.length > 0) {
+    const head = listItems[0];
+    if (
+      head &&
+      typeof head === "object" &&
+      (typeof (head as any).sentence_vi === "string" ||
+        typeof (head as any).sentence_en === "string")
+    ) {
+      const out: string[] = [
+        "Viết câu tiếng Anh tương ứng với các câu tiếng Việt sau:",
+      ];
+      listItems.forEach((it: any, i: number) => {
+        const vi =
+          typeof it?.sentence_vi === "string" ? it.sentence_vi.trim() : "";
+        const en =
+          typeof it?.sentence_en === "string" ? it.sentence_en.trim() : "";
+        const one = vi || en;
+        if (one) out.push(`${i + 1}. ${one}`);
+      });
+      return out.filter((l) => l.trim().length > 0);
+    }
+  }
+
+  const item =
+    doc.exercise?.items?.[0] ??
+    (Array.isArray(doc.exercise) ? doc.exercise[0] : undefined) ??
+    doc.items?.[0] ??
+    doc.exercises?.[0] ??
+    doc.exerciseItem;
+
+  if (item && typeof item === "object") {
+    add("Tiêu đề", item.title);
+    add("Tình huống", item.situation);
+    add("Yêu cầu", item.instruction ?? item.prompt);
+    add("Đề bài", item.prompt ?? item.question);
+    if (typeof item.content === "string" && item.content.trim()) {
+      add("Chi tiết", item.content);
+    }
+    if (Array.isArray(item.requirements) && item.requirements.length > 0) {
+      lines.push(`Cần có: ${item.requirements.join("; ")}`);
+    }
+    if (typeof item.minimum_sentences === "number") {
+      lines.push(`Số câu tối thiểu: ${item.minimum_sentences}`);
+    }
+  }
+
+  // exercise là chuỗi (một số API)
+  if (
+    lines.length === 0 &&
+    typeof doc.exercise === "string" &&
+    doc.exercise.trim()
+  ) {
+    lines.push(`Đề bài: ${doc.exercise.trim()}`);
+  }
+
+  const out = lines.filter((l) => l.trim().length > 0);
+  if (out.length === 0 && doc.practice && typeof doc.practice === "object") {
+    return collectTopicLinesFromPracticeDoc(doc.practice);
+  }
+  return out;
+}
+
+/** Gỡ ký hiệu markdown (**) trong phản hồi API để không hiển thị dấu sao. */
+function sanitizeAiFeedbackDisplay(text: string): string {
+  return String(text).replace(/\*\*/g, "");
+}
+
 export default function WritingDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -130,22 +242,12 @@ export default function WritingDetailPage() {
         studentId.trim(),
         currentType,
       );
-      const payload = res?.data ? res.data : res;
-      const createdId = payload?._id;
-      const firstItem = payload?.exercise?.items?.[0];
+      const payload = unwrapCreatedPracticeResponse(res);
+      const createdId = pickPracticeId(payload);
       if (createdId) setPracticeId(createdId);
 
-      if (firstItem) {
-        const lines: string[] = [];
-        if (firstItem.title) lines.push(`Tiêu đề: ${firstItem.title}`);
-        if (firstItem.situation) lines.push(`Tình huống: ${firstItem.situation}`);
-        if (firstItem.instruction) lines.push(`Yêu cầu: ${firstItem.instruction}`);
-        if (Array.isArray(firstItem.requirements) && firstItem.requirements.length > 0) {
-          lines.push(`Cần có: ${firstItem.requirements.join("; ")}`);
-        }
-        if (typeof firstItem.minimum_sentences === "number") {
-          lines.push(`Số câu tối thiểu: ${firstItem.minimum_sentences}`);
-        }
+      const lines = collectTopicLinesFromPracticeDoc(payload);
+      if (lines.length > 0) {
         setGeneratedTopic(lines.join("\n"));
       } else {
         const list = topicPool[currentType];
@@ -442,12 +544,12 @@ export default function WritingDetailPage() {
               )}
               {aiFeedback.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  {aiFeedback.map((note) => (
+                  {aiFeedback.map((note, idx) => (
                     <div
-                      key={note}
-                      className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                      key={idx}
+                      className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 whitespace-pre-wrap"
                     >
-                      {note}
+                      {sanitizeAiFeedbackDisplay(note)}
                     </div>
                   ))}
                 </div>

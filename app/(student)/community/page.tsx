@@ -13,6 +13,7 @@ import {
   Send,
   X,
   MoreHorizontal,
+  Pencil,
   Clock,
   Rocket,
   Zap,
@@ -76,6 +77,25 @@ function timeAgo(iso?: string | null): string {
   } catch {
     return "—";
   }
+}
+
+function postCreatedAtMs(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Bài tạo sau hiển thị trước (theo thời gian thực). */
+function sortPostsNewestFirst(items: Post[]): Post[] {
+  return [...items].sort(
+    (a, b) => postCreatedAtMs(b.createdAt) - postCreatedAtMs(a.createdAt),
+  );
+}
+
+function isOwnPost(post: Post, currentUserId: string | null): boolean {
+  if (!currentUserId?.trim() || !post.userId?.trim()) return false;
+  return (
+    normalizeUserIdKey(post.userId) === normalizeUserIdKey(currentUserId)
+  );
 }
 
 /** Lấy username từ object user (populate) hoặc null */
@@ -349,11 +369,7 @@ function normalizeCommunite(
 
   return {
     id,
-    userId: String(
-      typeof author === "object" && author?._id
-        ? author._id
-        : author ?? raw?.userId ?? "",
-    ),
+    userId: authorIdStr ? String(authorIdStr) : "",
     user: { name, avatar, level },
     content,
     images,
@@ -377,6 +393,66 @@ const itemVariants: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 60 } },
 };
+
+const COMMUNITY_EMOJIS = [
+  "😀", "😃", "😄", "😁", "😅", "😂", "🤣", "😊", "😍", "🥰", "😘", "😗", "🙂",
+  "🤗", "🤩", "🤔", "😏", "😌", "😮", "😯", "😲", "😳", "🥺", "😢", "😭", "😤",
+  "😡", "🥳", "😎", "🤓", "😴", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "💕",
+  "💯", "🔥", "✨", "⭐", "🌟", "👍", "👎", "👏", "🙌", "🙏", "💪", "🎉", "🏆",
+  "📚", "💡", "✅", "❌", "🤝", "✌️", "🎊", "🌈", "☀️", "🌙", "💤", "🤍", "💬",
+];
+
+function insertAtCursor(
+  el: HTMLTextAreaElement | null,
+  insert: string,
+  current: string,
+  setValue: (next: string) => void,
+) {
+  if (!el) {
+    setValue(current + insert);
+    return;
+  }
+  const start = el.selectionStart ?? current.length;
+  const end = el.selectionEnd ?? current.length;
+  const next = current.slice(0, start) + insert + current.slice(end);
+  setValue(next);
+  requestAnimationFrame(() => {
+    el.focus();
+    const pos = start + insert.length;
+    try {
+      el.setSelectionRange(pos, pos);
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+function CommunityEmojiPicker({
+  onPick,
+}: {
+  onPick: (emoji: string) => void;
+}) {
+  return (
+    <div className="absolute left-0 right-0 bottom-full z-[110] mb-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/80">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 px-0.5">
+        Cảm xúc
+      </p>
+      <div className="grid grid-cols-8 gap-1 max-h-40 overflow-y-auto pr-1 [scrollbar-width:thin]">
+        {COMMUNITY_EMOJIS.map((emoji, i) => (
+          <button
+            key={`${emoji}-${i}`}
+            type="button"
+            title={emoji}
+            className="flex items-center justify-center text-xl leading-none p-1.5 rounded-lg hover:bg-indigo-50 active:scale-95 transition"
+            onClick={() => onPick(emoji)}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -403,11 +479,29 @@ export default function CommunityPage() {
     null,
   );
 
+  const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const editFileRef = useRef<HTMLInputElement>(null);
+  const createTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [emojiPickerFor, setEmojiPickerFor] = useState<null | "create" | "edit">(
+    null,
+  );
+
   const loadPosts = useCallback(async () => {
     try {
       const list = await communitesService.list({ page: 1, limit: 30 });
       setPosts(
-        list.map((item) => normalizeCommunite(item, currentUserId, usernameMap)),
+        sortPostsNewestFirst(
+          list.map((item) =>
+            normalizeCommunite(item, currentUserId, usernameMap),
+          ),
+        ),
       );
     } catch (e: any) {
       console.error(e);
@@ -430,6 +524,42 @@ export default function CommunityPage() {
     setNewPostPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [newPostFile]);
+
+  useEffect(() => {
+    if (!editFile) {
+      setEditPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(editFile);
+    setEditPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [editFile]);
+
+  useEffect(() => {
+    if (!postMenuOpenId) return;
+    const onDown = (e: MouseEvent) => {
+      const wrap = document.getElementById(
+        `community-post-menu-${postMenuOpenId}`,
+      );
+      if (wrap && !wrap.contains(e.target as Node)) setPostMenuOpenId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [postMenuOpenId]);
+
+  useEffect(() => {
+    if (!emojiPickerFor) return;
+    const onDown = (e: MouseEvent) => {
+      const roots = document.querySelectorAll("[data-community-emoji-picker]");
+      let inside = false;
+      roots.forEach((node) => {
+        if (node.contains(e.target as Node)) inside = true;
+      });
+      if (!inside) setEmojiPickerFor(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [emojiPickerFor]);
 
   /** Preview ảnh bình luận */
   useEffect(() => {
@@ -509,7 +639,11 @@ export default function CommunityPage() {
 
           setUsernameMap(nextUsernameMap);
           setPosts(
-            list.map((item) => normalizeCommunite(item, uidStr, nextUsernameMap)),
+            sortPostsNewestFirst(
+              list.map((item) =>
+                normalizeCommunite(item, uidStr, nextUsernameMap),
+              ),
+            ),
           );
         } else {
           console.error(listOutcome.reason);
@@ -600,6 +734,75 @@ export default function CommunityPage() {
     }
   };
 
+  const openEditPost = (post: Post) => {
+    setEditingPostId(post.id);
+    setEditContent(post.content);
+    setEditFile(null);
+    setEditPreviewUrl(null);
+    if (editFileRef.current) editFileRef.current.value = "";
+    setPostMenuOpenId(null);
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingPostId(null);
+    setEditContent("");
+    setEditFile(null);
+    setEditPreviewUrl(null);
+    setEmojiPickerFor(null);
+    if (editFileRef.current) editFileRef.current.value = "";
+  };
+
+  const applyEmoji = (emoji: string) => {
+    if (emojiPickerFor === "create") {
+      insertAtCursor(
+        createTextareaRef.current,
+        emoji,
+        newPostContent,
+        setNewPostContent,
+      );
+    } else if (emojiPickerFor === "edit") {
+      insertAtCursor(
+        editTextareaRef.current,
+        emoji,
+        editContent,
+        setEditContent,
+      );
+    }
+  };
+
+  const handleSaveEditPost = async () => {
+    if (!editingPostId) return;
+    if (!editContent.trim() && !editFile) {
+      await showAlert("Nhập nội dung hoặc chọn ảnh mới.");
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const res: any = await communitesService.updatePost(editingPostId, {
+        content: editContent.trim() || " ",
+        file: editFile ?? undefined,
+      });
+      const doc = unwrapCommuniteDoc(res);
+      const updated = normalizeCommunite(doc, currentUserId, usernameMap);
+      setPosts((p) =>
+        sortPostsNewestFirst(
+          p.map((x) => (x.id === editingPostId ? updated : x)),
+        ),
+      );
+      closeEditModal();
+    } catch (e: any) {
+      await showAlert(
+        e?.response?.data?.message?.[0] ??
+          e?.message ??
+          "Không cập nhật được bài viết.",
+      );
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!newPostContent.trim() && !newPostFile) return;
     setIsPosting(true);
@@ -630,10 +833,11 @@ export default function CommunityPage() {
           ...(meKey && meHandle ? { [meKey]: meHandle } : {}),
         },
       );
-      setPosts((p) => [post, ...p]);
+      setPosts((p) => sortPostsNewestFirst([post, ...p]));
     setNewPostContent("");
       setNewPostFile(null);
       if (createFileRef.current) createFileRef.current.value = "";
+      setEmojiPickerFor(null);
     setShowCreateModal(false);
     } catch (e: any) {
       await showAlert(
@@ -718,9 +922,17 @@ export default function CommunityPage() {
               <span className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-green-50 text-green-600 text-xs font-bold">
                 <ImageIcon size={16} /> Ảnh
               </span>
-              <span className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-50 text-yellow-600 text-xs font-bold">
+              <button
+                type="button"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-50 text-yellow-600 text-xs font-bold hover:bg-yellow-100 transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCreateModal(true);
+                  setEmojiPickerFor("create");
+                }}
+              >
                 <Smile size={16} /> Cảm xúc
-              </span>
+              </button>
             </div>
             <button
               type="button"
@@ -788,12 +1000,38 @@ export default function CommunityPage() {
                       </div>
                     </div>
                   </div>
-                    <button
-                      type="button"
-                      className="text-slate-300 hover:text-indigo-500 p-2 rounded-xl hover:bg-indigo-50 transition"
+                  {isOwnPost(post, currentUserId) ? (
+                    <div
+                      className="relative shrink-0"
+                      id={`community-post-menu-${post.id}`}
                     >
-                    <MoreHorizontal size={20} />
-                  </button>
+                      <button
+                        type="button"
+                        aria-expanded={postMenuOpenId === post.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPostMenuOpenId((prev) =>
+                            prev === post.id ? null : post.id,
+                          );
+                        }}
+                        className="text-slate-300 hover:text-indigo-500 p-2 rounded-xl hover:bg-indigo-50 transition"
+                      >
+                        <MoreHorizontal size={20} />
+                      </button>
+                      {postMenuOpenId === post.id && (
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded-2xl border border-slate-100 bg-white py-1.5 shadow-xl shadow-slate-200/80">
+                          <button
+                            type="button"
+                            onClick={() => openEditPost(post)}
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-indigo-50 rounded-xl"
+                          >
+                            <Pencil size={16} className="text-indigo-500" />
+                            Sửa bài viết
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="text-slate-700 mb-4 leading-relaxed whitespace-pre-wrap text-[15px] pl-1">
@@ -1016,9 +1254,9 @@ export default function CommunityPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border-[6px] border-white ring-4 ring-indigo-200"
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-visible flex flex-col min-h-0 max-h-[90vh] border-[6px] border-white ring-4 ring-indigo-200"
             >
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 shrink-0 rounded-t-[1.75rem] overflow-hidden">
                 <h3 className="font-black text-xl text-slate-800">
                   Tạo bài viết
                 </h3>
@@ -1027,6 +1265,7 @@ export default function CommunityPage() {
                   onClick={() => {
                     setShowCreateModal(false);
                     setNewPostFile(null);
+                    setEmojiPickerFor(null);
                     if (createFileRef.current) createFileRef.current.value = "";
                   }}
                   className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition"
@@ -1035,86 +1274,105 @@ export default function CommunityPage() {
                 </button>
               </div>
 
-              <div className="p-6 overflow-y-auto">
-                <div className="flex gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
-                    <img
-                      src={currentUser?.avatar}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+              <div className="flex flex-col flex-1 min-h-0 overflow-visible">
+                <div className="p-6 overflow-y-auto flex-1 min-h-0">
+                  <div className="flex gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
+                      <img
+                        src={currentUser?.avatar}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-base">
+                        {currentUser?.displayName || currentUser?.fullName || "Bạn"}
+                      </p>
+                      <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold mt-1 inline-block">
+                        🌏 Công khai
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-800 text-base">
-                      {currentUser?.displayName || currentUser?.fullName || "Bạn"}
-                    </p>
-                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold mt-1 inline-block">
-                      🌏 Công khai
+                  <textarea
+                    ref={createTextareaRef}
+                    className="w-full h-40 resize-none text-slate-700 text-lg placeholder:text-slate-300 focus:outline-none bg-transparent"
+                    placeholder="Chia sẻ thành tích hoặc câu hỏi của bạn..."
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    autoFocus
+                  />
+
+                  <input
+                    ref={createFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) =>
+                      setNewPostFile(e.target.files?.[0] ?? null)
+                    }
+                  />
+
+                  {newPostPreviewUrl && (
+                    <div className="relative mt-3 inline-block max-w-full">
+                      <img
+                        src={newPostPreviewUrl}
+                        alt=""
+                        className="max-h-56 rounded-2xl border border-slate-200 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewPostFile(null);
+                          if (createFileRef.current)
+                            createFileRef.current.value = "";
+                        }}
+                        className="absolute -top-2 -right-2 p-1.5 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700"
+                        aria-label="Gỡ ảnh"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="relative shrink-0 px-6 pb-4 pt-2 border-t border-slate-100 bg-white overflow-visible"
+                  data-community-emoji-picker
+                >
+                  <div className="border border-slate-200 rounded-2xl p-2 flex items-center justify-between bg-slate-50">
+                    <span className="text-xs font-bold text-slate-400 pl-3 uppercase tracking-wider">
+                      Đính kèm
                     </span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => createFileRef.current?.click()}
+                        className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-green-500 transition"
+                      >
+                        <ImageIcon size={22} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-expanded={emojiPickerFor === "create"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEmojiPickerFor((f) =>
+                            f === "create" ? null : "create",
+                          );
+                        }}
+                        className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-yellow-500 transition"
+                      >
+                        <Smile size={22} />
+                      </button>
+                    </div>
                   </div>
+                  {emojiPickerFor === "create" ? (
+                    <CommunityEmojiPicker onPick={applyEmoji} />
+                  ) : null}
                 </div>
-                <textarea
-                  className="w-full h-40 resize-none text-slate-700 text-lg placeholder:text-slate-300 focus:outline-none bg-transparent"
-                  placeholder="Chia sẻ thành tích hoặc câu hỏi của bạn..."
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  autoFocus
-                />
-
-                <input
-                  ref={createFileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) =>
-                    setNewPostFile(e.target.files?.[0] ?? null)
-                  }
-                />
-
-                <div className="border border-slate-200 rounded-2xl p-2 flex items-center justify-between mt-4 bg-slate-50">
-                  <span className="text-xs font-bold text-slate-400 pl-3 uppercase tracking-wider">
-                    Đính kèm
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => createFileRef.current?.click()}
-                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-green-500 transition"
-                    >
-                      <ImageIcon size={22} />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-yellow-500 transition"
-                    >
-                      <Smile size={22} />
-                    </button>
-                  </div>
-                </div>
-                {newPostPreviewUrl && (
-                  <div className="relative mt-3 inline-block max-w-full">
-                    <img
-                      src={newPostPreviewUrl}
-                      alt=""
-                      className="max-h-56 rounded-2xl border border-slate-200 object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewPostFile(null);
-                        if (createFileRef.current)
-                          createFileRef.current.value = "";
-                      }}
-                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700"
-                      aria-label="Gỡ ảnh"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
               </div>
 
-              <div className="p-5 border-t border-slate-100">
+              <div className="p-5 border-t border-slate-100 shrink-0 rounded-b-[1.75rem] overflow-hidden bg-white">
                 <button
                   type="button"
                   onClick={() => void handleCreatePost()}
@@ -1128,6 +1386,133 @@ export default function CommunityPage() {
                   ) : (
                     <>
                       <Send size={20} /> Đăng bài
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEditModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-visible flex flex-col min-h-0 max-h-[90vh] border-[6px] border-white ring-4 ring-indigo-200"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 shrink-0 rounded-t-[1.75rem] overflow-hidden">
+                <h3 className="font-black text-xl text-slate-800">
+                  Sửa bài viết
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => closeEditModal()}
+                  className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex flex-col flex-1 min-h-0 overflow-visible">
+                <div className="p-6 overflow-y-auto flex-1 min-h-0">
+                  <textarea
+                    ref={editTextareaRef}
+                    className="w-full h-40 resize-none text-slate-700 text-lg placeholder:text-slate-300 focus:outline-none bg-transparent"
+                    placeholder="Nội dung bài viết..."
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    autoFocus
+                  />
+
+                  <input
+                    ref={editFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
+                  />
+
+                  <p className="text-[11px] text-slate-400 mt-2 px-1">
+                    Chọn ảnh mới nếu muốn thay ảnh hiện tại (tùy máy chủ).
+                  </p>
+
+                  {editPreviewUrl && (
+                    <div className="relative mt-3 inline-block max-w-full">
+                      <img
+                        src={editPreviewUrl}
+                        alt=""
+                        className="max-h-56 rounded-2xl border border-slate-200 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditFile(null);
+                          if (editFileRef.current) editFileRef.current.value = "";
+                        }}
+                        className="absolute -top-2 -right-2 p-1.5 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700"
+                        aria-label="Gỡ ảnh"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="relative shrink-0 px-6 pb-4 pt-2 border-t border-slate-100 bg-white overflow-visible"
+                  data-community-emoji-picker
+                >
+                  <div className="border border-slate-200 rounded-2xl p-2 flex items-center justify-between bg-slate-50">
+                    <span className="text-xs font-bold text-slate-400 pl-3 uppercase tracking-wider">
+                      Đính kèm
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => editFileRef.current?.click()}
+                        className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-green-500 transition"
+                      >
+                        <ImageIcon size={22} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-expanded={emojiPickerFor === "edit"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEmojiPickerFor((f) =>
+                            f === "edit" ? null : "edit",
+                          );
+                        }}
+                        className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-yellow-500 transition"
+                      >
+                        <Smile size={22} />
+                      </button>
+                    </div>
+                  </div>
+                  {emojiPickerFor === "edit" ? (
+                    <CommunityEmojiPicker onPick={applyEmoji} />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-slate-100 shrink-0 rounded-b-[1.75rem] overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => void handleSaveEditPost()}
+                  disabled={
+                    (!editContent.trim() && !editFile) || isSavingEdit
+                  }
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 text-lg"
+                >
+                  {isSavingEdit ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <>
+                      <Send size={20} /> Lưu thay đổi
                     </>
                   )}
                 </button>

@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileUp, Send, CheckCircle2, ExternalLink } from "lucide-react";
+import { ArrowLeft, FileUp, Send, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
+import {
+  isAssignmentSubmitLocked,
+  parseAssignmentDeadline,
+} from "@/utils/assignmentDeadline";
+import type { AssignmentStatus } from "../../data";
 
 export default function AssignmentFileSubmitPage() {
   const router = useRouter();
@@ -16,8 +21,46 @@ export default function AssignmentFileSubmitPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [deadlineLoading, setDeadlineLoading] = useState(true);
+  const [submitLocked, setSubmitLocked] = useState(false);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setDeadlineLoading(false);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const res: any = await assignmentsService.getAssignmentById(assignmentId);
+        const payload = res?.data || res;
+        const rawDl = payload?.deadline ?? payload?.dueDate;
+        const at = parseAssignmentDeadline(rawDl);
+        const rawSt = String(payload?.status ?? "").toUpperCase();
+        let st: AssignmentStatus = "PENDING";
+        if (["GRADED", "DONE", "COMPLETED"].includes(rawSt)) st = "GRADED";
+        else if (["SUBMITTED", "WAITING", "PENDING_REVIEW"].includes(rawSt))
+          st = "SUBMITTED";
+        else if (["LATE", "OVERDUE"].includes(rawSt)) st = "LATE";
+        const doneApi = st === "SUBMITTED" || st === "GRADED";
+        const lock = isAssignmentSubmitLocked(at, doneApi ? "GRADED" : st);
+        if (alive) setSubmitLocked(lock);
+      } catch {
+        if (alive) setSubmitLocked(false);
+      } finally {
+        if (alive) setDeadlineLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [assignmentId]);
 
   const onSubmit = async () => {
+    if (submitLocked) {
+      setError("Đã quá hạn nộp bài.");
+      return;
+    }
     if (!file || !assignmentId) {
       setError("Vui lòng chọn file trước khi nộp.");
       return;
@@ -115,6 +158,17 @@ export default function AssignmentFileSubmitPage() {
             Trang này chỉ hỗ trợ nộp bài bằng file.
           </p>
 
+          {deadlineLoading ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Đang kiểm tra hạn nộp...
+            </div>
+          ) : submitLocked ? (
+            <div className="mt-4 p-4 rounded-2xl border border-red-200 bg-red-50 text-red-800 text-sm font-semibold">
+              Đã hết hạn nộp bài so với thời gian hiện tại. Bạn không thể nộp thêm.
+            </div>
+          ) : null}
+
           <div className="mt-6 space-y-4">
             <div className="border border-dashed border-slate-300 rounded-2xl p-5 bg-slate-50">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
@@ -122,8 +176,9 @@ export default function AssignmentFileSubmitPage() {
               </label>
               <input
                 type="file"
+                disabled={submitLocked || deadlineLoading}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="w-full text-sm"
+                className="w-full text-sm disabled:opacity-50"
               />
               <p className="text-xs text-slate-400 mt-2">
                 Gợi ý: pdf, doc/docx, zip, ảnh chụp bài làm...
@@ -142,9 +197,10 @@ export default function AssignmentFileSubmitPage() {
               <textarea
                 rows={4}
                 value={note}
+                disabled={submitLocked || deadlineLoading}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Nhập ghi chú cho giáo viên..."
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 outline-none focus:border-blue-400 resize-none"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 outline-none focus:border-blue-400 resize-none disabled:opacity-50"
               />
             </div>
           </div>
@@ -180,7 +236,7 @@ export default function AssignmentFileSubmitPage() {
           <div className="mt-6 flex justify-end">
             <button
               onClick={onSubmit}
-              disabled={submitting || !file}
+              disabled={submitting || !file || submitLocked || deadlineLoading}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold disabled:opacity-60"
             >
               {submitting ? <FileUp size={18} /> : <Send size={18} />}

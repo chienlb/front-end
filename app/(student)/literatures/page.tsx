@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -61,6 +61,126 @@ function pickLiteratureImageUrl(l: any): string {
   return typeof raw === "string" ? raw : "";
 }
 
+const pickNumeric = (v: unknown): number | null => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && /^\s*\d+\s*$/.test(v)) return parseInt(v.trim(), 10);
+  return null;
+};
+
+/** Chuẩn hoá list + total/totalPages từ nhiều dạng JSON (kể cả `{ data: { items, total } }`). */
+function extractLiteraturesPayload(response: any, pageSize: number): {
+  rows: any[];
+  total: number | null;
+  totalPages: number | null;
+} {
+  if (response == null) return { rows: [], total: null, totalPages: null };
+  if (Array.isArray(response)) return { rows: response, total: null, totalPages: null };
+
+  const r = response as Record<string, unknown>;
+  let total: number | null =
+    pickNumeric(r.total) ??
+    pickNumeric(r.totalCount) ??
+    pickNumeric(r.count) ??
+    pickNumeric((r.meta as any)?.total) ??
+    pickNumeric((r.pagination as any)?.total);
+  let totalPages: number | null =
+    pickNumeric(r.totalPages) ??
+    pickNumeric(r.lastPage) ??
+    pickNumeric((r.meta as any)?.totalPages) ??
+    pickNumeric((r.meta as any)?.lastPage) ??
+    pickNumeric((r.pagination as any)?.totalPages) ??
+    pickNumeric((r.pagination as any)?.lastPage);
+
+  const data = r.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const d = data as Record<string, unknown>;
+    total =
+      total ??
+      pickNumeric(d.total) ??
+      pickNumeric(d.totalCount) ??
+      pickNumeric((d.meta as any)?.total) ??
+      pickNumeric((d.pagination as any)?.total);
+    totalPages =
+      totalPages ??
+      pickNumeric(d.totalPages) ??
+      pickNumeric(d.lastPage) ??
+      pickNumeric((d.meta as any)?.totalPages) ??
+      pickNumeric((d.pagination as any)?.totalPages);
+  }
+
+  let rows: any[] = [];
+  if (Array.isArray(r.data)) rows = r.data as any[];
+  else if (data && typeof data === "object" && !Array.isArray(data)) {
+    const d = data as Record<string, unknown>;
+    for (const k of ["literatures", "items", "results", "docs", "list", "data"] as const) {
+      if (Array.isArray(d[k])) {
+        rows = d[k] as any[];
+        break;
+      }
+    }
+    if (rows.length === 0) {
+      const ak = Object.keys(d).find((key) => Array.isArray(d[key]));
+      if (ak) rows = d[ak] as any[];
+    }
+  }
+  if (rows.length === 0) {
+    const raw =
+      Array.isArray((r as any)?.literatures) ? (r as any).literatures
+      : Array.isArray((r as any)?.items) ? (r as any).items
+      : Array.isArray((r as any)?.results) ? (r as any).results
+      : Array.isArray((r as any)?.docs) ? (r as any).docs
+      : Array.isArray((r as any)?.list) ? (r as any).list
+      : Array.isArray((r as any)?.result) ? (r as any).result
+      : [];
+    rows = raw;
+    if (rows.length === 0) {
+      const key = Object.keys(r).find((k) => Array.isArray((r as any)[k]));
+      if (key) rows = (r as any)[key];
+    }
+  }
+
+  if (totalPages == null && total != null) {
+    totalPages = Math.max(1, Math.ceil(total / pageSize));
+  }
+
+  return { rows, total, totalPages };
+}
+
+/** Luôn trả đủ total + totalPages cho UI; không để sót trạng thái tab trước. */
+function resolveListPagination(params: {
+  extractedTotal: number | null;
+  extractedPages: number | null;
+  rowCount: number;
+  pageFromQuery: number;
+  pageSize: number;
+}): { total: number; totalPages: number } {
+  let total = params.extractedTotal;
+  let pages = params.extractedPages;
+  const { rowCount, pageFromQuery, pageSize } = params;
+
+  if (total != null && pages == null) {
+    pages = Math.max(1, Math.ceil(total / pageSize));
+  }
+  if (pages != null && total == null) {
+    total = (pageFromQuery - 1) * pageSize + rowCount;
+  }
+
+  if (total == null && pages == null) {
+    if (rowCount < pageSize) {
+      total = (pageFromQuery - 1) * pageSize + rowCount;
+      pages = Math.max(1, pageFromQuery);
+    } else {
+      total = (pageFromQuery - 1) * pageSize + rowCount;
+      pages = Math.max(pageFromQuery + 1, 2);
+    }
+  }
+
+  return {
+    total: Math.max(0, total ?? 0),
+    totalPages: Math.max(1, pages ?? 1),
+  };
+}
+
 function LiteraturesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,14 +189,13 @@ function LiteraturesPageContent() {
   const typeFromQuery = (searchParams.get("type") || "all") as "all" | "story" | "comic" | "song";
   const gradeFromQuery = searchParams.get("grade") || "all";
 
-  const [activeTab, setActiveTab] = useState<"all" | "story" | "comic" | "song">(typeFromQuery);
-  const [gradeFilter, setGradeFilter] = useState(gradeFromQuery);
   const [literatures, setLiteratures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [useClientPagination, setUseClientPagination] = useState(false);
+  const listFetchIdRef = useRef(0);
 
   const updateQuery = useCallback((updates: { page?: number; type?: string; grade?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -87,8 +206,10 @@ function LiteraturesPageContent() {
   }, [router, searchParams]);
 
   useEffect(() => {
+    if (useClientPagination) return;
+    const fetchId = ++listFetchIdRef.current;
+    let cancelled = false;
     const fetchLiteratures = async () => {
-      if (useClientPagination) return;
       try {
         setLoading(true);
         let response: any;
@@ -96,30 +217,20 @@ function LiteraturesPageContent() {
           response = await literatureService.getAllLiteratures({
             page: pageFromQuery,
             limit: PAGE_SIZE,
-            type: activeTab,
-            grade: gradeFilter,
+            type: typeFromQuery,
+            grade: gradeFromQuery,
           });
         } catch (e: any) {
           if (e?.response?.status === 400) {
             response = await literatureService.getAllLiteratures();
-            setUseClientPagination(true);
+            if (!cancelled && fetchId === listFetchIdRef.current) {
+              setUseClientPagination(true);
+            }
           } else throw e;
         }
-        const raw =
-          Array.isArray(response) ? response
-          : Array.isArray(response?.data) ? response.data
-          : Array.isArray(response?.literatures) ? response.literatures
-          : Array.isArray(response?.items) ? response.items
-          : Array.isArray((response as any)?.results) ? (response as any).results
-          : Array.isArray((response as any)?.docs) ? (response as any).docs
-          : Array.isArray((response as any)?.list) ? (response as any).list
-          : Array.isArray((response as any)?.result) ? (response as any).result
-          : (() => {
-              const o = response && typeof response === "object" ? response : {};
-              const key = Object.keys(o).find((k) => Array.isArray((o as any)[k]));
-              return key ? (o as any)[key] : [];
-            })();
-        const published = raw.filter((l: any) => l.isPublished !== false);
+        if (cancelled || fetchId !== listFetchIdRef.current) return;
+        const extracted = extractLiteraturesPayload(response, PAGE_SIZE);
+        const published = extracted.rows.filter((l: any) => l.isPublished !== false);
         const mappedData = published.map((l: any, idx: number) => {
           const theme = CARD_THEMES[idx % CARD_THEMES.length];
           const type = (l.type || "story").toLowerCase();
@@ -137,36 +248,38 @@ function LiteraturesPageContent() {
             theme,
           };
         });
+        if (cancelled || fetchId !== listFetchIdRef.current) return;
+        const { total: nextTotal, totalPages: nextPages } = resolveListPagination({
+          extractedTotal: extracted.total,
+          extractedPages: extracted.totalPages,
+          rowCount: mappedData.length,
+          pageFromQuery,
+          pageSize: PAGE_SIZE,
+        });
         setLiteratures(mappedData);
-        const totalCount = typeof response?.total === "number" ? response.total : response?.meta?.total;
-        const pages = typeof response?.totalPages === "number" ? response.totalPages : response?.meta?.totalPages;
-        if (totalCount != null) setTotal(totalCount);
-        if (pages != null) setTotalPages(pages);
-        if (totalCount == null && pages == null) {
-          setTotal(mappedData.length);
-          setTotalPages(Math.max(1, Math.ceil(mappedData.length / PAGE_SIZE)));
-        }
+        setTotal(nextTotal);
+        setTotalPages(nextPages);
       } catch (err) {
         console.error("Lỗi tải literatures:", err);
       } finally {
-        setLoading(false);
-        setHasLoadedOnce(true);
+        if (!cancelled && fetchId === listFetchIdRef.current) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       }
     };
-    fetchLiteratures();
-  }, [pageFromQuery, activeTab, gradeFilter, useClientPagination]);
-
-  useEffect(() => {
-    setActiveTab(typeFromQuery);
-    setGradeFilter(gradeFromQuery);
-  }, [typeFromQuery, gradeFromQuery]);
+    void fetchLiteratures();
+    return () => {
+      cancelled = true;
+    };
+  }, [pageFromQuery, typeFromQuery, gradeFromQuery, useClientPagination]);
 
   const filteredLiteratures = useClientPagination
     ? literatures.filter((literature) => {
-        if (activeTab === "comic" && literature.type !== "comic") return false;
-        if (activeTab === "song" && !literature.hasAudio && literature.type !== "song") return false;
-        if (activeTab === "story" && (literature.type !== "story" || literature.hasAudio)) return false;
-        if (gradeFilter !== "all" && literature.grade !== gradeFilter) return false;
+        if (typeFromQuery === "comic" && literature.type !== "comic") return false;
+        if (typeFromQuery === "song" && !literature.hasAudio && literature.type !== "song") return false;
+        if (typeFromQuery === "story" && (literature.type !== "story" || literature.hasAudio)) return false;
+        if (gradeFromQuery !== "all" && literature.grade !== gradeFromQuery) return false;
         return true;
       })
     : literatures;
@@ -296,7 +409,7 @@ function LiteraturesPageContent() {
                     Đang chọn
                   </div>
                   <div className="mt-1 text-base font-black text-slate-900">
-                    {TYPE_TABS.find((tab) => tab.key === activeTab)?.label}
+                    {TYPE_TABS.find((tab) => tab.key === typeFromQuery)?.label}
                   </div>
                 </div>
               </div>
@@ -332,7 +445,7 @@ function LiteraturesPageContent() {
                         key={tab.key}
                         onClick={() => updateQuery({ type: tab.key, page: 1 })}
                         className={`flex w-full items-center justify-between rounded-[1.2rem] px-4 py-3 text-left text-sm font-black transition ${
-                          activeTab === tab.key
+                          typeFromQuery === tab.key
                             ? "bg-[#7B6ED6] text-white shadow-[0_4px_0_rgba(91,80,176,0.18),0_10px_24px_rgba(123,110,214,0.18)]"
                             : "bg-slate-50 text-slate-700 hover:bg-slate-100"
                         }`}
@@ -354,7 +467,7 @@ function LiteraturesPageContent() {
                         key={grade.key}
                         onClick={() => updateQuery({ grade: grade.key, page: 1 })}
                         className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
-                          gradeFilter === grade.key
+                          gradeFromQuery === grade.key
                             ? "bg-[#F4F1FF] text-[#7B6ED6] ring-2 ring-[#D8D1F8]"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}

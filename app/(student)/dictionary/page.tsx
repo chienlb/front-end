@@ -32,7 +32,13 @@ interface Definition {
 
 interface DictionaryResult {
   word: string;
-  phonetic: string; // Phiên âm (IPA)
+  /** Phiên âm gần tiếng Việt (API: phoneticSpelling), ví dụ "hơ-lâu" */
+  phoneticSpelling?: string;
+  /** IPA Anh / Mỹ (API: dictionary.ipa.uk / .us) */
+  ipaUk?: string;
+  ipaUs?: string;
+  /** Dòng hiển thị dự phòng khi thiếu các trường trên */
+  phonetic: string;
   audio: string; // Link file âm thanh chuẩn
   definitions: Definition[];
 }
@@ -67,8 +73,15 @@ export default function DictionaryPage() {
       const pronunciation =
         payload?.data?.pronunciation || payload?.pronunciation || {};
       const ipa = dictionary?.ipa || {};
+      const ipaUk = typeof ipa?.uk === "string" ? ipa.uk.trim() : "";
+      const ipaUs = typeof ipa?.us === "string" ? ipa.us.trim() : "";
+      const phoneticSpellingRaw = dictionary?.phoneticSpelling;
+      const phoneticSpelling =
+        typeof phoneticSpellingRaw === "string"
+          ? phoneticSpellingRaw.trim()
+          : "";
       const phonetic =
-        dictionary?.phoneticSpelling || ipa?.uk || ipa?.us || `/${keyword}/`;
+        phoneticSpelling || ipaUk || ipaUs || `/${keyword.trim()}/`;
       const audioSrc = String(pronunciation?.audioUrl || "").trim();
 
       const senses = Array.isArray(dictionary?.senses) ? dictionary.senses : [];
@@ -94,6 +107,9 @@ export default function DictionaryPage() {
       setResult({
         word: String(dictionary?.word || keyword).toLowerCase(),
         phonetic,
+        phoneticSpelling: phoneticSpelling || undefined,
+        ipaUk: ipaUk || undefined,
+        ipaUs: ipaUs || undefined,
         audio: audioSrc,
         definitions,
       });
@@ -221,22 +237,68 @@ export default function DictionaryPage() {
                     <h2 className="text-5xl font-black text-slate-900 mb-3 capitalize tracking-tight">
                       {result.word}
                     </h2>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xl text-slate-500 font-mono bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
-                        {result.phonetic}
-                      </span>
-                      <button
-                        onClick={playMainAudio}
-                        className="group flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-full font-bold transition-all active:scale-95"
-                      >
-                        <Volume2
-                          size={20}
-                          className="group-hover:animate-pulse"
-                        />
-                        <span className="text-sm">Phát âm</span>
-                      </button>
-                      {/* Audio Tag ẩn để play file mp3 */}
-                      <audio ref={audioRef} src={result.audio} />
+                    <div className="flex flex-col gap-3">
+                      {result.phoneticSpelling && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                            Phiên âm
+                          </span>
+                          <span className="text-xl text-slate-600 font-medium bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                            {result.phoneticSpelling}
+                          </span>
+                        </div>
+                      )}
+                      {(result.ipaUk || result.ipaUs) && (
+                        <div className="flex flex-wrap items-start gap-3">
+                          <span className="text-xs font-bold uppercase tracking-wide text-slate-400 pt-1.5 shrink-0">
+                            IPA
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {result.ipaUk && (
+                              <span className="inline-flex items-baseline gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-base text-slate-800 shadow-sm">
+                                <span className="font-sans text-xs font-bold text-blue-600">
+                                  UK
+                                </span>
+                                {result.ipaUk}
+                              </span>
+                            )}
+                            {result.ipaUs && (
+                              <span className="inline-flex items-baseline gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-base text-slate-800 shadow-sm">
+                                <span className="font-sans text-xs font-bold text-emerald-600">
+                                  US
+                                </span>
+                                {result.ipaUs}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {!result.phoneticSpelling &&
+                        !result.ipaUk &&
+                        !result.ipaUs &&
+                        result.phonetic && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                              Phiên âm
+                            </span>
+                            <span className="text-xl text-slate-500 font-mono bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                              {result.phonetic}
+                            </span>
+                          </div>
+                        )}
+                      <div className="flex flex-wrap items-center gap-4">
+                        <button
+                          onClick={playMainAudio}
+                          className="group flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-full font-bold transition-all active:scale-95"
+                        >
+                          <Volume2
+                            size={20}
+                            className="group-hover:animate-pulse"
+                          />
+                          <span className="text-sm">Phát âm</span>
+                        </button>
+                        <audio ref={audioRef} src={result.audio} />
+                      </div>
                     </div>
                   </div>
                   {/* Decor Icon */}

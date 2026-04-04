@@ -15,6 +15,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { assignmentsService } from "@/services/assignments.service";
+import {
+  deadlineDisplayLabel,
+  isAssignmentOverdue,
+  isAssignmentSubmitLocked,
+  parseAssignmentDeadline,
+} from "@/utils/assignmentDeadline";
 import { type Assignment, type AssignmentSource } from "./data";
 
 export default function AssignmentsPage() {
@@ -79,6 +85,9 @@ export default function AssignmentsPage() {
       (Array.isArray(item?.attachments) && item.attachments[0]?.fileName) ||
       undefined;
 
+    const rawDeadline = item?.deadline ?? item?.dueDate;
+    const deadlineAt = parseAssignmentDeadline(rawDeadline);
+
     return {
       id: String(item?._id || item?.id || ""),
       title: item?.title || item?.name || "Bài tập chưa đặt tên",
@@ -88,9 +97,14 @@ export default function AssignmentsPage() {
         item?.classId?.name ||
         item?.classId?.title ||
         item?.lessonId?.title ||
-        "Không rõ nguồn",
+        item?.lessonId?.name ||
+        item?.className ||
+        item?.lessonTitle ||
+        (typeof item?.sourceName === "string" ? item.sourceName.trim() : "") ||
+        undefined,
       teacher: item?.teacherId?.fullName || item?.teacherName || undefined,
-      deadline: item?.deadline || item?.dueDate || "Chưa có hạn nộp",
+      deadline: deadlineDisplayLabel(rawDeadline, deadlineAt),
+      deadlineAt,
       status,
       score:
         typeof item?.score === "number"
@@ -234,6 +248,14 @@ export default function AssignmentsPage() {
   );
 
   const getStatusBadge = (item: Assignment) => {
+    const overdue = isAssignmentOverdue(item.deadlineAt ?? null, item.status);
+    if (overdue && (item.status === "PENDING" || item.status === "LATE")) {
+      return (
+        <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          <AlertCircle size={12} /> Hết hạn
+        </span>
+      );
+    }
     switch (item.status) {
       case "PENDING":
         return item.priority === "HIGH" ? (
@@ -421,7 +443,16 @@ export default function AssignmentsPage() {
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {lesson.items.map((item) => (
+                        {lesson.items.map((item) => {
+                          const submitLocked = isAssignmentSubmitLocked(
+                            item.deadlineAt ?? null,
+                            item.status,
+                          );
+                          const overdueUi = isAssignmentOverdue(
+                            item.deadlineAt ?? null,
+                            item.status,
+                          );
+                          return (
                           <div
                             key={item.id}
                             className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition group flex flex-col h-full"
@@ -447,12 +478,14 @@ export default function AssignmentsPage() {
                                 {item.title}
                               </Link>
 
-                              <p className="text-xs text-slate-400 font-medium mb-3 line-clamp-1">
-                                Từ:{" "}
-                                <span className="text-slate-600">
-                                  {item.sourceName}
-                                </span>
-                              </p>
+                              {item.sourceName ? (
+                                <p className="text-xs text-slate-400 font-medium mb-3 line-clamp-1">
+                                  Từ:{" "}
+                                  <span className="text-slate-600">
+                                    {item.sourceName}
+                                  </span>
+                                </p>
+                              ) : null}
 
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 {item.teacher && (
@@ -468,37 +501,59 @@ export default function AssignmentsPage() {
                             </div>
 
                             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                              <div className="text-xs">
+                              <div className="text-xs min-w-0 pr-2">
                                 <p className="text-slate-400 font-bold">
                                   Hạn nộp
                                 </p>
-                                <p
-                                  className={`font-bold ${
-                                    item.status === "LATE"
-                                      ? "text-red-600"
-                                      : "text-slate-700"
-                                  }`}
-                                >
-                                  {item.deadline}
-                                </p>
+                                {overdueUi ? (
+                                  <>
+                                    <p className="font-black text-red-600">
+                                      Hết hạn
+                                    </p>
+                                    {item.deadlineAt != null && (
+                                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                        Đã qua: {item.deadline}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p
+                                    className={`font-bold ${
+                                      item.status === "LATE"
+                                        ? "text-red-600"
+                                        : "text-slate-700"
+                                    }`}
+                                  >
+                                    {item.deadline}
+                                  </p>
+                                )}
                               </div>
 
                               {item.status === "PENDING" ||
                               item.status === "LATE" ? (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                   <Link
                                     href={`/assignments/${item.id}`}
                                     className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition"
                                   >
                                     Xem nội dung
                                   </Link>
-                                  <Link
-                                    href={`/assignments/${item.id}/submit`}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
-                                  >
-                                    Nộp file{" "}
-                                    <ArrowUpRight size={14} />
-                                  </Link>
+                                  {submitLocked ? (
+                                    <span
+                                      className="bg-slate-200 text-slate-500 px-4 py-2 rounded-xl text-xs font-bold cursor-not-allowed flex items-center gap-1"
+                                      title="Đã quá hạn nộp bài"
+                                    >
+                                      Hết hạn nộp
+                                    </span>
+                                  ) : (
+                                    <Link
+                                      href={`/assignments/${item.id}/submit`}
+                                      className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center gap-1"
+                                    >
+                                      Nộp file{" "}
+                                      <ArrowUpRight size={14} />
+                                    </Link>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-3">
@@ -520,7 +575,8 @@ export default function AssignmentsPage() {
                               )}
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
