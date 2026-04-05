@@ -14,7 +14,6 @@ import {
   Medal,
   Zap,
   Lock,
-  Gift,
   ArrowRight,
   BarChart3,
   Clock,
@@ -171,7 +170,7 @@ export default function StudentCompetitionsPage() {
 
 
   const goToPlay = (compId: string) => {
-    router.push(`/competitions/${compId}/play`);
+    router.push(`/competitions/${compId}/register`);
   };
 
   const goToLeaderboard = (compId: string) => {
@@ -303,10 +302,7 @@ export default function StudentCompetitionsPage() {
                     backgroundPosition: 'center'
                   }}
                 >
-                  <div className="flex justify-between items-start">
-                    <span className="bg-black/20 backdrop-blur-md text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-white/10">
-                      {comp.type === "QUIZ" ? "🧩 Quiz" : "🎙️ Speaking"}
-                    </span>
+                  <div className="flex justify-end items-start">
                     {comp.status === "HAPPENING" && (
                       <span className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse flex items-center gap-1.5 shadow-sm">
                         <span className="w-2 h-2 bg-white rounded-full block animate-ping" />{" "}
@@ -333,21 +329,6 @@ export default function StudentCompetitionsPage() {
                         </p>
                         <p className="text-sm font-bold text-slate-700">
                           {formatDateTime(comp.startTime)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Reward */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                        <Gift size={20} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                          Phần thưởng
-                        </p>
-                        <p className="text-sm font-bold text-orange-600">
-                          {comp.reward}
                         </p>
                       </div>
                     </div>

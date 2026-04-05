@@ -7,7 +7,39 @@ import {
   ChevronLeft, Share2, MapPin, CheckCircle2, Gift, Zap, HelpCircle
 } from "lucide-react";
 import { competitionService } from "@/services/competition.service";
+import { ranksService } from "@/services/ranks.service";
+import { userService } from "@/services/user.service";
 import { showAlert } from "@/utils/dialog";
+
+const pickUserId = (source: any): string | null => {
+  const candidates = [
+    source?._id,
+    source?.id,
+    source?.userId,
+    source?.data?._id,
+    source?.data?.id,
+    source?.data?.userId,
+    source?.data?.user?._id,
+    source?.data?.user?.id,
+    source?.user?._id,
+    source?.user?.id,
+  ];
+
+  const found = candidates.find((v) => typeof v === "string" && v.trim());
+  return typeof found === "string" ? found : null;
+};
+
+const getCachedUserId = (): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("currentUser");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return pickUserId(parsed);
+  } catch {
+    return null;
+  }
+};
 
 export default function CompetitionRegisterPage({
   params,
@@ -53,6 +85,29 @@ export default function CompetitionRegisterPage({
     setRegistering(true);
     try {
       await competitionService.joinCompetition(competitionId);
+
+      // Create rank record when joining. Ignore duplicate/conflict responses.
+      try {
+        const profileRes: any = await userService.getProfile().catch(() => null);
+        const userId: string | null = pickUserId(profileRes) ?? getCachedUserId();
+
+        if (userId) {
+          await ranksService.createRank({
+            idCompetition: competitionId,
+            userId,
+            score: 0,
+            submittedAt: new Date().toISOString(),
+          });
+        } else {
+          console.warn("Không tìm thấy userId để tạo rank sau khi tham gia cuộc thi.");
+        }
+      } catch (rankErr: any) {
+        const status = rankErr?.response?.status ?? rankErr?.status;
+        if (status !== 400 && status !== 409) {
+          console.error("Lỗi tạo rank khi tham gia:", rankErr);
+        }
+      }
+
       setIsRegistered(true);
       // Tự động chuyển sang phòng thi sau 1.5s
       setTimeout(() => {
